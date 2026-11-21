@@ -2,6 +2,7 @@
 
 ## 0.4.0-dev · 2026-11-21
 
+- Änderungsvorschau für Gerätename, Sendeintervall und Sendeleistung mit strengem Wertevergleich und Bezug auf den aktuellen Originalbeleg. Erhält ungespeicherte Eingaben bei neuer Auslesung; veraltete Entwürfe und unbekannte Funk-Gegenwerte blockiert. Keine Gerätebefehle, keine Schreibfreigabe; Warnung vor möglichem Historienverlust und notwendige Vollauslesung/Bestätigung/Rücklesen sichtbar. 88 Python-Tests bestanden.
 - Fortschritt, Tastensignal und Fehler eines Einstellungs-Leseauftrags direkt bei den Geräteeinstellungen angezeigt. Fehlgeschlagene Aufträge ausdrücklich ohne neuen Stand; bisherige Werte bleiben sichtbar. Installierter Leseweg mit acht erfolgreichen Geräteabfragen und neuem dauerhaftem Stand geprüft.
 - Erste lesende Geräteeinstellungsansicht: belegte Name-/Zeit-/Status-/Aufzeichnungs-/Funk-/Alarmabfragen, neue Anzeige, verifizierter CSV-Rohbeleg und JSON-Zusammenfassung. Kein Setter, Speichern am Logger, Start/Stop oder Uhränderung.
 - Neue Abfragen am realen BT06 erfolgreich; unbekannter Funkmoduscode wird ausdrücklich nicht als Long-Range-Zustand interpretiert. Weitere SDK-Parameter bleiben unbekannt statt auf Standardwerte gesetzt.

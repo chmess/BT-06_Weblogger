@@ -184,6 +184,30 @@ class ApiTests(unittest.TestCase):
                 self.assertEqual(start.call_args.args[0], {'mode': 'settings'})
         self.assertEqual(self.request('/klima/api/device-settings/write', {}, self.auth())[0], 404)
 
+    def test_settings_preview_requires_current_selected_capture_and_never_starts_bluetooth(self):
+        from settings_fixture import observation
+        from test_history_jobs import config
+        saved = self.app.device_settings.save('56789012', observation())
+        selected = config(); selected['device']['id'] = '56789012'
+        value = {'base_capture': saved['capture'], 'changes': {'broadcast_interval_seconds': 1}}
+        self.assertEqual(self.request('/klima/api/device-settings/preview', value)[0], 403)
+        with patch.object(self.app.receiver, 'status', return_value={'config': selected}), patch.object(self.app.sync, 'start') as start, patch.object(self.app.receiver, 'stop') as stop:
+            status, _, body = self.request('/klima/api/device-settings/preview', value, self.auth())
+            self.assertEqual(status, 200, body)
+            result = json.loads(body)
+            self.assertFalse(result['write_available'])
+            self.assertEqual(result['changes'][0]['after'], 1)
+            start.assert_not_called(); stop.assert_not_called()
+            self.assertEqual(self.app.device_settings.latest('56789012'), saved)
+            with patch.object(self.app.sync, 'busy', return_value=True):
+                self.assertEqual(self.request('/klima/api/device-settings/preview', value, self.auth())[0], 409)
+            self.app.device_settings.save('56789012', observation())
+            self.assertEqual(self.request('/klima/api/device-settings/preview', value, self.auth())[0], 400)
+            selected['device']['id'] = '87654321'
+            self.assertEqual(self.request('/klima/api/device-settings/preview', value, self.auth())[0], 400)
+        for route in ('write', 'apply', 'save'):
+            self.assertEqual(self.request('/klima/api/device-settings/' + route, value, self.auth())[0], 404)
+
     def test_device_history_chart_export_and_snapshot_access(self):
         from backend.common.history_capture import decode_capture
         from history_fixture import capture

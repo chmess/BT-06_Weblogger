@@ -28,7 +28,7 @@ Echte Daten: `/api/history?source=live&logger=bt06-<id>&start=...&end=...`, Expo
 
 Empfangsstart: `{ "device": "<aus letzter Suche>", "adapter": "hci0", "save_interval_seconds": 60 }`. Der Server übernimmt Identität/Firmware aus seinem eigenen verifizierten Suchergebnis, nicht aus vom Browser gelieferten Identitätsfeldern. Leeres `{}` setzt ein bereits bewusst gewähltes Gerät fort. Stop benötigt `{}`. Die Entscheidung wird lokal gespeichert und nach Neustart wieder aufgenommen. Alle POST-Regeln einschließlich CSRF gelten unverändert. Liveempfang und Diagnose teilen eine exklusive Adaptersperre; Konflikte ergeben 409.
 
-Noch nicht implementiert: automatische/inkrementelle Historiensynchronisation und bestätigte UTC-Zuordnung, Geräteeinstellungen, Messstellenhistorie, Klimaberechnungen, Risikostatistik und dauerhafte Ereignisse. Entsprechende API-Routen werden erst mit verifizierter Funktion eingeführt.
+Noch nicht implementiert: bestätigte tatsächliche UTC-Zuordnung, Geräteschreibablauf, Messstellenhistorie, Klimaberechnungen, Risikostatistik und dauerhafte Ereignisse. Historie/Nachladen, opt-in Automatik und lesende Geräteeinstellungen sind unten beschrieben; unbeaufsichtigter Gerätezugriff ist noch nicht erfolgreich geprüft.
 
 
 ## Manuelle Historie · V0.3.0-dev
@@ -65,6 +65,14 @@ Automatische Aufträge nutzen `mode=incremental` und `trigger=automatic`. Ohne g
 ## V0.4: ausschließlich lesende Geräteeinstellungen
 
 `GET /api/device-settings` liefert `read_only=true`, ob ein Gerät gewählt ist, und den letzten geprüften Einstellungsbeleg oder `settings=null`. GET löst keine Verbindung aus. `POST /api/device-settings/read` mit `{}` startet bewusst die feste Lesesequenz für das eingerichtete Gerät. Fortschritt bleibt unter `/api/sync` (`mode=settings`); Ergebnis ist mit `kind=device-settings` von Messwertimporten getrennt. Abfragekonflikte liefern 409, keine automatischen parallelen BLE-Zugriffe. Keine Schreibroute für Geräteeinstellungen vorhanden.
+
+### Änderungsvorschau ohne Gerätezugriff
+
+`POST /api/device-settings/preview` benötigt `{"base_capture":"<capture aus GET /api/device-settings>","changes":{"broadcast_interval_seconds":1}}`. Kein Client-Gerät/Adapter oder Bytekommando: Auswahl kommt serverseitig aus der Empfangskonfiguration. Nur Firmware 2.05; Originalbeleg wird vor Vergleich wie beim GET anhand CSV und Prüfsumme geprüft. Ersetzter oder zum gewählten Logger unpassender Stand ergibt 400, laufender Leseauftrag 409. CSRF/Origin-Regeln gelten auch für die Vorschau.
+
+Erlaubte Felder: `name` (1–15 UTF-8-Bytes, keine Steuerzeichen oder äußeren Leerzeichen, keine Kürzung), `broadcast_interval_seconds` (0,5–30 s, exakte 0,1-s-Schritte), `transmit_power_dbm` (Ganzzahl aus -20/-16/-12/-8/-4/0/4/6/8). Keine Typumwandlung, Rundung oder unbekannten Zusatzfelder. Ein unverändertes Feld erscheint nicht in `changes`; für den gemeinsamen Funkparameterblock müssen beide bisherigen Werte bekannt und plausibel sein. Der nicht bearbeitete Gegenwert wird erhalten.
+
+Antwort `kind=device-settings-preview`: aktuelle Basis und Beobachtungszeit, `changes` mit `field/label/before/after/unit`, optional `broadcast_after`, Hinweise und erforderliche Schutzschritte. **`write_available=false` immer**; eine Vorschau ist weder Bestätigung noch aktuelle Vollständigkeitsprüfung. Sie startet kein BLE, pausiert keinen Empfang, speichert keine Einstellungen und führt keinen Setter/Save aus. Es gibt weiterhin keine Write-/Apply-/Save-Route. Neu ausgelesene Stände machen einen alten Entwurf ungültig, auch bei identischen Einstellungswerten.
 
 Die Zusammenfassung zeigt nur belegte Felder. Abgewiesene Antworten stehen in `read_errors`, unbekannte Formate in `decode_errors`. `unverified` kennzeichnet noch nicht belegte Parameter. `transmit_rate_code` ist ein Rohcode, `long_range=null`; keine geratene Bool-Zuordnung. Gerätezeitfelder sind ungeprüft, keine automatische Jahres-/UTC-Korrektur. Name, Intervalle und Hardware-Alarme sind keine Programmeinstellungen oder Software-Klimagrenzen.
 

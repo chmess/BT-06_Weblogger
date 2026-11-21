@@ -221,7 +221,8 @@ async function refreshSync() {
   if(previous==='running'&&!busy){await refreshLive();await refreshSnapshots();await refreshBluetooth();await refreshAutoSync();await refreshDeviceSettings();await renderCards();}
 }
 async function refreshDeviceSettings() {
-  const target=$('#device-settings-values');target.replaceChildren();let result;try{result=await api('device-settings');}catch(error){$('#device-settings-status').textContent=error.message;return;}const data=result.settings;
+  const target=$('#device-settings-values');target.replaceChildren();let result;try{result=await api('device-settings');}catch(error){updateDeviceDraft(null);$('#device-settings-status').textContent=error.message;return;}const data=result.settings;
+  updateDeviceDraft(data);
   if(!data){$('#device-settings-status').textContent=result.selected?'Für dieses Gerät noch keine gespeicherte Einstellungsabfrage.':'Zuerst einen verifizierten BT06 auswählen.';return;}
   const v=data.values;
   $('#device-settings-status').textContent=`Nur gelesen · Stand ${date(data.observed_at)} · Firmware ${data.firmware} · Gerätezeit ungeprüft`;
@@ -232,6 +233,56 @@ async function refreshDeviceSettings() {
   for(const [label,value] of pairs)if(value!=null)target.append(element('dt',label),element('dd',String(value)));
   const errors=Object.keys({...data.read_errors,...data.decode_errors});
   if(errors.length){const labels={device_info:'Gerätename',device_clock:'Gerätezeit',log_status:'Aufzeichnungsstatus',log_settings:'Aufzeichnungsparameter',broadcast_settings:'Funkparameter',transmit_rate:'Funkmodus',temperature_alarm:'Temperaturalarm',humidity_alarm:'Feuchtealarm'};target.append(element('dt','Nicht verfügbar'),element('dd',errors.map(key=>labels[key]||key).join(', ')));}
+}
+const deviceDraftFields={name:'#device-draft-name',broadcast_interval_seconds:'#device-draft-interval',transmit_power_dbm:'#device-draft-power'};
+let deviceDraftBase=null,deviceDraftLatest=null,deviceDraftPending=false,deviceDraftRevision=0;
+function deviceDraftValues() {
+  const values={};
+  for(const [key,selector] of Object.entries(deviceDraftFields))if(deviceDraftBase&&key in deviceDraftBase.values)values[key]=key==='name'?$(selector).value:Number($(selector).value);
+  return values;
+}
+function deviceDraftDirty() {
+  return deviceDraftBase&&Object.entries(deviceDraftValues()).some(([key,value])=>value!==deviceDraftBase.values[key]);
+}
+function deviceDraftControls() {
+  const current=deviceDraftBase&&deviceDraftLatest?.capture===deviceDraftBase.capture;
+  for(const [key,selector] of Object.entries(deviceDraftFields))$(selector).disabled=!deviceDraftLatest||!deviceDraftBase||!(key in deviceDraftBase.values);
+  $('#device-draft-preview').disabled=deviceDraftPending||!current||!Object.keys(deviceDraftValues()).length;
+  $('#device-draft-reset').disabled=deviceDraftPending||!deviceDraftLatest;
+}
+function updateDeviceDraft(data,force=false) {
+  deviceDraftLatest=data;
+  if(!data){deviceDraftRevision++;$('#device-draft-result').replaceChildren();$('#device-draft-status').textContent='Zuerst für den ausgewählten Logger Geräteeinstellungen auslesen.';deviceDraftControls();return;}
+  if(force||!deviceDraftBase||data.capture!==deviceDraftBase.capture){
+    deviceDraftRevision++;$('#device-draft-result').replaceChildren();
+    if(!force&&deviceDraftDirty()){
+      $('#device-draft-status').textContent='Ein anderer Einstellungsstand liegt vor. Entwurf bleibt sichtbar; vor einer neuen Prüfung „Aktuellen Stand übernehmen“ wählen.';
+    }else{
+      deviceDraftBase=data;
+      for(const [key,selector] of Object.entries(deviceDraftFields))$(selector).value=data.values[key]??'';
+      $('#device-draft-status').textContent=`Entwurf zum Stand ${date(data.observed_at)}. Noch keine Änderungen geprüft oder am Gerät gespeichert.`;
+    }
+  }
+  deviceDraftControls();
+}
+async function previewDeviceDraft(event) {
+  event.preventDefault();
+  if(!deviceDraftBase||deviceDraftBase.capture!==deviceDraftLatest?.capture)throw new Error('Aktuellen Einstellungsstand zuerst übernehmen.');
+  const revision=++deviceDraftRevision;
+  deviceDraftPending=true;deviceDraftControls();$('#device-draft-result').replaceChildren();
+  $('#device-draft-status').textContent='Änderungen werden lokal geprüft …';
+  try{
+    const result=await post('device-settings/preview',{base_capture:deviceDraftBase.capture,changes:deviceDraftValues()});
+    if(revision!==deviceDraftRevision)return;
+    $('#device-draft-status').textContent=result.notice;
+    const target=$('#device-draft-result'),values=element('dl');
+    for(const item of result.changes)values.append(element('dt',item.label),element('dd',`${item.before} → ${item.after}${item.unit?' '+item.unit:''}`));
+    target.append(values);
+    if(result.broadcast_after)target.append(element('p',`Funkparameter danach: ${number(result.broadcast_after.broadcast_interval_seconds,1)} s · ${result.broadcast_after.transmit_power_dbm} dBm. Nicht bearbeitete Funkwerte bleiben erhalten.`,'hint'));
+    if(result.required_steps.length){target.append(element('p','Vor einem späteren Schreiben erforderlich:'));const steps=element('ol');for(const text of result.required_steps)steps.append(element('li',text));target.append(steps);}
+    target.append(element('p',result.write_block_reason,'hint'));
+  }catch(error){if(revision===deviceDraftRevision)$('#device-draft-status').textContent=`Vorschau fehlgeschlagen: ${error.message}`;}
+  finally{deviceDraftPending=false;deviceDraftControls();}
 }
 async function refreshAutoSync(fill=false) {
   const data=await api('autosync');state.autoSync=data;
@@ -319,6 +370,9 @@ async function main() {
   $('#timezone-form').addEventListener('submit',guard(async event=>{event.preventDefault();if(state.source!=='device'||!state.snapshot)throw new Error('Zuerst einen Historienstand auswählen.');await post('time-assignment',{logger:state.logger,snapshot:state.snapshot.id,timezone:$('#history-timezone').value,timezone_confirmed:$('#timezone-confirmed').checked});$('#timezone-confirmed').checked=false;await loadHistory(true);notice('Zeitzone für diesen Historienstand bestätigt. Datum bleibt ungeprüft; Originaldateien erhalten.');}));
   $('#autosync-form').addEventListener('submit',guard(async event=>{event.preventDefault();await post('autosync',{enabled:$('#autosync-enabled').checked,interval_minutes:Number($('#autosync-interval').value)});await refreshAutoSync(true);notice(state.autoSync.config.enabled?'Automatische Nachladeversuche gespeichert. Erster Versuch nach Ablauf des Intervalls.':'Automatische Nachladeversuche ausgeschaltet.');}));
   $('#device-settings-read').addEventListener('click',guard(async()=>{await post('device-settings/read',{});await refreshSync();await refreshLive();await refreshBluetooth();}));
+  $('#device-settings-draft').addEventListener('submit',guard(previewDeviceDraft));
+  $('#device-settings-draft').addEventListener('input',()=>{deviceDraftRevision++;$('#device-draft-result').replaceChildren();$('#device-draft-status').textContent=deviceDraftBase?.capture===deviceDraftLatest?.capture?'Entwurf geändert. Erneut prüfen; noch nichts am Gerät gespeichert.':'Einstellungsstand ersetzt. Zuerst aktuellen Stand übernehmen.';});
+  $('#device-draft-reset').addEventListener('click',()=>updateDeviceDraft(deviceDraftLatest,true));
   $('#sync-incremental').addEventListener('click',guard(async()=>{await post('sync',{mode:'incremental'});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#sync-start').addEventListener('click',guard(async()=>{await post('sync',{});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#ble-scan').addEventListener('click',guard(()=>startBluetooth('scan')));

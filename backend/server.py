@@ -25,6 +25,7 @@ from backend.linux.history_jobs import HistoryJobs
 from backend.linux.auto_sync import AutoSync
 from backend.common.history_timezones import HistoryTimezones, ASSIGNED_FIELDS
 from backend.common.device_settings import DeviceSettingsStore
+from backend.common.settings_preview import settings_preview
 
 
 class Application:
@@ -255,7 +256,7 @@ def handler_for(app):
                     self.send(413, {"error": "JSON muss zwischen 1 und 16.384 Bytes groß sein."})
                     return
                 value = json.loads(self.rfile.read(length))
-                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync", "/api/device-settings/read"}
+                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync", "/api/device-settings/read", "/api/device-settings/preview"}
                 with app.control_lock if controlled else nullcontext():
                     if controlled and path != "/api/autosync" and app.sync.busy():
                         raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
@@ -265,6 +266,11 @@ def handler_for(app):
                         self.send(200, app.auto_sync.configure(value))
                     elif path == "/api/time-assignment":
                         self.send(200, app.timezones.assign(value))
+                    elif path == "/api/device-settings/preview":
+                        config = app.receiver.status()['config']
+                        device = config['device']
+                        saved = app.device_settings.latest(device['id']) if device else None
+                        self.send(200, settings_preview(config, saved, value))
                     elif path == "/api/device-settings/read":
                         if value != {}:
                             raise ValueError("Geräteeinstellungen lesen benötigt ein leeres JSON-Objekt.")

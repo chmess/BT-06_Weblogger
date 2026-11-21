@@ -173,10 +173,14 @@ from pathlib import Path
 sys.path.insert(0,str(Path.cwd()/'tests'))
 from settings_fixture import observation
 from backend.common.device_settings import DeviceSettingsStore
-print(json.dumps(DeviceSettingsStore(Path(sys.argv[1])/'data/device-settings').save('12345678',observation())))
+from backend.common.settings_preview import settings_preview
+from test_history_jobs import config
+saved=DeviceSettingsStore(Path(sys.argv[1])/'data/device-settings').save('12345678',observation())
+preview=settings_preview(config(),saved,{'base_capture':saved['capture'],'changes':{'broadcast_interval_seconds':1}})
+print(json.dumps({'settings':saved,'preview':preview}))
 `,join(scratch,'data')],{cwd:project,encoding:'utf8'});
   assert.equal(settingsFixture.status,0,settingsFixture.stderr);
-  const observed=JSON.parse(settingsFixture.stdout);
+  const settingsFixtureData=JSON.parse(settingsFixture.stdout),observed=settingsFixtureData.settings;
   await evaluate(`(async()=>{const originalApi=api;try{api=async(path,...args)=>path==='device-settings'?{settings:${JSON.stringify(observed)},selected:true,read_only:true}:originalApi(path,...args);await refreshDeviceSettings();}finally{api=originalApi;}})()`);
   await click('[data-page="logger"]');
   const settingsText=await evaluate(`document.querySelector('#device-settings-values').textContent`);
@@ -191,10 +195,44 @@ print(json.dumps(DeviceSettingsStore(Path(sys.argv[1])/'data/device-settings').s
   assert.ok(settingsJobs[1].text.includes('Bluetooth-Zeitlimit'));
   assert.ok(settingsJobs.every(job=>job.stand.includes('Stand')));
   assert.ok(settingsJobs[2].text.includes('Geräteeinstellungen gelesen'));
+  const draftFlow=await evaluate(`(async()=>{const originalApi=api;try{
+    const saved=${JSON.stringify(observed)};updateDeviceDraft(saved,true);
+    document.querySelector('#device-settings-draft').closest('details').open=true;
+    const input=document.querySelector('#device-draft-interval');input.value='1';input.dispatchEvent(new Event('input',{bubbles:true}));
+    let request;
+    api=async(path,options)=>{if(path!=='device-settings/preview')throw new Error('Unexpected draft request '+path);request=JSON.parse(options.body);return ${JSON.stringify(settingsFixtureData.preview)};};
+    await previewDeviceDraft(new Event('submit'));
+    const text=document.querySelector('#device-draft-result').textContent,status=document.querySelector('#device-draft-status').textContent;
+    input.value='2';input.dispatchEvent(new Event('input',{bubbles:true}));
+    const invalidated=document.querySelector('#device-draft-result').textContent==='';
+    updateDeviceDraft({...saved,capture:'f'.repeat(32)+'.csv'});
+    const stale={value:input.value,blocked:document.querySelector('#device-draft-preview').disabled,status:document.querySelector('#device-draft-status').textContent};
+    document.querySelector('#device-draft-reset').click();
+    const reset={value:input.value,blocked:document.querySelector('#device-draft-preview').disabled};
+    let release;api=()=>new Promise(resolve=>{release=resolve;});
+    const inFlight=previewDeviceDraft(new Event('submit'));
+    input.value='3';input.dispatchEvent(new Event('input',{bubbles:true}));
+    release(${JSON.stringify(settingsFixtureData.preview)});await inFlight;
+    const lateResponseIgnored=document.querySelector('#device-draft-result').textContent==='';
+    updateDeviceDraft(null);const noDeviceBlocked=document.querySelector('#device-draft-preview').disabled;
+    updateDeviceDraft(saved,true);
+    return {request,text,status,invalidated,stale,reset,lateResponseIgnored,noDeviceBlocked};
+  }finally{api=originalApi;}})()`);
+  assert.equal(draftFlow.request.base_capture,observed.capture);
+  assert.equal(draftFlow.request.changes.broadcast_interval_seconds,1);
+  assert.equal(draftFlow.request.changes.transmit_power_dbm,0);
+  assert.ok(draftFlow.text.includes('12.5 → 1 s')&&draftFlow.text.includes('0 dBm'));
+  assert.ok(draftFlow.status.includes('Gerätehistorie löschen'));
+  assert.equal(draftFlow.invalidated,true);
+  assert.equal(draftFlow.stale.value,'2');assert.equal(draftFlow.stale.blocked,true);
+  assert.ok(draftFlow.stale.status.includes('Entwurf bleibt sichtbar'));
+  assert.equal(draftFlow.reset.value,'12.5');assert.equal(draftFlow.reset.blocked,false);
+  assert.equal(draftFlow.lateResponseIgnored,true);
+  assert.equal(draftFlow.noDeviceBlocked,true);
   await screenshot('device-settings-mobile.png');
   assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
   assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(external.length,0,JSON.stringify(external));
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','no JS exceptions','no external requests'],screenshots:8};
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','no JS exceptions','no external requests'],screenshots:8};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}
