@@ -34,10 +34,12 @@ async def known_device(config):
         bus.disconnect()
 
 
-async def retrieve(config, progress, base=None):
+async def retrieve(config, progress, base=None, automatic=False):
+    if automatic and base is None:
+        raise ProtocolError('Automatisches Nachladen benötigt eine eindeutige geprüfte Basis. Zuerst vollständig lesen.')
     from bleak import BleakClient
     target = await known_device(config)
-    client = BleakClient(target, pair=False, timeout=45)
+    client = BleakClient(target, pair=False, timeout=8 if automatic else 45)
     queue = asyncio.Queue(maxsize=1024)
     capture = []
     received_bytes = 0
@@ -70,7 +72,7 @@ async def retrieve(config, progress, base=None):
 
     try:
         progress('connecting')
-        await asyncio.wait_for(client.connect(), 50)
+        await asyncio.wait_for(client.connect(), 9 if automatic else 50)
         service = client.services.get_service(SERVICE_UUID)
         tx = service.get_characteristic(TX_UUID) if service else None
         rx = service.get_characteristic(RX_UUID) if service else None
@@ -103,6 +105,8 @@ async def retrieve(config, progress, base=None):
                 metadata = selected
                 count = int.from_bytes(metadata[:2], 'little')
             else:
+                if automatic:
+                    raise ProtocolError('Gesamtbestand oder Einstellungen geändert. Manuell vollständig lesen.')
                 progress('full_fallback')
         decoder = HistoryDecoder(count, unit='F' if settings[6] else 'C')
         progress('receiving', expected=count, received=0)

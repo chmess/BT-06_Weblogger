@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.3.1-dev
+# BLE-Protokollstand · V0.3.2-dev
 
 ## Belege
 
@@ -76,3 +76,10 @@ Die unabhängig aus der Herstellerreferenz abgeleitete Bereichsauswahl wurde am 
 Der neue Treiber liest vor einer Bereichsauswahl die Gesamtmetadaten und Einstellungen. Eine geeignete eindeutige Basis benötigt mindestens 16 streng zeitlich aufsteigende Werte. Gesamter Anfang, Endgrenze, Anzahl, Einheit und Intervall müssen passen. Der Bereich beginnt eine Sekunde vor dem ersten der letzten 16 Basiswerte und endet eine Sekunde nach der aktuellen Endgrenze. Anzahl entspricht neuen Werten plus 16; Endemarkierung und vollständiger Vergleich der Überlappung sind Pflicht. Widersprüche blockieren die Übernahme. Keine pauschale Freigabe für andere Firmware oder Speicherumlauf.
 
 Anschließend wurde der neue Nachladepfad selbst am Gerät geprüft: ausgewählter kleiner Bereich vollständig übertragen, Vergleichswerte unverändert, neue Messungen ergänzt, ursprünglicher Bestand unverändert und zu einer Reihe zugeordnet. Der Hostempfang wurde wieder gestartet. Die neue UI/API ist erst nach Dienstneustart aktiv; automatische Synchronisation, bestätigte UTC-Zuordnung und Zusammenführung verschobener Reihen sind weiter offen.
+
+
+## V0.3.2: Zugriff ohne Tastendruck noch nicht erfolgreich
+
+Der neue automatische Verbindungsablauf wurde einmal am ausgewählten BT06 ohne Tastenaktion geprüft. Er endete im kurzen Verbindungszeitlimit, es kam kein erfolgreicher Transfer zustande. Historien wurden nicht verändert; der aktivierte Advertising-Empfang wurde wieder gestartet. Dieser Versuch belegt keinen zuverlässig unbeaufsichtigten GATT-Zugriff im aktuellen Gerätemodus. Die neue Automatik ist daher standardmäßig ausgeschaltet und verändert weder Long Range noch andere Loggerparameter. Der Verbindungsmodus muss bei der späteren kontrollierten Konfiguration geprüft werden.
+
+Die Nutzerbestätigung von Europe/Berlin betrifft die bisherige historische Aufzeichnung. Sie bestätigt weder die aktuelle Geräteuhr noch das Datum neuer Messungen. Eine separate, begrenzte Zeitzonenzuordnung erlaubt einen transparent gekennzeichneten Zusatzexport, keine automatische Uhrkorrektur oder Freigabe destruktiver Aktionen.

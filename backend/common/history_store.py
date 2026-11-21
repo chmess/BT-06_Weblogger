@@ -64,12 +64,17 @@ class HistoryStore:
             value = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
         except FileNotFoundError:
             raise ValueError('Historienstand nicht gefunden.') from None
-        if (value.get('schema_version') != 1 or value.get('id') != snapshot or value.get('logger') != logger
+        if (value.get('schema_version') not in (1, 2) or value.get('id') != snapshot or value.get('logger') != logger
                 or value.get('transport_complete') is not True or value.get('clock_verified') is not False):
             raise ValueError('Beschädigte Historienmetadaten; Originale erhalten.')
         files = value.get('files')
         if not isinstance(files, dict) or not files or any(not re.fullmatch(r'(?:[0-9]{4}/[0-9]{4}-[0-9]{2}|capture)\.csv', name) for name in files):
             raise ValueError('Ungültige Historien-Dateiliste.')
+        if value['schema_version'] == 2:
+            if value.get('storage') not in ('full', 'delta') or type(value.get('delta_depth')) is not int or not 0 <= value['delta_depth'] < 32:
+                raise ValueError('Ungültige Historien-Ablagebeschreibung.')
+            if value['storage'] == 'delta' and (not isinstance(value.get('base_snapshot'), str) or not SNAPSHOT_ID.fullmatch(value['base_snapshot']) or value['base_snapshot'] == snapshot):
+                raise ValueError('Ungültige Historienbasis.')
         return value
 
     def _verify(self, logger, snapshot):
@@ -119,12 +124,19 @@ class HistoryStore:
         for record in records:
             digest.update(record.device_seconds.to_bytes(4, 'little') + bytes.fromhex(record.raw_values_hex))
         snapshot = digest.hexdigest()
+        depth = (self.metadata(logger, base_snapshot).get('delta_depth', 0) + 1) if scope == 'range' else 0
+        storage = 'delta' if scope == 'range' and depth < 32 else 'full'
+        if storage == 'full':
+            depth = 0
+        stored_records = records[-new_count:] if storage == 'delta' and new_count else records
+        old_ids = ({int(row['Sequenz']): row['DatensatzID'] for row in self.rows(logger, base_snapshot)}
+                   if scope == 'range' and storage == 'full' else {})
         grouped = {}
-        for record in records:
+        for record in stored_records:
             stamp = calendar(record.device_seconds)
             key = stamp[:4] + '/' + stamp[:7] + '.csv'
             grouped.setdefault(key, []).append({
-                'Schema': '3', 'DatensatzID': f'{snapshot}-{record.ordinal}', 'Zeitstempel': '',
+                'Schema': '3', 'DatensatzID': old_ids.get(record.ordinal, f'{snapshot}-{record.ordinal}'), 'Zeitstempel': '',
                 'Temperatur': decimal(record.temperature_c) if record.temperature_c is not None else '',
                 'Feuchte': decimal(record.humidity_pct) if record.humidity_pct is not None else '',
                 'Batterie': '', 'RSSI': '', 'Quelle': 'BT06-Historie', 'Messstelle': logger,
@@ -136,7 +148,7 @@ class HistoryStore:
         files = {name: csv_text(rows, HISTORY_FIELDS).encode('utf-8') for name, rows in grouped.items()}
         files['capture.csv'] = capture_bytes
         monotonic = all(b.device_seconds >= a.device_seconds for a, b in zip(records, records[1:]))
-        manifest = {'schema_version': 1, 'id': snapshot, 'logger': logger, 'firmware': '2.05',
+        manifest = {'schema_version': 2, 'storage': storage, 'delta_depth': depth, 'id': snapshot, 'logger': logger, 'firmware': '2.05',
                     'count': count, 'frame_count': decoder.frame_count, 'unit': unit,
                     'interval_seconds': int.from_bytes(settings[:2], 'little'),
                     'first_device_calendar': calendar(first), 'last_device_calendar': calendar(last),
@@ -153,6 +165,7 @@ class HistoryStore:
                 destination = self._folder(logger, snapshot)
                 if destination.exists():
                     existing = self._verify(logger, snapshot)
+                    self.rows(logger, snapshot)
                     for folder in (parent, self.root, self.root.parent):
                         sync_directory(folder)
                     return {**existing, 'duplicate': True, 'last_transfer_scope': scope,
@@ -212,21 +225,29 @@ class HistoryStore:
                     signature.append((meta['logger'], meta['id'], name, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size))
             if self._series_cache and self._series_cache[0] == signature:
                 return deepcopy(self._series_cache[1])
-            ancestors = {}
+            # Longest heads first: each exact ancestor is covered while hashing
+            # its head once, instead of re-reading the entire history per archive.
+            candidates = {}
             for meta in snapshots:
-                candidates = {item['id'] for item in snapshots if item['logger'] == meta['logger'] and item['unit'] == meta['unit']
-                              and item['count'] < meta['count']}
-                sizes = {item['count'] for item in snapshots if item['id'] in candidates}
+                candidates.setdefault((meta['logger'], meta['unit'], meta['count']), set()).add(meta['id'])
+            ancestors = {}
+            covered = set()
+            for meta in sorted(snapshots, key=lambda item: item['count'], reverse=True):
+                key = (meta['logger'], meta['id'])
+                if key in covered:
+                    continue
                 digest = content_hash(meta['unit'])
                 prefixes = []
                 for index, row in enumerate(self.rows(meta['logger'], meta['id']), 1):
                     digest.update(int(row['GeraeteSekunden']).to_bytes(4, 'little') + bytes.fromhex(row['RohwerteHex']))
-                    if index in sizes and digest.hexdigest() in candidates:
-                        prefixes.append(digest.hexdigest())
+                    matching = candidates.get((meta['logger'], meta['unit'], index), set())
+                    candidate = digest.hexdigest() if matching else None
+                    if candidate in matching and candidate != meta['id']:
+                        prefixes.append(candidate)
+                        covered.add((meta['logger'], candidate))
                 if digest.hexdigest() != meta['id']:
                     raise ValueError('Historieninhalt widerspricht seiner Inhaltskennung.')
-                ancestors[(meta['logger'], meta['id'])] = prefixes
-            covered = {(logger, item) for (logger, _), items in ancestors.items() for item in items}
+                ancestors[key] = prefixes
             heads = [{**meta, 'member_ids': ancestors[(meta['logger'], meta['id'])] + [meta['id']],
                       'member_count': len(ancestors[(meta['logger'], meta['id'])]) + 1}
                      for meta in snapshots if (meta['logger'], meta['id']) not in covered]
@@ -251,22 +272,48 @@ class HistoryStore:
 
     def rows(self, logger, snapshot):
         with self.lock:
-            meta = self._verify(logger, snapshot)
-            folder = self._folder(logger, snapshot)
+            chain, seen = [], set()
+            current = snapshot
+            while True:
+                if current in seen:
+                    raise ValueError('Zyklus in der Historienbasis.')
+                seen.add(current)
+                meta = self._verify(logger, current)
+                chain.append(meta)
+                if meta.get('storage', 'full') != 'delta':
+                    break
+                current = meta['base_snapshot']
+                if len(chain) > 32:
+                    raise ValueError('Historienkette überschreitet die Prüfgrenze.')
             result = []
-            for name in sorted(meta['files']):
-                if name == 'capture.csv':
-                    continue
-                with (folder / name).open(encoding='utf-8', newline='') as stream:
-                    reader = csv.DictReader(stream, delimiter=';')
-                    if reader.fieldnames != HISTORY_FIELDS:
-                        raise ValueError('Historien-CSV-Schemafehler.')
-                    result.extend(reader)
-            if len(result) != meta['count'] or any(None in row or any(v is None for v in row.values()) for row in result):
-                raise ValueError('Unvollständige Historien-CSV.')
-            result.sort(key=lambda row: int(row['Sequenz']))
-            if [int(row['Sequenz']) for row in result] != list(range(1, meta['count'] + 1)):
-                raise ValueError('Historiensequenz beschädigt.')
+            for meta in reversed(chain):
+                folder = self._folder(logger, meta['id'])
+                incoming = []
+                for name in sorted(meta['files']):
+                    if name == 'capture.csv':
+                        continue
+                    with (folder / name).open(encoding='utf-8', newline='') as stream:
+                        reader = csv.DictReader(stream, delimiter=';')
+                        if reader.fieldnames != HISTORY_FIELDS:
+                            raise ValueError('Historien-CSV-Schemafehler.')
+                        incoming.extend(reader)
+                if any(None in row or any(v is None for v in row.values()) for row in incoming):
+                    raise ValueError('Unvollständige Historien-CSV.')
+                incoming.sort(key=lambda row: int(row['Sequenz']))
+                if meta.get('storage', 'full') == 'delta':
+                    if len(incoming) != meta['new_count'] or not result:
+                        raise ValueError('Unvollständiger Historien-Nachladebestand.')
+                    result.extend(incoming)
+                else:
+                    result = incoming
+                if len(result) != meta['count'] or [int(row['Sequenz']) for row in result] != list(range(1, meta['count'] + 1)):
+                    raise ValueError('Historiensequenz beschädigt.')
+                # Verify every link's content identity, not only CSV byte checksums.
+                digest = content_hash(meta['unit'])
+                for row in result:
+                    digest.update(int(row['GeraeteSekunden']).to_bytes(4, 'little') + bytes.fromhex(row['RohwerteHex']))
+                if digest.hexdigest() != meta['id']:
+                    raise ValueError('Historieninhalt widerspricht seiner Inhaltskennung.')
             return result
 
     def filtered_rows(self, logger, snapshot, start=None, end=None):

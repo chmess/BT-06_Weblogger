@@ -1,4 +1,4 @@
-# HTTP-API · V0.3.1-dev
+# HTTP-API · V0.3.2-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB. Fehler: `{ "error": "..." }`.
 
@@ -49,3 +49,14 @@ Optionale `start/end` verwenden bei `source=device` dieselben Kalenderkoordinate
 `POST /api/sync` mit `{"mode":"incremental"}` fordert Nachladen an. `{}` oder `{"mode":"full"}` liest weiter vollständig. Nur der bewusst ausgewählte Live-Logger wird verwendet. Existiert genau eine geeignete Reihe mit mindestens 16 Werten und streng aufsteigender Gerätezeit, werden zuerst aktuelle Gesamtmetadaten gelesen und auf kompatible Grenzen, Zähler, Einheit und Intervall geprüft. Bei einer vorab ungeeigneten/veränderten Basis wird vollständig gelesen. Bei einem Widerspruch nach Bereichsübertragung wird abgebrochen und eine Vollauslesung verlangt, nicht still gemischt.
 
 Ergebniszusätze: `last_transfer_scope` (`full/range`) beschreibt den aktuellen Auftrag; `received_count` die tatsächlich übertragenen Messungen einschließlich Vergleichswerten, `new_count` die ergänzten Werte. `count` ist weiterhin die Gesamtzahl im resultierenden Stand. `transfer_scope`, `base_snapshot` und `full_read_verified` dokumentieren die ursprüngliche Herkunft des gespeicherten Standes; sie sind kein Nachweis eines frischen Vollabrufs bei späteren Wiederholungen. Ein Bereichstransfer darf keine destruktive Geräteänderung freigeben. Nachladen ist manuell, kein automatischer Zeitplan.
+
+
+## V0.3.2: optionale Automatik und historische Zeitzone
+
+`GET /api/autosync` liefert gespeicherte Aktivierung, gebundenes Ziel, Intervall, letzten Versuch/Erfolg, Wartezeit, Fehler und Pausengrund. `POST /api/autosync` mit `{"enabled":false,"interval_minutes":30}` speichert diese Auswahl. Nur 15–1440 ganze Minuten erlaubt; das Ziel stammt ausschließlich aus dem eingerichteten Liveempfang. Aktivierung benötigt einen gewählten Logger und gespeicherten Empfangswunsch. Eine Änderung der Geräteauswahl verhindert Versuche bis zur erneuten bewussten Aktivierung. Ausschalten bleibt während eines Auftrags möglich; der laufende Auftrag endet geordnet. Alle bisherigen Origin-/Host-/CSRF-Regeln gelten.
+
+Automatische Aufträge nutzen `mode=incremental` und `trigger=automatic`. Ohne geeignete Basis oder nach widersprüchlichen Gesamtmetadaten wird nicht automatisch vollständig gelesen. Verbindungsaufbau ist auf ungefähr neun Sekunden begrenzt, gesamte Lesesequenz auf 70 Sekunden zuzüglich begrenzter Trennung. Manuelle Aufträge behalten ihre bisherigen Zeitlimits. Bereits belegtes Bluetooth, pausierter/unfrischer Empfang oder geändertes Ziel verhindern den Start. Fehler verdoppeln die Wartezeit bis sechs Stunden, mindestens jedoch bis zum gewählten Grundintervall. Persistenzfehler pausieren weitere automatische Versuche.
+
+`GET /api/time-assignment?logger=...&snapshot=...` liefert bestätigte Zeitzone, Anzahl zugeordneter/unbestätigter Werte und ausdrücklich `clock_verified=false`, `date_verified=false`. `POST /api/time-assignment` benötigt `logger`, `snapshot`, `timezone` und exakt `timezone_confirmed:true`. Die Bestätigung gilt für den gewählten Stand und exakt passende frühere Präfixe, nicht ungefragt für spätere Messungen oder abweichende Reihen.
+
+`GET /api/export?source=device&logger=...&snapshot=...&time_basis=assigned` ergänzt `ZugeordneteZeit`, `BestaetigteZeitzone`, `Zeitzuordnung`. Originalfelder bleiben erhalten, `Zeitstempel` bleibt leer. Datum ist nicht bestätigt; zugeordnete Kalenderzeiten sind kein Beweis für tatsächliche Messzeitpunkte. Ohne passende Bestätigung wird abgewiesen. Nicht bestätigte spätere Zeilen erhalten leere Zusatzzeit und `BEREICH_NICHT_BESTAETIGT`. Der normale Export bleibt unverändert; Kalenderdiagramme verwenden weiter die ausdrücklich gekennzeichnete Gerätezeitachse.

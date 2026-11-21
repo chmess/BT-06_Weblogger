@@ -45,6 +45,44 @@ class ApiTests(unittest.TestCase):
     def auth(self):
         return {"Origin": self.origin, "X-CSRF-Token": self.app.csrf}
 
+    def test_auto_sync_settings_are_opt_in_and_protected(self):
+        auto = json.loads(self.request('/klima/api/autosync')[2])
+        self.assertFalse(auto['config']['enabled'])
+        value = {'enabled': False, 'interval_minutes': 30}
+        self.assertEqual(self.request('/klima/api/autosync', value)[0], 403)
+        self.assertEqual(self.request('/klima/api/autosync', value, self.auth())[0], 200)
+        self.assertEqual(self.request('/klima/api/autosync', {'enabled': True, 'interval_minutes': 30}, self.auth())[0], 400)
+        self.assertFalse(json.loads(self.request('/klima/api/autosync')[2])['config']['enabled'])
+        from test_history_jobs import config
+        with patch.object(self.app.receiver, 'status', return_value={'config': config()}):
+            enabled = {'enabled': True, 'interval_minutes': 30}
+            status, _, body = self.request('/klima/api/autosync', enabled, self.auth())
+            self.assertEqual(status, 200, body)
+            self.assertEqual(json.loads(body)['config']['target']['id'], '12345678')
+            with patch.object(self.app.sync, 'busy', return_value=True):
+                self.assertEqual(self.request('/klima/api/autosync', value, self.auth())[0], 200)
+        self.assertFalse(json.loads(self.request('/klima/api/autosync')[2])['config']['enabled'])
+
+    def test_time_assignment_export_is_explicit_and_preserves_originals(self):
+        from backend.common.history_capture import decode_capture
+        from history_fixture import capture
+        snapshot = self.app.history_store.publish('34567890', **decode_capture(capture()))
+        query = f"source=device&logger={snapshot['logger']}&snapshot={snapshot['id']}"
+        original = self.request('/klima/api/export?' + query)[2]
+        self.assertEqual(self.request('/klima/api/export?' + query + '&time_basis=assigned')[0], 400)
+        options = {'logger': snapshot['logger'], 'snapshot': snapshot['id'], 'timezone': 'Europe/Berlin', 'timezone_confirmed': True}
+        self.assertEqual(self.request('/klima/api/time-assignment', options)[0], 403)
+        status, _, payload = self.request('/klima/api/time-assignment', options, self.auth())
+        self.assertEqual(status, 200, payload)
+        self.assertFalse(json.loads(payload)['date_verified'])
+        status, _, mapped = self.request('/klima/api/export?' + query + '&time_basis=assigned')
+        self.assertEqual(status, 200, mapped)
+        self.assertIn(b'ZugeordneteZeit', mapped)
+        self.assertIn(b'+01:00', mapped)
+        self.assertIn(b'ZEITZONE_BESTAETIGT_DATUM_UNGEPRUEFT', mapped)
+        self.assertEqual(self.request('/klima/api/export?' + query)[2], original)
+        self.assertEqual(self.request('/klima/api/history?' + query + '&time_basis=assigned')[0], 400)
+
     def test_paths_assets_and_mime_types(self):
         for path, mime in (("/klima/", "text/html"), ("/klima/assets/favicon.svg", "image/svg+xml"),
                            ("/klima/favicon.ico", "image/x-icon"), ("/klima/js/app.js", "text/javascript"),

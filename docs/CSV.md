@@ -1,4 +1,4 @@
-# CSV-Vertrag · V0.3.1-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
+# CSV-Vertrag · V0.3.2-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
 
 Originalformat: UTF-8, Semikolon, Dezimalkomma, LF, Header. Browserexport zusätzlich mit UTF-8-BOM für Excel. Zeitstempel in V0.1 explizit UTC (`+00:00`); Anzeige in konfigurierter Zeitzone. Monatsdateien folgen UTC, daher stabile Dateigrenzen auch bei Sommerzeitwechsel. Leere Batterie/RSSI-Felder bedeuten unbekannt.
 
@@ -49,3 +49,12 @@ Schema 3 der Messwerte bleibt unverändert. Die längste exakt passende Folge en
 Beim Nachladen enthält `capture.csv` den aktuellen Metadaten-/Bereichstransfer. Die früheren Originalmessungen stammen aus `base_snapshot`; die CSV des resultierenden Standes enthält weiterhin den gesamten unveränderten Bestand plus neue Messungen. Das Manifest ergänzt `transfer_scope=range`, `base_snapshot`, `received_count`, `new_count` und `full_read_verified=false`. Der gesamte aktuell vorhandene Gerätespeicher wurde bei dieser Übertragung **nicht** erneut gelesen. Die Metadaten und 16 Vergleichswerte reduzieren Verwechslungsrisiken, beweisen jedoch keine Unverändertheit aller nicht übertragenen Gerätebereiche.
 
 Auch ein Bereich wird vollständig über Endemarkierung und Anzahl geprüft, bevor er veröffentlicht wird. Die 16 Vergleichswerte müssen bytegenau stimmen und werden nicht doppelt eingefügt. Wiederholte Zeitstempel, Rücksprünge oder uneindeutige Basis verhindern diesen Nachladepfad. Originaldateien werden nicht gelöscht. Aktuell werden vollständige resultierende Monats-CSV-Stände gespeichert; Nachladen spart Funkübertragung, ist noch keine Optimierung des Archivspeicherverbrauchs. Kein automatischer Sync in dieser Entwicklungsfassung.
+
+
+## V0.3.2: zusätzliche Zeilen und Manifestversion 2
+
+Messwert-CSV bleibt Schema 3. Bei einer Fortsetzung enthalten neue Monatsdateien nur zusätzliche Messungen, nicht erneut die Vergleichswerte oder den ganzen Basisbestand. Sequenznummern setzen die Basis fort, bestehende Datensatz-IDs bleiben beim Rekonstruieren erhalten. Manifestversion 2 beschreibt `storage=delta`, `base_snapshot`, `delta_depth`, Gesamtanzahl und neue Anzahl. Vorhandene Manifestversion 1 wird weiterhin als vollständiger Stand gelesen.
+
+Die Rekonstruktion prüft CSV-Prüfsummen, Sequenzen und Inhaltskennungen jedes benötigten Glieds. Fehlende/beschädigte Basis blockiert Lesen und Bestätigung eines Wiederimports. Spätestens nach 32 Fortsetzungen wird ein vollständiger Zwischenstand geschrieben (`storage=full`, Tiefe 0). Dies begrenzt die Lesekette, bestätigt jedoch keinen neuen vollständigen Geräteabruf. Alte Stände werden nicht gelöscht. Dateiveröffentlichung bleibt atomar mit fsync. Ältere Programmversionen können Manifestversion 2 nicht lesen.
+
+Bestätigte historische Zeitzonen liegen als reine Zuordnung unter `config/history-timezones.json`. Ein optionaler abgeleiteter Export ergänzt drei Spalten: `ZugeordneteZeit` als ISO-8601 mit Offset, `BestaetigteZeitzone`, `Zeitzuordnung=ZEITZONE_BESTAETIGT_DATUM_UNGEPRUEFT`. Original-CSV und Originalfelder werden nicht ersetzt. Eine bestätigte Zeitzone macht ein falsches Gerätedatum nicht richtig. Ungeprüfte spätere Teile bleiben ohne Zusatzzeit; unklare oder fehlende Zeitumstellungsstunden werden nicht geraten.

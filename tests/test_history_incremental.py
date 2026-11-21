@@ -121,7 +121,7 @@ class IncrementalReaderTests(unittest.TestCase):
         seconds=[1700000000+i*600 for i in range(22)]
         base={'snapshot':'a'*64,'count':20,'first':seconds[0],'last':seconds[19],
               'begin':seconds[4]-1,'overlap':16,'unit':'C','interval_seconds':600}
-        for use_range in (True,False):
+        for use_range,automatic in ((True,False),(False,False),(True,True),(False,True)):
             selected_base=dict(base)
             if not use_range:selected_base['first']-=600
             rows=range_capture(seconds,base['begin'],seconds[-1]+1) if use_range else capture(seconds)
@@ -129,8 +129,11 @@ class IncrementalReaderTests(unittest.TestCase):
             stream_start=next(i for i,r in enumerate(rows) if r['Richtung']=='TX' and bytes.fromhex(r['DatenHex'])==read_request(ReadCommand.RECEIVE_HISTORY))+2
             chunks=[bytes.fromhex(r['DatenHex']) for r in rows[stream_start:]]
             sent=[]
+            test_case=self
             class Client:
                 def __init__(self,*args,**options):
+                    test_case.assertEqual(options['timeout'],8 if automatic else 45)
+                    test_case.assertFalse(options['pair'])
                     tx=SimpleNamespace(properties=['write']);rx=SimpleNamespace(properties=['notify'])
                     service=SimpleNamespace(get_characteristic=lambda uuid:tx if uuid==TX_UUID else rx if uuid==RX_UUID else None)
                     self.services=SimpleNamespace(get_service=lambda uuid:service if uuid==SERVICE_UUID else None)
@@ -148,7 +151,11 @@ class IncrementalReaderTests(unittest.TestCase):
                     if raw==read_request(ReadCommand.RECEIVE_HISTORY):
                         for chunk in chunks:self.notify(None,chunk)
             with patch('backend.linux.history_reader.known_device',AsyncMock(return_value=object())), patch.dict('sys.modules',{'bleak':SimpleNamespace(BleakClient=Client)}):
-                transfer=asyncio.run(retrieve(config(),lambda *args,**kwargs:None,base=selected_base))
+                if automatic and not use_range:
+                    with self.assertRaises(ValueError):asyncio.run(retrieve(config(),lambda *args,**kwargs:None,base=selected_base,automatic=True))
+                    self.assertNotIn(read_request(ReadCommand.RECEIVE_HISTORY),sent)
+                    continue
+                transfer=asyncio.run(retrieve(config(),lambda *args,**kwargs:None,base=selected_base,automatic=automatic))
             self.assertEqual('selection' in transfer,use_range)
             self.assertEqual(int.from_bytes(transfer['metadata'][:2],'little'),18 if use_range else 22)
             self.assertEqual(sum(raw[:4]==bytes.fromhex('2a0e6c00') for raw in sent),2 if use_range else 1)

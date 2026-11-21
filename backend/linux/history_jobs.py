@@ -1,4 +1,4 @@
-"""Manual serialized history sync, with host-receiver restoration on every exit."""
+"""Serialized manual and opt-in automatic sync; restore host reception on every exit."""
 import asyncio
 import threading
 from copy import deepcopy
@@ -25,21 +25,24 @@ class HistoryJobs:
     def busy(self):
         return self.status()['state'] == 'running'
 
-    def start(self, options):
+    def start(self, options, *, automatic=False, on_complete=None):
         if not isinstance(options, dict) or set(options) - {'mode'} or options.get('mode', 'full') not in ('full', 'incremental'):
             raise ValueError('Historienlesen erwartet mode=full oder incremental; Standard ist vollständig.')
         config = self.receiver.status()['config']
         self.receiver.validate(config)
         if config['device'] is None:
             raise ValueError('Zuerst einen verifizierten BT06 für den Liveempfang auswählen.')
+        if automatic and options.get('mode') != 'incremental':
+            raise ValueError('Automatische Aufträge dürfen nur neue Werte nachladen.')
         with self.lock:
             if self.closing or self.busy():
                 raise BusyError('Historienauftrag läuft bereits oder Anwendung wird beendet.')
             self.value = {'state': 'running', 'phase': 'pausing_host', 'received': 0, 'expected': None,
                           'result': None, 'error': None, 'resume_error': None,
                           'mode': options.get('mode', 'full'),
+                          'trigger': 'automatic' if automatic else 'manual',
                           'started_at': datetime.now(timezone.utc).isoformat()}
-            self.worker = threading.Thread(target=self._run, args=(deepcopy(config), options.get('mode', 'full')), name='bt06-history')
+            self.worker = threading.Thread(target=self._run, args=(deepcopy(config), options.get('mode', 'full'), automatic, on_complete), name='bt06-history')
             try:
                 self.worker.start()
             except BaseException:
@@ -51,25 +54,27 @@ class HistoryJobs:
         with self.lock:
             self.value.update(phase=phase, **values)
 
-    async def _read(self, config, base):
+    async def _read(self, config, base, automatic):
         with self.lock:
             self.loop = asyncio.get_running_loop()
             self.task = asyncio.current_task()
             if self.closing:
                 raise asyncio.CancelledError()
-        return await asyncio.wait_for(retrieve(config, self._progress, base=base), 180)
+        return await asyncio.wait_for(retrieve(config, self._progress, base=base, automatic=automatic), 70 if automatic else 180)
 
-    def _run(self, config, mode):
+    def _run(self, config, mode, automatic, on_complete):
         acquired = False
         paused = False
         try:
             base = self.store.incremental_base('bt06-' + config['device']['id']) if mode == 'incremental' else None
+            if automatic and base is None:
+                raise ProtocolError('Keine eindeutige geprüfte Nachladebasis. Manuell vollständig lesen.')
             self.receiver.stop(persist=False)
             paused = True
             acquired = self.receiver.radio_lock.acquire(blocking=False)
             if not acquired:
                 raise BusyError('Bluetooth ist noch belegt. Historienlesen später erneut starten.')
-            transfer = asyncio.run(self._read(config, base))
+            transfer = asyncio.run(self._read(config, base, automatic))
             self._progress('saving')
             result = self.store.publish(config['device']['id'], **transfer)
             with self.lock:
@@ -78,7 +83,8 @@ class HistoryJobs:
             if isinstance(exc, ProtocolError):
                 message = str(exc)
             elif isinstance(exc, TimeoutError):
-                message = 'Bluetooth-Zeitlimit erreicht. Verbindungsfenster per kurzem START/STOP prüfen und erneut lesen. Kein vollständiger Import bestätigt.'
+                message = ('Automatischer Verbindungsversuch ohne Tastendruck hat das Zeitlimit erreicht. Manuellen Verbindungsmodus prüfen.' if automatic
+                           else 'Bluetooth-Zeitlimit erreicht. Verbindungsfenster per kurzem START/STOP prüfen und erneut lesen. Kein vollständiger Import bestätigt.')
             elif isinstance(exc, (ValueError, BusyError, RuntimeError)):
                 message = str(exc) if isinstance(exc, BusyError) else 'Historienlesen fehlgeschlagen. Geräteauswahl, Verbindung und Format prüfen; bisherige Daten erhalten.'
             elif isinstance(exc, OSError):
@@ -103,6 +109,14 @@ class HistoryJobs:
                         self.value['resume_error'] = 'Liveempfang konnte nicht wieder starten. Unter Logger / Bluetooth erneut aktivieren.'
             with self.lock:
                 self.value.update(state='error' if self.value['error'] else 'done', phase='finished')
+                completion = deepcopy(self.value)
+            if on_complete:
+                # Scheduler persistence failures must not corrupt the finished
+                # transfer or prevent receiver recovery.
+                try:
+                    on_complete(completion)
+                except Exception:
+                    pass
 
     def close(self):
         with self.lock:

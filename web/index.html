@@ -20,7 +20,7 @@
     <button data-page="settings">Einstellungen</button>
     <button data-page="diagnostics">Diagnose</button>
   </nav>
-  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.3.1-dev</span><br>Deine Daten bleiben hier.</p></div>
+  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.3.2-dev</span><br>Deine Daten bleiben hier.</p></div>
 </aside>
 <main>
   <header><div><p class="eyebrow">BT-06 WEBLOGGER</p><h1 id="page-title">Übersicht</h1></div><span class="tag warning">Entwicklung · Testbetrieb</span></header>
@@ -39,10 +39,17 @@
     <article class="panel">
       <div class="toolbar"><label id="run-label"><span id="run-title">Testlauf</span><select id="run-select"></select></label><label>Messstelle<select id="logger-select"></select></label><label>Zeitraum<select id="period"><option value="24">24 Stunden</option><option value="168">7 Tage</option><option value="720">30 Tage</option><option value="0">Alles</option><option value="custom">Frei wählen</option></select></label></div>
       <div class="toolbar" id="custom-period" hidden><label>Von<input id="range-start" type="datetime-local"></label><label>Bis<input id="range-end" type="datetime-local"></label><button id="apply-range">Zeitraum laden</button></div>
-      <div class="section-heading"><p class="muted" id="chart-caption">Keine Daten ausgewählt.</p><div class="button-row"><button class="secondary" id="chart-reset">Zoom zurücksetzen</button><button class="secondary" id="chart-fullscreen">Vollbild</button><button id="chart-export" disabled>CSV exportieren</button></div></div>
+      <div class="section-heading"><p class="muted" id="chart-caption">Keine Daten ausgewählt.</p><div class="button-row"><button class="secondary" id="chart-reset">Zoom zurücksetzen</button><button class="secondary" id="chart-fullscreen">Vollbild</button><button id="chart-export-assigned" class="secondary" disabled hidden>CSV mit Zeitzuordnung</button><button id="chart-export" disabled>Original-CSV</button></div></div>
       <div id="chart" aria-label="Interaktiver Temperatur- und Feuchteverlauf"></div>
       <label class="inline-check" id="live-follow-label" hidden><input id="live-follow" type="checkbox" checked> Live aktualisieren · manueller Zoom pausiert die Aktualisierung</label>
       <p id="chart-time-note" class="hint">Temperatur in °C · relative Luftfeuchte in % · Lücken bleiben sichtbar. CSV enthält die Originalauflösung des gewählten Zeitraums, unabhängig vom Grafikzoom.</p>
+      <details id="timezone-panel" hidden><summary>Historische Zeitzone zuordnen</summary>
+        <p id="timezone-status" class="hint">Zeitzone noch nicht bestätigt.</p>
+        <form id="timezone-form"><div class="toolbar"><label>Zeitzone dieses Historienstands<input id="history-timezone" value="Europe/Berlin" required></label><button type="submit">Zeitzone zuordnen</button></div>
+          <label class="inline-check"><input id="timezone-confirmed" type="checkbox" required> Ich bestätige die Zeitzone der dargestellten Aufzeichnung.</label>
+          <p class="hint">Die Bestätigung betrifft nur die Zeitzone dieses Datenstands. Datum und Geräteuhr werden nicht als korrekt bestätigt. Originaldateien bleiben erhalten; spätere Messungen werden nicht automatisch mit bestätigt.</p>
+        </form>
+      </details>
     </article>
   </section>
 
@@ -84,7 +91,15 @@
       <div class="button-row"><button id="sync-incremental" disabled>Neue Werte nachladen</button><button id="sync-start" class="secondary" disabled>Alles vollständig lesen</button></div>
       <p id="sync-status" class="hint" role="status" aria-live="polite">Historienstatus wird geladen …</p>
       <p id="sync-button-signal" class="simulation-notice" hidden><strong>Jetzt kurz START, danach kurz STOP antippen.</strong> Nicht halten. Das öffnet das kurze Verbindungsfenster. Handy-App vorher trennen.</p>
-      <p class="hint">Die Gerätezeit wird unverändert übernommen und als ungeprüft gekennzeichnet. Nachladen prüft die letzten 16 gespeicherten Werte erneut und ergänzt nur passende neue Messungen. Ohne geeignete Basis wird vollständig gelesen. Übereinstimmende Fortsetzungen erscheinen als ein Verlauf, frühere Einzelstände bleiben erreichbar. Noch kein automatischer Sync.</p>
+      <p class="hint">Die Gerätezeit wird unverändert übernommen und als ungeprüft gekennzeichnet. Nachladen prüft die letzten 16 gespeicherten Werte erneut und ergänzt nur passende neue Messungen. Ohne geeignete Basis wird vollständig gelesen. Übereinstimmende Fortsetzungen erscheinen als ein Verlauf, frühere Einzelstände bleiben erreichbar. Automatische Versuche sind separat einschaltbar.</p>
+      <details><summary>Automatische Synchronisation</summary>
+        <form id="autosync-form">
+          <label class="inline-check"><input id="autosync-enabled" type="checkbox"> Automatische Nachladeversuche für den ausgewählten Logger aktivieren</label>
+          <div class="toolbar"><label>Intervall in Minuten<input id="autosync-interval" type="number" value="30" min="15" max="1440" required></label><button type="submit">Automatik speichern</button></div>
+        </form>
+        <p id="autosync-status" class="hint" role="status">Automatik wird geprüft …</p>
+        <p class="hint">Standardmäßig aus. Während eines Versuchs pausiert der Hostempfang kurz. Fehlversuche verlängern die Wartezeit. Ein geänderter Logger, pausierter Liveempfang oder fehlende aktuelle Pakete verhindern neue Versuche. Die Automatik ändert keinen Long-Range-Modus und drückt keine Gerätetasten. Ausschalten verhindert weitere Versuche; ein laufender Auftrag endet geordnet.</p>
+      </details>
       <div id="snapshot-list" class="run-list"></div>
     </article>
     <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. „Verbinden &amp; prüfen“ liest nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>
@@ -96,7 +111,7 @@
 
   <section id="page-diagnostics" class="page" hidden>
     <article class="panel"><h2>Programmstatus</h2><dl id="diagnostics"></dl></article>
-    <article class="panel"><h2>BLE-Diagnose</h2><p>Suche und Verbindungsprüfung sind auf der Loggerseite verfügbar. Alternativ lokal:</p><pre>./tools/ble-diagnose.sh scan --seconds 10</pre><p class="hint">Benötigt die optionale Bleak-Umgebung und Zugriff auf BlueZ. Keine Konfigurations- oder Speicherbefehle. BT06-Advertising-Format 2.05 ist dokumentiert; GATT und vollständiger Historientransfer sind am realen BT06 geprüft; automatische Synchronisation und Zeitzuordnung bleiben offen.</p></article>
+    <article class="panel"><h2>BLE-Diagnose</h2><p>Suche und Verbindungsprüfung sind auf der Loggerseite verfügbar. Alternativ lokal:</p><pre>./tools/ble-diagnose.sh scan --seconds 10</pre><p class="hint">Benötigt die optionale Bleak-Umgebung und Zugriff auf BlueZ. Keine Konfigurations- oder Speicherbefehle. BT06-Advertising-Format 2.05 ist dokumentiert; GATT und vollständiger Historientransfer sind am realen BT06 geprüft; Automatik und Zeitzuordnung zeigen ihren jeweiligen Prüfstand auf der Logger- und Verlaufseite.</p></article>
   </section>
   <footer>BT-06_Weblogger · vollständig lokal · CSV als Datenformat</footer>
 </main>

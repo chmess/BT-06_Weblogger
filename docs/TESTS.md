@@ -1,4 +1,4 @@
-# Prüfung · V0.3.1-dev · 21.11.2026
+# Prüfung · V0.3.2-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -87,3 +87,16 @@ Damit ist die integrierte manuelle BLE-/API-/CSV-Strecke auf dem realen BT06 gep
 Chromium: exakt fortgesetzte synthetische Stände erscheinen als ein Verlauf mit korrekter Rohanzahl; frühere Einzelstände bleiben auswählbar. Nachlade-Button ohne Gerät gesperrt. Bestehende Quellen-, Kalender-, Export-, Zoom- und Mobilprüfungen weiterhin erfolgreich; keine JS-Fehler oder externen Requests.
 
 Hardware getrennt geprüft: kleine Bereichsabfrage gegen bekannte Originalwerte; danach neuer Treiber mit Basis und 16 Vergleichswerten. Bereichsanzahl, Endemarkierung und Rohwertüberlappung stimmen; neue Messungen wurden ergänzt und vorherige Daten erhalten. Fortgesetzter Originalverlauf anschließend nur lesend in der Browser-Vorschau geprüft. Private Berichte unter `private/gatt-range-verification.json` und `private/incremental-driver-report.json`. Die neue UI/API benötigt noch Dienstneustart. Kein Nachweis für automatischen Sync oder korrekte UTC-Zeitbasis.
+
+
+## V0.3.2-dev: Automatik, Speicher und bestätigte Zeitzone
+
+74 automatisierte Tests bestanden. Automatik: standardmäßig aus, ausdrückliche Aktivierung, Bindung an Logger/Adresse/Adapter/Firmware, Start erst nach Frist, Pausen bei unfrischem/pausiertem Empfang oder belegtem Bluetooth, Abschalten während eines Auftrags, Wiederaufnahme des Empfangs, Fehlerwartezeiten nach Neustart, monotone Fristen bei Host-Uhrsprung und Blockade bei Persistenzfehler. Integration mit echtem HistoryJobs-Ablauf wird mit simuliertem BLE geprüft; automatische Aufträge dürfen nicht auf Vollabruf wechseln.
+
+Speicher: nur zusätzliche Messwertzeilen, unveränderte IDs vorhandener Werte, rekonstruiertes Ergebnis nach Neustart, vollständiger Zwischenstand nach spätestens 32 Schritten, beschädigte Basis und alte Manifestversion 1. Zeitzonen: ausdrückliche Bestätigung, unveränderte Originale, begrenzter Rohpräfix, spätere Werte unbestätigt, abweichende Reihe abgewiesen, Winter-/Sommerzeitoffsets und Ablehnung mehrdeutiger/nicht existierender Stunden.
+
+Chromium-Prüfung erfolgreich: Auto-Sync bleibt beim Speichern eines Intervalls aus, zusätzliche Zeitzonenbestätigung und abgeleiteter Export, spätere Werte unbestätigt sowie bestehende Quellen-/Verlaufs-/Zoom-/Mobilprüfungen. Originalverlauf und bestätigte historische Zeitzone zusätzlich nur lesend geprüft. Keine JS-Ausnahmen oder externen Requests. Die neue UI/API ist bis zum Dienstneustart noch nicht produktiv aktiviert.
+
+Realer automatischer Verbindungsversuch ohne Tastendruck endete nach etwa acht Sekunden im Timeout; keine Historienänderung, Hostempfang wieder gestartet. Damit ist unbeaufsichtigtes Auslesen im aktuellen Gerätemodus ausdrücklich nicht erfolgreich abgenommen. Privater Bericht: `private/unattended-sync-report.json`. Automatik bleibt aus; geeigneter Gerätemodus und tatsächliches Gerätedatum müssen weiter geklärt werden.
+
+Aktualisierter synthetischer Historienbenchmark (Einzellauf auf DeskPi, 32.000 Ausgangswerte): Vollimport 1,931 s, Wiederimport mit Inhaltsprüfung 2,726 s, Lesen/Diagramm 1,380 s. Drei neue Werte aus 19 übertragenen Vergleichs-/Neuwerten ergänzen: 1,263 s einschließlich synthetischem Capture-Aufbau, zusätzlich 823 Byte Messwert-CSV. Rekonstruktion und Verlaufsindex anschließend 1,784 s. Maximales RSS des gesamten Benchmarkprozesses einschließlich Datengenerator 107.260 KiB (ca. 104,7 MiB); keine Server-Grundlast oder SMApi-Messung. Test enthält zusätzlich zum Ausgangsbestand den vollständigen synthetischen Nachladefixture-Aufbau im selben Prozess.

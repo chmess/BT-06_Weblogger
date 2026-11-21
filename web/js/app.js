@@ -1,6 +1,6 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
-const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null};
+const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null, autoSync:null, timeAssignment:null};
 const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
@@ -134,6 +134,9 @@ function renderChart(data, reset=false) {
 async function loadHistory(refresh=false) {
   const query=buildQuery(); if(!query) {state.query=null;state.chartData=null;state.chart?.clear();$('#chart-caption').textContent='Keine Daten ausgewählt.';return;}
   const request=++state.loading; const data=await api(`history?${query}`);if(request!==state.loading)return;
+  const assignment=query.get('source')==='device'?await api(`time-assignment?${new URLSearchParams({logger:query.get('logger'),snapshot:query.get('snapshot')})}`):null;if(request!==state.loading)return;state.timeAssignment=assignment;
+  $('#chart-export-assigned').hidden=!assignment;$('#chart-export-assigned').disabled=!assignment?.timezone_confirmed;$('#timezone-panel').hidden=!assignment;
+  if(assignment){$('#timezone-status').textContent=assignment.timezone_confirmed?`${assignment.timezone} bestätigt · ${assignment.assigned_count} Werte zugeordnet · ${assignment.unassigned_count} spätere/unbestätigte Werte · Datum weiterhin ungeprüft`:'Zeitzone dieses Historienstands noch nicht bestätigt.';if(assignment.timezone)$('#history-timezone').value=assignment.timezone;}
   const reset=!refresh&&state.query?.toString()!==query.toString();state.query=query;state.chartData=data;
   $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}`;
   renderChart(data,reset);
@@ -159,7 +162,7 @@ function populateSnapshots() {
 }
 function setSource(source) {
   if(!['live','device','simulation'].includes(source))source='simulation';
-  state.loading++;state.chartData=null;state.query=null;state.chart?.clear();
+  state.loading++;state.chartData=null;state.query=null;state.chart?.clear();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
   state.source=source;localStorage.setItem('bt06-source',source);$('#source-select').value=source;
   const live=source==='live',device=source==='device';$('#run-label').hidden=live;$('#live-follow-label').hidden=!live;
   $('#run-title').textContent=device?'Historienstand':'Testlauf';
@@ -204,14 +207,21 @@ let syncPolling=null;
 async function refreshSync() {
   const previous=state.sync?.state;state.sync=await api('sync');
   const busy=state.sync.state==='running';
-  const labels={pausing_host:'Hostempfang wird pausiert',connecting:'Verbindung wartet auf kurzen Tastendruck',reading_metadata:'Metadaten lesen',selecting_range:'Nachladebereich wählen',full_fallback:'Vollauslesung erforderlich',receiving:'Historie empfangen',saving:'CSV dauerhaft speichern',finished:'Abgeschlossen'};
+  const labels={pausing_host:'Hostempfang wird pausiert',connecting:state.sync.trigger==='automatic'?'Automatischer Verbindungsversuch ohne Tastendruck':'Verbindung wartet auf kurzen Tastendruck',reading_metadata:'Metadaten lesen',selecting_range:'Nachladebereich wählen',full_fallback:'Vollauslesung erforderlich',receiving:'Historie empfangen',saving:'CSV dauerhaft speichern',finished:'Abgeschlossen'};
   $('#sync-start').disabled=busy||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;
-  $('#sync-button-signal').hidden=!(busy&&state.sync.phase==='connecting');
+  $('#sync-button-signal').hidden=!(busy&&state.sync.trigger!=='automatic'&&state.sync.phase==='connecting');
   const result=state.sync.result;
   $('#sync-status').textContent=[labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} Werte`:'',result?(result.last_transfer_scope==='range'?`${result.new_count} neue Werte · ${result.received_count} Werte einschließlich Überlappung geprüft · ${result.count} Werte im Gesamtbestand · ${result.duplicate?'keine Änderung':'dauerhaft gespeichert'}`:`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`):'',state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
   if(busy&&!syncPolling)syncPolling=setInterval(guard(refreshSync),1000);
   if(!busy&&syncPolling){clearInterval(syncPolling);syncPolling=null;}
-  if(previous==='running'&&!busy){await refreshLive();await refreshSnapshots();await refreshBluetooth();await renderCards();}
+  if(previous==='running'&&!busy){await refreshLive();await refreshSnapshots();await refreshBluetooth();await refreshAutoSync();await renderCards();}
+}
+async function refreshAutoSync(fill=false) {
+  const data=await api('autosync');state.autoSync=data;
+  if(fill){$('#autosync-enabled').checked=data.config.enabled;$('#autosync-interval').value=data.config.interval_minutes;}
+  $('#autosync-enabled').disabled=!state.live?.config.device;
+  const next=data.next_in_seconds==null?'':`Nächster Versuch in ${Math.ceil(data.next_in_seconds/60)} min`;
+  $('#autosync-status').textContent=[data.config.enabled?'Automatik eingeschaltet':'Automatik ausgeschaltet',data.active?'Nachladeversuch läuft':next,`Intervall ${data.config.interval_minutes} min`,data.failures?`${data.failures} aufeinanderfolgende Fehlversuche`:'',data.wait_reason||'',data.last_error||'',data.persistence_error||''].filter(Boolean).join(' · ');
 }
 async function refreshLive() {
   const [live,loggers]=await Promise.all([api('live'),api('loggers')]);state.live=live;state.liveLoggers=loggers.loggers;
@@ -288,6 +298,9 @@ async function main() {
   $('#chart-reset').addEventListener('click',()=>{if(state.chartData)renderChart(state.chartData,true);});
   $('#chart-fullscreen').addEventListener('click',guard(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else await $('#chart').requestFullscreen();}));
   $('#chart-export').addEventListener('click',guard(exportCSV));
+  $('#chart-export-assigned').addEventListener('click',guard(()=>{if(!state.query||!state.timeAssignment?.timezone_confirmed)throw new Error('Zuerst Historienstand mit bestätigter Zeitzone laden.');const query=new URLSearchParams(state.query);query.set('time_basis','assigned');const link=document.createElement('a');link.href=`api/export?${query}`;link.click();}));
+  $('#timezone-form').addEventListener('submit',guard(async event=>{event.preventDefault();if(state.source!=='device'||!state.snapshot)throw new Error('Zuerst einen Historienstand auswählen.');await post('time-assignment',{logger:state.logger,snapshot:state.snapshot.id,timezone:$('#history-timezone').value,timezone_confirmed:$('#timezone-confirmed').checked});$('#timezone-confirmed').checked=false;await loadHistory(true);notice('Zeitzone für diesen Historienstand bestätigt. Datum bleibt ungeprüft; Originaldateien erhalten.');}));
+  $('#autosync-form').addEventListener('submit',guard(async event=>{event.preventDefault();await post('autosync',{enabled:$('#autosync-enabled').checked,interval_minutes:Number($('#autosync-interval').value)});await refreshAutoSync(true);notice(state.autoSync.config.enabled?'Automatische Nachladeversuche gespeichert. Erster Versuch nach Ablauf des Intervalls.':'Automatische Nachladeversuche ausgeschaltet.');}));
   $('#sync-incremental').addEventListener('click',guard(async()=>{await post('sync',{mode:'incremental'});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#sync-start').addEventListener('click',guard(async()=>{await post('sync',{});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#ble-scan').addEventListener('click',guard(()=>startBluetooth('scan')));
@@ -304,7 +317,7 @@ async function main() {
   $('#settings-form').addEventListener('submit',guard(async event=>{event.preventDefault();const result=await post('settings',checkSettings(formSettings()));state.saved=result;fillSettings(result);applySettings();downloadSettings(result);notice('Einstellungen gespeichert und als JSON zum Download bereitgestellt.');}));
   $('#load-settings').addEventListener('click',()=>$('#settings-file').click());
   $('#settings-file').addEventListener('change',guard(async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>16384)throw new Error('Einstellungsdatei ist zu groß.');fillSettings(checkSettings(JSON.parse(await file.text())));notice('Einstellungen eingelesen. Mit Save Settings übernehmen.');}finally{event.target.value='';}}));
-  await diagnostics();await refreshLive();await refreshSync();await refreshBluetooth();await refreshRuns();await refreshSnapshots();setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
-  let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshSync();await refreshLive();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
+  await diagnostics();await refreshLive();await refreshSync();await refreshAutoSync(true);await refreshBluetooth();await refreshRuns();await refreshSnapshots();setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
+  let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshSync();await refreshLive();await refreshAutoSync();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
 }
 guard(main)();

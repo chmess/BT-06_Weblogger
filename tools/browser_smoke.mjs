@@ -131,6 +131,18 @@ for seconds in [120,60]:store.append(reading,-55,(datetime.now(timezone.utc)-tim
   assert.ok(deviceExport.includes('Geraetekalender')&&deviceExport.includes('ZEIT_UNGEPRUEFT'));
   await screenshot('device-history-mobile.png');
   assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
+  await evaluate(`document.querySelector('#history-timezone').value='Europe/Berlin';document.querySelector('#timezone-confirmed').checked=true;document.querySelector('#timezone-form').requestSubmit()`);
+  await waitFor(`state.timeAssignment?.timezone_confirmed===true&&!document.querySelector('#chart-export-assigned').disabled`);
+  assert.equal(await evaluate(`state.timeAssignment.date_verified`),false);
+  const assignedExport=await evaluate(`fetch('api/export?'+state.query+'&time_basis=assigned').then(r=>r.text())`);
+  assert.ok(assignedExport.includes('ZugeordneteZeit')&&assignedExport.includes('+01:00')&&assignedExport.includes('DATUM_UNGEPRUEFT'));
+  await evaluate(`document.querySelector('#autosync-interval').value='45';document.querySelector('#autosync-form').requestSubmit()`);
+  await waitFor(`state.autoSync?.config.interval_minutes===45`);
+  assert.equal(await evaluate(`state.autoSync.config.enabled`),false);
+  const automaticSignal=await evaluate(`(async()=>{const originalApi=api;try{api=async(path,...args)=>path==='sync'?{state:'running',phase:'connecting',trigger:'automatic',expected:null,received:0,result:null,error:null,resume_error:null}:originalApi(path,...args);await refreshSync();return {signalHidden:document.querySelector('#sync-button-signal').hidden,status:document.querySelector('#sync-status').textContent};}finally{api=originalApi;await refreshSync();}})()`);
+  assert.equal(automaticSignal.signalHidden,true);
+  assert.ok(automaticSignal.status.includes('ohne Tastendruck'));
+
   await evaluate(`document.querySelector('#period').value='custom';document.querySelector('#period').dispatchEvent(new Event('change'));document.querySelector('#range-start').value='2024-03-31T00:30';document.querySelector('#range-end').value='2024-03-31T00:40';document.querySelector('#apply-range').click()`);
   await waitFor(`state.chartData.raw_count===2`);
   const extensionFixture=spawnSync('python3',['-c',`import sys
@@ -148,13 +160,15 @@ HistoryStore(Path(sys.argv[1])/'data/history').publish('12345678',**decode_captu
   await waitFor(`state.chartData.raw_count===4`);
   assert.equal(await evaluate(`state.series.length`),1);
   assert.equal(await evaluate(`state.snapshots.length`),2);
+  assert.equal(await evaluate(`state.timeAssignment.assigned_count`),3);
+  assert.equal(await evaluate(`state.timeAssignment.unassigned_count`),1);
   assert.equal(await evaluate(`document.querySelectorAll('#run-select optgroup').length`),2);
   assert.equal(await evaluate(`document.querySelector('#snapshot-list').textContent.includes('2 übereinstimmende Historienstände')`),true);
   assert.equal(await evaluate(`document.querySelector('#sync-incremental').disabled`),true);
   await evaluate(`setSource('simulation');document.querySelector('#period').value='0';loadHistory()`);
   await waitFor(`document.querySelector('#chart-caption').textContent.includes('Testwerte')`);
   assert.equal(await evaluate(`document.querySelector('#run-title').textContent`),'Testlauf');
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','no JS exceptions','no external requests'],screenshots:7};
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','no JS exceptions','no external requests'],screenshots:7};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}

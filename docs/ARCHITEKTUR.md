@@ -1,4 +1,4 @@
-# Architektur · V0.3.1-dev
+# Architektur · V0.3.2-dev
 
 ## Laufzeit
 
@@ -62,3 +62,12 @@ Das Frontend behandelt Hostempfang, Gerätekalender und Simulation als getrennte
 `HistoryStore.series()` rekonstruiert Präfixbeziehungen aus den geordneten Rohzeiten/Rohwerten und deren Inhaltskennung. Genau enthaltene frühere Stände werden im Hauptverlauf zusammengefasst, Originalarchive bleiben unverändert. Cache ist ausschließlich im Arbeitsspeicher und wird bei geänderten Manifest-/Dateistatistiken verworfen; gewählte CSV werden weiterhin anhand ihrer Prüfsummen gelesen. Mehrdeutige Reihen verhindern automatische Basiswahl.
 
 Der manuelle Nachladeauftrag verwendet dieselbe Adaptersperre und Wiederaufnahme wie die Vollauslesung. Erst passende Gesamtmetadaten erlauben die Bereichsabfrage; vor Veröffentlichung werden Basis, 16 überlappende Messungen, Grenzen und Anzahl nochmals geprüft. Abbruch/Widerspruch ändert bestehende Daten nicht. Teilbereichsherkunft wird ausdrücklich dokumentiert und gilt nicht als neuer Vollabruf. Noch kein automatischer Zeitplan oder separater Hintergrunddienst. Die Gesamt-CSV-Stände bleiben vollständig; Archivspeicheroptimierung ist nicht Teil dieses Schritts.
+
+
+## V0.3.2: Automatik und Zeitzonenzuordnung
+
+`linux/auto_sync.py` hält einen abschaltbaren Zeitplan im vorhandenen Prozess. Ein wartender Thread nutzt dieselbe Steuersperre und dieselben HistoryJobs wie manuelle Aktionen; kein Systemdienst oder Cronjob zusätzlich. Gerät, Adapter und Firmware sind an die explizite Aktivierung gebunden. Monotone Zeit steuert laufende Fristen; UTC-Fristen und Fehlerzahl ermöglichen konservatives Fortsetzen nach Neustart. Aufträge verwenden kurze Verbindungslimits und dürfen nicht automatisch auf Vollabruf wechseln. Abschalten verhindert Folgeaufträge, Änderungen am Logger erfolgen nicht.
+
+`common/history_timezones.py` speichert ausschließlich bestätigte historische Zeitzonenzuordnungen, ohne Geräteuhränderung und ohne Originaldateien zu ändern. Bestätigung wird durch Rohpräfixvergleich begrenzt. Zeitzone und Datum sind getrennte Aussagen: selbst eine bestätigte Zeitzone setzt `clock_verified` oder `date_verified` nicht auf wahr. Ein zusätzlicher Export enthält abgeleitete Kalenderzeiten mit dieser Kennzeichnung.
+
+Historienfortsetzungen speichern nur neue CSV-Zeilen; ein vollständiger Zwischenstand begrenzt die Basisverkettung. Die Verlaufszuordnung arbeitet vom längsten Stand aus und erkennt Präfixe beim einmaligen Durchlauf, statt jede ältere Gesamtserie vollständig erneut zu lesen. Regenerierbarer Cache bleibt im Arbeitsspeicher. Keine Datenbank, keine Löschung alter Originale und kein zusätzlicher Backupmechanismus.

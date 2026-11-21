@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.3.2-dev · 2026-11-21
+
+- Optionale automatische Nachladeversuche innerhalb des bestehenden Prozesses: standardmäßig aus, explizite Gerätebindung, 15–1440 Minuten Intervall, frischer Liveempfang erforderlich, kein automatischer Vollabruf. Begrenzte Verbindungsdauer, längere Wartezeiten bei Fehlern und dauerhafter Versuchszustand.
+- Neue Messungen platzsparend als CSV-Fortsetzung gespeichert, vollständiger Zwischenstand spätestens nach 32 Schritten. Manifestversion 2, vorhandene Version 1 weiter lesbar. Keine Änderung alter Originaldateien.
+- Ausdrücklich bestätigte historische Zeitzone pro Datenstand; zusätzlicher CSV-Export mit abgeleiteten Kalenderzeiten und Offset, Originalzeitstempel unverändert. Datum bleibt ungeprüft, spätere Werte werden nicht ungefragt zugeordnet; problematische Zeitumstellungsstunden blockiert.
+- Gesamte Automatik einschließlich Wiederaufnahme und Speicherschutz synthetisch geprüft. Hardwareversuch ohne Tastendruck im aktuellen BT06-Modus: Timeout, keine Historienänderung, Hostempfang wieder gestartet. Automatik bleibt aus; unbeaufsichtigtes Auslesen nicht als erfolgreich behauptet.
+- Neue UI/API erfordert Dienstneustart. Der bestätigte historische Zeitbezug ist separat hinterlegt; tatsächliche Geräteuhrkorrelation und geeigneter Verbindungsmodus bleiben offen.
+
 ## 0.3.1-dev · 2026-11-21
 
 - Zeitbereichsabfrage am realen BT06 mit bekannten Rohwerten verifiziert und als begrenzter, reiner Lesepfad implementiert. „Neue Werte nachladen“ prüft 16 gespeicherte Vergleichswerte sowie Zähler und Grenzen, bevor neue Messungen übernommen werden. Keine Loggeränderungen.

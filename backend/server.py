@@ -22,6 +22,8 @@ from backend.linux.receiver import Receiver
 from backend.common.live_store import LiveStore, LIVE_FIELDS
 from backend.common.history_store import HistoryStore, HISTORY_FIELDS
 from backend.linux.history_jobs import HistoryJobs
+from backend.linux.auto_sync import AutoSync
+from backend.common.history_timezones import HistoryTimezones, ASSIGNED_FIELDS
 
 
 class Application:
@@ -50,12 +52,16 @@ class Application:
         self.control_lock = threading.RLock()
         self.history_store = HistoryStore(self.root / "data/history")
         self.sync = HistoryJobs(self.receiver, self.history_store)
+        self.timezones = HistoryTimezones(self.root / "config/history-timezones.json", self.history_store)
+        self.auto_sync = AutoSync(self.root / "config/autosync.json", self.receiver, self.sync, self.bluetooth, self.control_lock)
 
     def resume(self):
         if self.receiver.config["enabled"]:
             self.receiver.start()
+        self.auto_sync.start()
 
     def close(self):
+        self.auto_sync.close()
         self.sync.close()
         self.receiver.stop(persist=False)
 
@@ -153,11 +159,20 @@ def handler_for(app):
                     self.send(200, {"snapshots": app.history_store.snapshots()})
                 elif path == "/api/series":
                     self.send(200, {"series": app.history_store.series()})
+                elif path == "/api/autosync":
+                    self.send(200, app.auto_sync.status())
+                elif path == "/api/time-assignment":
+                    if set(query) != {"logger", "snapshot"} or any(len(v) != 1 for v in query.values()):
+                        raise ValueError("Zeitzuordnung benötigt genau logger und snapshot.")
+                    self.send(200, app.timezones.info(query["logger"][0], query["snapshot"][0]))
                 elif path in ("/api/history", "/api/export"):
-                    allowed = {"source", "run", "logger", "start", "end", "snapshot"}
+                    allowed = {"source", "run", "logger", "start", "end", "snapshot", "time_basis"}
                     if set(query) - allowed or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Ungültige Abfrageparameter.")
                     source = query.get("source", ["simulation"])[0]
+                    basis = query.get("time_basis", ["original"])[0]
+                    if basis not in ("original", "assigned") or "time_basis" in query and (source != "device" or path != "/api/export"):
+                        raise ValueError("Zeitzuordnung ist nur für den zusätzlichen Historien-CSV-Export verfügbar.")
                     logger = identifier(query.get("logger", [""])[0])
                     start, end = query.get("start", [None])[0], query.get("end", [None])[0]
                     if source == "simulation":
@@ -187,6 +202,9 @@ def handler_for(app):
                         rows = (app.history_store.filtered_rows(logger, snapshot, start, end) if path == "/api/export"
                                 else app.history_store.chart_rows(logger, snapshot, start, end))
                         fields, label = HISTORY_FIELDS, "BT06-Historie"
+                        if basis == "assigned":
+                            rows = app.timezones.export_rows(logger, snapshot, start, end)
+                            fields = HISTORY_FIELDS + ASSIGNED_FIELDS
                     else:
                         raise ValueError("Unbekannte Datenquelle.")
                     if path == "/api/export":
@@ -231,12 +249,16 @@ def handler_for(app):
                     self.send(413, {"error": "JSON muss zwischen 1 und 16.384 Bytes groß sein."})
                     return
                 value = json.loads(self.rfile.read(length))
-                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync"}
+                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync"}
                 with app.control_lock if controlled else nullcontext():
-                    if controlled and app.sync.busy():
+                    if controlled and path != "/api/autosync" and app.sync.busy():
                         raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
                     if path == "/api/settings":
                         self.send(200, app.settings.save(value))
+                    elif path == "/api/autosync":
+                        self.send(200, app.auto_sync.configure(value))
+                    elif path == "/api/time-assignment":
+                        self.send(200, app.timezones.assign(value))
                     elif path == "/api/sync":
                         if app.bluetooth.status()["state"] == "running":
                             raise BusyError("Bluetooth-Diagnose läuft bereits.")
