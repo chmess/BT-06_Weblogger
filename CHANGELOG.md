@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.4.0-dev · 2026-11-21
+
+- Erste lesende Geräteeinstellungsansicht: belegte Name-/Zeit-/Status-/Aufzeichnungs-/Funk-/Alarmabfragen, neue Anzeige, verifizierter CSV-Rohbeleg und JSON-Zusammenfassung. Kein Setter, Speichern am Logger, Start/Stop oder Uhränderung.
+- Neue Abfragen am realen BT06 erfolgreich; unbekannter Funkmoduscode wird ausdrücklich nicht als Long-Range-Zustand interpretiert. Weitere SDK-Parameter bleiben unbekannt statt auf Standardwerte gesetzt.
+- BlueZ-Cacheverlust nach Stop der Suche durch erneute Auswahl mit Adresse, Gerätekennung und Firmware abgedeckt. Automatisches Verbindungsfenster für vorhandene Einträge auf 35 Sekunden erweitert, um ein 30-Sekunden-Sendeintervall zu berücksichtigen; nach frischer Suche kurzes Fenster.
+- Verbindung mit nur kurzem STOP erfolgreich. Längerer Versuch ganz ohne Tastenaktion weiterhin Timeout; Automatik bleibt aus und wird nicht als zuverlässig abgenommen dargestellt.
+- 82 automatisierte Tests und synthetische Browserprüfung erfolgreich; gespeicherte Originale zusätzlich nur lesend geprüft. Neue UI/API muss noch durch Dienstneustart aktiviert werden. Kontrollierte Schreibfunktionen bleiben offen.
+
 ## 0.3.2-dev · 2026-11-21
 
 - Optionale automatische Nachladeversuche innerhalb des bestehenden Prozesses: standardmäßig aus, explizite Gerätebindung, 15–1440 Minuten Intervall, frischer Liveempfang erforderlich, kein automatischer Vollabruf. Begrenzte Verbindungsdauer, längere Wartezeiten bei Fehlern und dauerhafter Versuchszustand.

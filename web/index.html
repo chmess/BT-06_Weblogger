@@ -20,7 +20,7 @@
     <button data-page="settings">Einstellungen</button>
     <button data-page="diagnostics">Diagnose</button>
   </nav>
-  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.3.2-dev</span><br>Deine Daten bleiben hier.</p></div>
+  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.4.0-dev</span><br>Deine Daten bleiben hier.</p></div>
 </aside>
 <main>
   <header><div><p class="eyebrow">BT-06 WEBLOGGER</p><h1 id="page-title">Übersicht</h1></div><span class="tag warning">Entwicklung · Testbetrieb</span></header>
@@ -101,6 +101,13 @@
         <p class="hint">Standardmäßig aus. Während eines Versuchs pausiert der Hostempfang kurz. Fehlversuche verlängern die Wartezeit. Ein geänderter Logger, pausierter Liveempfang oder fehlende aktuelle Pakete verhindern neue Versuche. Die Automatik ändert keinen Long-Range-Modus und drückt keine Gerätetasten. Ausschalten verhindert weitere Versuche; ein laufender Auftrag endet geordnet.</p>
       </details>
       <div id="snapshot-list" class="run-list"></div>
+    </article>
+    <article class="panel"><h2>Geräteeinstellungen lesen</h2>
+      <p>Vorhandene Einstellungen des ausgewählten BT06 abfragen. Auslesen pausiert den Hostempfang kurz und setzt ihn danach fort.</p>
+      <div class="button-row"><button id="device-settings-read" disabled>Einstellungen jetzt lesen</button></div>
+      <p id="device-settings-status" class="hint" role="status">Noch keine Geräteeinstellungen gelesen.</p>
+      <dl id="device-settings-values"></dl>
+      <p class="hint">Nur belegte Werte werden angezeigt. Unbekannte Parameter bleiben unbekannt; der Funkmoduscode ist noch keinem bestätigten Long-Range-Zustand zugeordnet. Diese Ansicht sendet keine Einstellungs-, Speicher-, Start-/Stopp- oder Uhränderung.</p>
     </article>
     <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. „Verbinden &amp; prüfen“ liest nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>
       <div class="toolbar"><label>Bluetooth-Adapter<input id="ble-adapter" value="hci0" pattern="hci[0-9]{1,3}" required></label><label>CSV-Speicherabstand in Sekunden<input id="capture-interval" type="number" min="10" max="3600" step="1" value="60"></label><button id="ble-scan">Geräte suchen (30 s)</button></div>

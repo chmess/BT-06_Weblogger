@@ -207,14 +207,28 @@ let syncPolling=null;
 async function refreshSync() {
   const previous=state.sync?.state;state.sync=await api('sync');
   const busy=state.sync.state==='running';
-  const labels={pausing_host:'Hostempfang wird pausiert',connecting:state.sync.trigger==='automatic'?'Automatischer Verbindungsversuch ohne Tastendruck':'Verbindung wartet auf kurzen Tastendruck',reading_metadata:'Metadaten lesen',selecting_range:'Nachladebereich wählen',full_fallback:'Vollauslesung erforderlich',receiving:'Historie empfangen',saving:'CSV dauerhaft speichern',finished:'Abgeschlossen'};
-  $('#sync-start').disabled=busy||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;
-  $('#sync-button-signal').hidden=!(busy&&state.sync.trigger!=='automatic'&&state.sync.phase==='connecting');
+  const labels={finding_device:'Gewählten Logger erneut suchen',reading_settings:'Geräteeinstellungen lesen',pausing_host:'Hostempfang wird pausiert',connecting:state.sync.trigger==='automatic'?'Automatischer Verbindungsversuch ohne Tastendruck':'Verbindung wartet auf kurzen Tastendruck',reading_metadata:'Metadaten lesen',selecting_range:'Nachladebereich wählen',full_fallback:'Vollauslesung erforderlich',receiving:'Historie empfangen',saving:'CSV dauerhaft speichern',finished:'Abgeschlossen'};
+  $('#sync-start').disabled=busy||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;$('#device-settings-read').disabled=$('#sync-start').disabled;
+  $('#sync-button-signal').hidden=!(busy&&state.sync.trigger!=='automatic'&&['finding_device','connecting'].includes(state.sync.phase));
   const result=state.sync.result;
-  $('#sync-status').textContent=[labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} Werte`:'',result?(result.last_transfer_scope==='range'?`${result.new_count} neue Werte · ${result.received_count} Werte einschließlich Überlappung geprüft · ${result.count} Werte im Gesamtbestand · ${result.duplicate?'keine Änderung':'dauerhaft gespeichert'}`:`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`):'',state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
+  const resultText=result?.kind==='device-settings'?`Geräteeinstellungen gelesen · Stand ${date(result.observed_at)} · ${Object.keys(result.read_errors).length+Object.keys(result.decode_errors).length} nicht verfügbare Abfragen`:(result?(result.last_transfer_scope==='range'?`${result.new_count} neue Werte · ${result.received_count} Werte einschließlich Überlappung geprüft · ${result.count} Werte im Gesamtbestand · ${result.duplicate?'keine Änderung':'dauerhaft gespeichert'}`:`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`):'');
+  $('#sync-status').textContent=[labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} ${state.sync.mode==='settings'?'Abfragen':'Werte'}`:'',resultText,state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
   if(busy&&!syncPolling)syncPolling=setInterval(guard(refreshSync),1000);
   if(!busy&&syncPolling){clearInterval(syncPolling);syncPolling=null;}
-  if(previous==='running'&&!busy){await refreshLive();await refreshSnapshots();await refreshBluetooth();await refreshAutoSync();await renderCards();}
+  if(previous==='running'&&!busy){await refreshLive();await refreshSnapshots();await refreshBluetooth();await refreshAutoSync();await refreshDeviceSettings();await renderCards();}
+}
+async function refreshDeviceSettings() {
+  const target=$('#device-settings-values');target.replaceChildren();let result;try{result=await api('device-settings');}catch(error){$('#device-settings-status').textContent=error.message;return;}const data=result.settings;
+  if(!data){$('#device-settings-status').textContent=result.selected?'Für dieses Gerät noch keine gespeicherte Einstellungsabfrage.':'Zuerst einen verifizierten BT06 auswählen.';return;}
+  const v=data.values;
+  $('#device-settings-status').textContent=`Nur gelesen · Stand ${date(data.observed_at)} · Firmware ${data.firmware} · Gerätezeit ungeprüft`;
+  const pairs=[['Gerätename',v.name],['Aufzeichnung',v.recording],['Aufzeichnungsintervall',v.record_interval_seconds==null?null:`${v.record_interval_seconds} s`],['Temperatureinheit',v.temperature_unit?`°${v.temperature_unit}`:null],['Sendeintervall',v.broadcast_interval_seconds==null?null:`${number(v.broadcast_interval_seconds,1)} s`],['Sendeleistung',v.transmit_power_dbm==null?null:`${v.transmit_power_dbm} dBm`],['Funkmoduscode',v.transmit_rate_code==null?null:`${v.transmit_rate_code} · Bedeutung noch nicht bestätigt`],['Gerätekalender',v.clock_calendar_2000?`${v.clock_calendar_2000.replace('T',' ')} · Jahresbasis 2000, ungeprüft`:null]];
+  for(const [key,alarm,unit] of [['Temperaturalarm',v.temperature_alarm,v.temperature_unit?`°${v.temperature_unit}`:'Einheit unbekannt'],['Feuchtealarm',v.humidity_alarm,'% rF']]){
+    if(alarm)pairs.push([key,`Untergrenze ${number(alarm.low.limit)} ${unit} (${alarm.low.enabled?'ein':'aus'}) · Obergrenze ${number(alarm.high.limit)} ${unit} (${alarm.high.enabled?'ein':'aus'})`]);
+  }
+  for(const [label,value] of pairs)if(value!=null)target.append(element('dt',label),element('dd',String(value)));
+  const errors=Object.keys({...data.read_errors,...data.decode_errors});
+  if(errors.length){const labels={device_info:'Gerätename',device_clock:'Gerätezeit',log_status:'Aufzeichnungsstatus',log_settings:'Aufzeichnungsparameter',broadcast_settings:'Funkparameter',transmit_rate:'Funkmodus',temperature_alarm:'Temperaturalarm',humidity_alarm:'Feuchtealarm'};target.append(element('dt','Nicht verfügbar'),element('dd',errors.map(key=>labels[key]||key).join(', ')));}
 }
 async function refreshAutoSync(fill=false) {
   const data=await api('autosync');state.autoSync=data;
@@ -226,7 +240,7 @@ async function refreshAutoSync(fill=false) {
 async function refreshLive() {
   const [live,loggers]=await Promise.all([api('live'),api('loggers')]);state.live=live;state.liveLoggers=loggers.loggers;
   const syncing=state.sync?.state==='running';const active=['starting','receiving','retrying'].includes(live.state);
-  $('#capture-stop').disabled=!active||syncing;$('#capture-resume').hidden=!live.config.device||active;$('#capture-resume').disabled=syncing;$('#sync-start').disabled=syncing||!live.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;
+  $('#capture-stop').disabled=!active||syncing;$('#capture-resume').hidden=!live.config.device||active;$('#capture-resume').disabled=syncing;$('#sync-start').disabled=syncing||!live.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;$('#device-settings-read').disabled=$('#sync-start').disabled;
   const latest=live.latest;
   $('#capture-status').textContent=[`Empfang: ${live.state}`,live.config.device?`BT06 ${live.config.device.id} · Firmware ${live.config.device.firmware}`:'Noch kein Gerät ausgewählt.',latest?`Letzter Empfang: ${date(latest.received_at)} (${live.fresh?'aktuell':'veraltet'})`:'Noch kein Livepaket in dieser Sitzung.',`CSV-Abstand ${live.config.save_interval_seconds} s`,live.last_stored_at?`Zuletzt gespeichert: ${date(live.last_stored_at)}`:'Noch nichts gespeichert.',live.error||''].filter(Boolean).join(' · ');
   $('#ble-scan').disabled=active||$('#ble-scan').disabled;
@@ -259,7 +273,7 @@ async function refreshBluetooth() {
   const data=await api('ble');
   $('#ble-status').textContent=!data.available?'Optionale Bluetooth-Unterstützung fehlt. Mit ./install.sh --ble lokal installieren und das Programm neu starten.':data.state==='running'?'Bluetooth-Auftrag läuft …':data.error||`Bereit. Sichtbare Adapter: ${data.adapters.join(', ')||'keine erkannt'}.`;
   const busy=data.state==='running'||state.sync?.state==='running'||['starting','receiving','retrying'].includes(state.live?.state);
-  $('#sync-start').disabled=data.state==='running'||state.sync?.state==='running'||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;
+  $('#sync-start').disabled=!data.available||data.state==='running'||state.sync?.state==='running'||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;$('#device-settings-read').disabled=$('#sync-start').disabled;
   $('#ble-scan').disabled=!data.available||busy;
   for(const button of document.querySelectorAll('[data-ble-action]'))button.disabled=busy;
   if(data.state==='running') { if(!blePolling)blePolling=setInterval(guard(refreshBluetooth),1000);return; }
@@ -301,6 +315,7 @@ async function main() {
   $('#chart-export-assigned').addEventListener('click',guard(()=>{if(!state.query||!state.timeAssignment?.timezone_confirmed)throw new Error('Zuerst Historienstand mit bestätigter Zeitzone laden.');const query=new URLSearchParams(state.query);query.set('time_basis','assigned');const link=document.createElement('a');link.href=`api/export?${query}`;link.click();}));
   $('#timezone-form').addEventListener('submit',guard(async event=>{event.preventDefault();if(state.source!=='device'||!state.snapshot)throw new Error('Zuerst einen Historienstand auswählen.');await post('time-assignment',{logger:state.logger,snapshot:state.snapshot.id,timezone:$('#history-timezone').value,timezone_confirmed:$('#timezone-confirmed').checked});$('#timezone-confirmed').checked=false;await loadHistory(true);notice('Zeitzone für diesen Historienstand bestätigt. Datum bleibt ungeprüft; Originaldateien erhalten.');}));
   $('#autosync-form').addEventListener('submit',guard(async event=>{event.preventDefault();await post('autosync',{enabled:$('#autosync-enabled').checked,interval_minutes:Number($('#autosync-interval').value)});await refreshAutoSync(true);notice(state.autoSync.config.enabled?'Automatische Nachladeversuche gespeichert. Erster Versuch nach Ablauf des Intervalls.':'Automatische Nachladeversuche ausgeschaltet.');}));
+  $('#device-settings-read').addEventListener('click',guard(async()=>{await post('device-settings/read',{});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#sync-incremental').addEventListener('click',guard(async()=>{await post('sync',{mode:'incremental'});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#sync-start').addEventListener('click',guard(async()=>{await post('sync',{});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#ble-scan').addEventListener('click',guard(()=>startBluetooth('scan')));
@@ -317,7 +332,7 @@ async function main() {
   $('#settings-form').addEventListener('submit',guard(async event=>{event.preventDefault();const result=await post('settings',checkSettings(formSettings()));state.saved=result;fillSettings(result);applySettings();downloadSettings(result);notice('Einstellungen gespeichert und als JSON zum Download bereitgestellt.');}));
   $('#load-settings').addEventListener('click',()=>$('#settings-file').click());
   $('#settings-file').addEventListener('change',guard(async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>16384)throw new Error('Einstellungsdatei ist zu groß.');fillSettings(checkSettings(JSON.parse(await file.text())));notice('Einstellungen eingelesen. Mit Save Settings übernehmen.');}finally{event.target.value='';}}));
-  await diagnostics();await refreshLive();await refreshSync();await refreshAutoSync(true);await refreshBluetooth();await refreshRuns();await refreshSnapshots();setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
-  let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshSync();await refreshLive();await refreshAutoSync();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
+  await diagnostics();await refreshLive();await refreshSync();await refreshAutoSync(true);await refreshDeviceSettings();await refreshBluetooth();await refreshRuns();await refreshSnapshots();setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
+  let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshSync();await refreshLive();await refreshAutoSync();await refreshDeviceSettings();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
 }
 guard(main)();

@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.3.2-dev
+# BLE-Protokollstand · V0.4.0-dev
 
 ## Belege
 
@@ -83,3 +83,14 @@ Anschließend wurde der neue Nachladepfad selbst am Gerät geprüft: ausgewählt
 Der neue automatische Verbindungsablauf wurde einmal am ausgewählten BT06 ohne Tastenaktion geprüft. Er endete im kurzen Verbindungszeitlimit, es kam kein erfolgreicher Transfer zustande. Historien wurden nicht verändert; der aktivierte Advertising-Empfang wurde wieder gestartet. Dieser Versuch belegt keinen zuverlässig unbeaufsichtigten GATT-Zugriff im aktuellen Gerätemodus. Die neue Automatik ist daher standardmäßig ausgeschaltet und verändert weder Long Range noch andere Loggerparameter. Der Verbindungsmodus muss bei der späteren kontrollierten Konfiguration geprüft werden.
 
 Die Nutzerbestätigung von Europe/Berlin betrifft die bisherige historische Aufzeichnung. Sie bestätigt weder die aktuelle Geräteuhr noch das Datum neuer Messungen. Eine separate, begrenzte Zeitzonenzuordnung erlaubt einen transparent gekennzeichneten Zusatzexport, keine automatische Uhrkorrektur oder Freigabe destruktiver Aktionen.
+
+
+## V0.4: Einstellungs-Getter und Verbindungsprüfung
+
+Am realen BT06 2.05 rein lesend erfolgreich: Name `7233`, Kalender `7251`, Aufzeichnungsstatus `4C01`, Aufzeichnungsparameter `7202`, Funkparameter `7235`, Funkmoduscode `7237`, Temperatur-/Feuchtealarm `7220/7223`. `7235` und `7237` verwenden drei Nullbytes als Leseparameter; keine Loggeränderung. Funkparameterantwort: drei Bytes, Leistungscode und Intervall uint16 LE in 100-ms-Schritten. Die verifizierte Leistungstabelle ordnet Codes 1–9 den Werten -20, -16, -12, -8, -4, 0, 4, 6, 8 dBm zu. Codebedeutung der separaten einbyteigen Funkmodusantwort bleibt unbelegt; nicht als Long-Range-Schalter freigeben.
+
+Aufzeichnungsantwort: 15 Bytes; nur Intervall uint16 LE und Temperatureinheit Byte 6 (0/1) sind hier belegt. Andere Felder werden nicht aus SDK-Defaultwerten abgeleitet. Die untersuchte SDK-Implementierung belegt mehrere Parameter ihrer allgemeinen Methodensignatur nicht vollständig. Alarmantworten: je zwölf Bytes; Enable-/Typmarker, uint16-Verzögerungsrohdaten und **signed int16**-Grenze in Zehnteln je Unter-/Obergrenze. Das Alarm-Vorzeichenformat unterscheidet sich vom sign/magnitude der Messwert-Historie. Typ-/Verzögerungsbedeutung wird nicht geraten.
+
+Die neuen Getter wurden am Gerät geprüft und ihre Rohbelege separat gespeichert; kein Setter oder Save-Changed gesendet. [Hersteller-SDK-Referenz](https://github.com/TZONE-Team/BTLogger-Android) und [BT06-Handbuch V1.4](https://d.tzonedigital.com/f/d/BT%20Series/User%20Manual/BT06-User%27s%20Manual%20V1.4.pdf) bleiben Quellen. Handbuch warnt vor Historienlöschung bei Konfigurations-Save und App-Start der Aufzeichnung. Schreibfunktionen bleiben daher bis belegter Implementierung, aktueller vollständiger Auslesung und ausdrücklicher Bestätigung gesperrt.
+
+Die Verbindung gelang auch bei einem gesonderten Test mit nur kurzem STOP, ohne vorherigen START. Das belegt noch keine dauerhafte Funkmoduszuordnung. Ein ungekoppelter BlueZ-Eintrag war bei einem anderen Versuch nach Pausieren des Scans verschwunden; das ist nun ein expliziter Wiedererkennungsfall mit passender Identitätsprüfung. Das zuvor kurze automatische Zeitlimit war gegenüber dem beobachteten 30-Sekunden-Advertising unzureichend bemessen. Auch der korrigierte Versuch mit 35 Sekunden Wartezeit blieb jedoch ohne Tastenaktion erfolglos. Weder allein das Sendeintervall noch Long Range werden als abschließend belegte Ursache behauptet.

@@ -1,8 +1,8 @@
 # BT-06 Weblogger
 
-Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.3.2-dev – optionale automatische Nachladeversuche, platzsparende CSV-Fortsetzungen und bestätigte historische Zeitzonen.** Der installierte Dienst bleibt bis zum nächsten Neustart auf V0.3.1-dev.
+Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.4.0-dev – vorhandene BT06-Geräteeinstellungen sicher auslesen.** V0.3.2 läuft bereits auf dem DeskPi; die neue Ansicht wird mit dem nächsten Dienstneustart aktiv.
 
-Manuelles Vollauslesen und Nachladen sind am realen BT06 geprüft. Der kurze Versuch ohne Tastendruck endete im aktuellen Gerätemodus mit Timeout; die Automatik bleibt standardmäßig aus. Softwareablauf, Fehlerwartezeiten, Speicherung und Oberfläche sind automatisiert geprüft; unbeaufsichtigtes Auslesen ist damit am Gerät noch nicht erfolgreich abgenommen. Die bestätigte Zeitzone ändert keine Originalmessung und bestätigt nicht das Datum der Geräteuhr.
+Funkparameter, Aufzeichnungsintervall/-einheit, Name, Status, Gerätezeitfelder und Alarmgrenzen wurden am realen BT06 2.05 rein lesend abgefragt. Die neue Oberfläche zeigt nur belegte Werte; die Bedeutung des Funkmoduscodes sowie weitere Parameter bleiben offen. Noch keine Geräteschreibfunktion. Manuelle Historie/Nachladen funktionieren; unbeaufsichtigter Zugriff war auch mit längerem Zeitfenster nicht erfolgreich. Die Automatik bleibt ausgeschaltet.
 
 ## Start
 
@@ -28,6 +28,7 @@ Im Browser `http://127.0.0.1:8766/` öffnen. Der Prozess läuft im Vordergrund. 
 - Historie manuell auslesen: **Logger / Bluetooth → Alles vollständig lesen** verwendet den eingerichteten Live-Logger, pausiert den Hostempfang und stellt ihn danach wieder her. Beim angezeigten Signal START und danach STOP jeweils nur kurz antippen; nicht halten, Handy-App vorher trennen. Keine Kopplung oder Änderung von Loggeruhr/Aufzeichnung.
 - Vollständige Historienstände als monatliche Original-CSV mit überprüfter Anzahl/Endemarkierung; identische Wiederholungen erzeugen keine Kopie. Exakte Fortsetzungen erscheinen als ein Verlauf; frühere Einzelstände bleiben erreichbar. Abweichende Reihen bleiben getrennt, weil kein dauerhaft stabiler Geräteindex belegt ist.
 - **Neue Werte nachladen** liest bei geeigneter Basis nur einen Zeitbereich mit den letzten 16 gespeicherten Vergleichswerten und neuen Messungen. Anzahl, Grenzen und Rohwerte müssen übereinstimmen; bei Widerspruch bleibt der Bestand erhalten und eine Vollauslesung wird verlangt. Ohne geeignete Basis erfolgt eine Vollauslesung. Manuelles Nachladen startet auf Klick; automatische Versuche sind separat einschaltbar.
+- **Geräteeinstellungen lesen** unter Logger / Bluetooth: Name, Aufzeichnungs- und Sendeparameter, Alarmgrenzen sowie ungeprüfte Gerätezeit auslesen. Rohbeleg und Zusammenfassung werden geprüft gespeichert; GET/Anzeigen verbindet nicht mit dem Gerät. Unbekannte Felder werden nicht als SDK-Standardwerte dargestellt.
 - Automatik unter **Logger / Bluetooth → Automatische Synchronisation**: standardmäßig aus, an den eingerichteten Logger gebunden, 15–1440 Minuten Intervall. Versuche benötigen frisches Advertising und aktiven Liveempfang; bei Fehlern längere Wartezeiten. Kein automatischer Vollabruf, keine Kopplung, keine Änderung des Verbindungsmodus.
 - **Historische Zeitzone zuordnen** bestätigt nur die Zeitzone eines gewählten Datenstands. Zusätzlicher Export **CSV mit Zeitzuordnung** enthält daraus abgeleitete Kalenderzeiten mit Offset. Originalzeitstempel bleiben leer, Datum bleibt ungeprüft. Spätere Messungen werden nicht ungefragt mit bestätigt; mehrdeutige Zeitumstellungsstunden werden abgewiesen.
 - Datenquelle **Loggerhistorie · Gerätezeit**: Verlauf, freie Kalenderbereiche und Original-CSV-Export, ausdrücklich ohne bestätigten UTC-Offset. Keine Verschiebung auf Hostzeit und keine Vermischung mit Liveempfängen.
@@ -138,3 +139,12 @@ Die Automatik läuft innerhalb des bestehenden Prozesses, ohne zusätzlichen Sys
 Im derzeit geprüften BT06-Modus war ohne Tastendruck keine Verbindung möglich. Automatische Versuche ändern das nicht; der Verbindungsmodus muss später bei der kontrollierten Gerätekonfiguration geprüft werden. Nach Fehlversuch läuft der Hostempfang weiter. Automatik bleibt ausgeschaltet, solange sie nicht ausdrücklich gespeichert aktiviert wird.
 
 `config/autosync.json` enthält die bewusste Aktivierung und Gerätebindung, `autosync-state.json` abgeleiteten Versuchszustand, `history-timezones.json` bestätigte historische Zeitzonen. Die allgemeinen Save/Load-Settings-Dateien enthalten weiterhin die bisherigen allgemeinen Programmeinstellungen. Eine umfassendere Einstellungszusammenführung gehört zu V0.8; es gibt keinen gesonderten Backupdienst.
+
+
+## V0.4: lesende Geräteeinstellungsansicht
+
+**Einstellungen jetzt lesen** verwendet die vorhandene Geräteauswahl und dieselbe Adaptersperre wie Historienlesen. Hostempfang wird kurz pausiert und danach wieder aufgenommen. Das Ergebnis wird unter `data/device-settings/bt06-<id>/` gespeichert: Rohantworten als CSV, geprüfte Einstellungszusammenfassung als JSON. Angezeigter Stand ist die ursprüngliche Abfragezeit, nicht die Zeit eines späteren Imports. Auch teilweise abgewiesene Abfragen werden kenntlich gemacht. Ungültiger/inkonsistenter Rohbeleg wird nicht als verifiziert angezeigt.
+
+Die neue Ansicht sendet ausschließlich belegte Leseabfragen. Änderungen von Uhr, Start/Stop, Zugangsschlüssel, Intervallen oder Speichern sind hier noch nicht möglich. Insbesondere wird aus einem Funkmoduscode noch kein Long-Range-Schalter abgeleitet. Vor einer späteren Geräteänderung müssen konkrete Wirkung, frischer vollständiger Historienabruf und ausdrückliche Zustimmung vorliegen.
+
+Die reale Prüfung zeigte ein langsames Advertising-Intervall. Acht Sekunden Verbindungszeit können deshalb zu kurz sein: ein vorhandener BlueZ-Eintrag erhält bei automatischen Versuchen nun bis zu 35 Sekunden; nach frischer Suche bleibt das kürzere Fenster. Verschwindet ein ungekoppelter Cacheeintrag, wird erneut nach exakt gewählter Adresse, Kennung und Firmware gesucht. Ein Test mit nur kurzem STOP war erfolgreich, ein Versuch ganz ohne Tastenaktion trotz längerem Zeitfenster nicht. Das Problem ist damit nicht allein durch das Sendeintervall erklärt; Automatik nicht als zuverlässig abgenommen.

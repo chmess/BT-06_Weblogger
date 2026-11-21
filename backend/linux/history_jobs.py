@@ -7,11 +7,13 @@ from datetime import datetime, timezone
 from backend.common.bt06_gatt import ProtocolError
 from .ble_jobs import BusyError
 from .history_reader import retrieve
+from .settings_reader import retrieve_settings
 
 
 class HistoryJobs:
-    def __init__(self, receiver, store):
+    def __init__(self, receiver, store, settings_store=None):
         self.receiver, self.store = receiver, store
+        self.settings_store = settings_store
         self.lock = threading.RLock()
         self.worker = None
         self.loop = self.task = None
@@ -26,8 +28,10 @@ class HistoryJobs:
         return self.status()['state'] == 'running'
 
     def start(self, options, *, automatic=False, on_complete=None):
-        if not isinstance(options, dict) or set(options) - {'mode'} or options.get('mode', 'full') not in ('full', 'incremental'):
-            raise ValueError('Historienlesen erwartet mode=full oder incremental; Standard ist vollständig.')
+        if not isinstance(options, dict) or set(options) - {'mode'} or options.get('mode', 'full') not in ('full', 'incremental', 'settings'):
+            raise ValueError('Leseauftrag erwartet mode=full, incremental oder settings.')
+        if options.get('mode') == 'settings' and self.settings_store is None:
+            raise ValueError('Geräteeinstellungsablage nicht eingerichtet.')
         config = self.receiver.status()['config']
         self.receiver.validate(config)
         if config['device'] is None:
@@ -54,13 +58,15 @@ class HistoryJobs:
         with self.lock:
             self.value.update(phase=phase, **values)
 
-    async def _read(self, config, base, automatic):
+    async def _read(self, config, base, automatic, mode):
         with self.lock:
             self.loop = asyncio.get_running_loop()
             self.task = asyncio.current_task()
             if self.closing:
                 raise asyncio.CancelledError()
-        return await asyncio.wait_for(retrieve(config, self._progress, base=base, automatic=automatic), 70 if automatic else 180)
+        operation = (retrieve_settings(config, self._progress) if mode == 'settings'
+                     else retrieve(config, self._progress, base=base, automatic=automatic))
+        return await asyncio.wait_for(operation, 70 if automatic else 180)
 
     def _run(self, config, mode, automatic, on_complete):
         acquired = False
@@ -74,9 +80,10 @@ class HistoryJobs:
             acquired = self.receiver.radio_lock.acquire(blocking=False)
             if not acquired:
                 raise BusyError('Bluetooth ist noch belegt. Historienlesen später erneut starten.')
-            transfer = asyncio.run(self._read(config, base, automatic))
+            transfer = asyncio.run(self._read(config, base, automatic, mode))
             self._progress('saving')
-            result = self.store.publish(config['device']['id'], **transfer)
+            result = (self.settings_store.save(config['device']['id'], transfer) if mode == 'settings'
+                      else self.store.publish(config['device']['id'], **transfer))
             with self.lock:
                 self.value.update(result=result)
         except (Exception, asyncio.CancelledError) as exc:
@@ -84,7 +91,7 @@ class HistoryJobs:
                 message = str(exc)
             elif isinstance(exc, TimeoutError):
                 message = ('Automatischer Verbindungsversuch ohne Tastendruck hat das Zeitlimit erreicht. Manuellen Verbindungsmodus prüfen.' if automatic
-                           else 'Bluetooth-Zeitlimit erreicht. Verbindungsfenster per kurzem START/STOP prüfen und erneut lesen. Kein vollständiger Import bestätigt.')
+                           else 'Bluetooth-Zeitlimit erreicht. Verbindungsfenster per kurzem START/STOP prüfen und erneut lesen. Kein vollständiger Leseauftrag bestätigt.')
             elif isinstance(exc, (ValueError, BusyError, RuntimeError)):
                 message = str(exc) if isinstance(exc, BusyError) else 'Historienlesen fehlgeschlagen. Geräteauswahl, Verbindung und Format prüfen; bisherige Daten erhalten.'
             elif isinstance(exc, OSError):

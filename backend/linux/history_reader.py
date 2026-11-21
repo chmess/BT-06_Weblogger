@@ -23,15 +23,32 @@ async def known_device(config):
             if (props.get('Address') and props['Address'].value.lower() == config['device']['address'].lower()
                     and props.get('Adapter') and props['Adapter'].value == '/org/bluez/' + config['adapter']):
                 matches.append((path, props))
-        if len(matches) != 1:
-            raise RuntimeError('Gewählten Logger zuerst auf diesem Adapter suchen und Liveempfang einrichten.')
-        path, props = matches[0]
-        if props.get('Connected') and props['Connected'].value:
-            raise RuntimeError('Logger ist bereits verbunden. Andere Verbindung zuerst trennen.')
-        return BLEDevice(config['device']['address'], config['device']['name'],
-                         {'path': path, 'props': {key: value.value for key, value in props.items()}})
+        if len(matches) > 1:
+            raise RuntimeError('Gewählter Logger ist im BlueZ-Inventar nicht eindeutig.')
+        if matches:
+            path, props = matches[0]
+            if props.get('Connected') and props['Connected'].value:
+                raise RuntimeError('Logger ist bereits verbunden. Andere Verbindung zuerst trennen.')
+            return BLEDevice(config['device']['address'], config['device']['name'],
+                             {'path': path, 'props': {key: value.value for key, value in props.items()}})
     finally:
         bus.disconnect()
+    # Unpaired BlueZ entries can disappear when host discovery stops. A missing
+    # cache entry is not evidence that the chosen logger is unavailable.
+    from bleak import BleakScanner
+    from backend.common.bt06 import advertised_reading
+    from .ble_options import scan_options
+    def selected(device, advertisement):
+        if device.address.lower() != config['device']['address'].lower():
+            return False
+        reading = advertised_reading(advertisement.manufacturer_data)
+        return bool(reading and reading['device_id'] == config['device']['id']
+                    and reading['firmware'] == config['device']['firmware'])
+    target = await BleakScanner.find_device_by_filter(selected, timeout=35, bluez=scan_options(config['adapter']))
+    if target is None:
+        raise RuntimeError('Gewählter Logger mit bestätigtem Format während der Suche nicht gefunden.')
+    target.details['bt06_fresh_discovery'] = True
+    return target
 
 
 async def retrieve(config, progress, base=None, automatic=False):
@@ -39,7 +56,11 @@ async def retrieve(config, progress, base=None, automatic=False):
         raise ProtocolError('Automatisches Nachladen benötigt eine eindeutige geprüfte Basis. Zuerst vollständig lesen.')
     from bleak import BleakClient
     target = await known_device(config)
-    client = BleakClient(target, pair=False, timeout=8 if automatic else 45)
+    # Verified BT06 broadcast intervals reach 30 seconds. Eight seconds can miss
+    # every connectable event even in standard mode. A newly found advertiser
+    # gets a shorter window; an existing BlueZ entry gets one full interval.
+    connect_seconds = (8 if getattr(target, 'details', {}).get('bt06_fresh_discovery') else 35) if automatic else 45
+    client = BleakClient(target, pair=False, timeout=connect_seconds)
     queue = asyncio.Queue(maxsize=1024)
     capture = []
     received_bytes = 0
@@ -72,7 +93,7 @@ async def retrieve(config, progress, base=None, automatic=False):
 
     try:
         progress('connecting')
-        await asyncio.wait_for(client.connect(), 9 if automatic else 50)
+        await asyncio.wait_for(client.connect(), connect_seconds + (1 if automatic else 5))
         service = client.services.get_service(SERVICE_UUID)
         tx = service.get_characteristic(TX_UUID) if service else None
         rx = service.get_characteristic(RX_UUID) if service else None

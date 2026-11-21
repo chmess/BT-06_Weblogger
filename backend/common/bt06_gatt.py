@@ -18,6 +18,10 @@ class ReadCommand(Enum):
     DEVICE_CLOCK = b"\x72\x51"
     LOG_STATUS = b"\x4c\x01"
     LOG_SETTINGS = b"\x72\x02"
+    BROADCAST_SETTINGS = b"\x72\x35"
+    TRANSMIT_RATE = b"\x72\x37"
+    TEMPERATURE_ALARM = b"\x72\x20"
+    HUMIDITY_ALARM = b"\x72\x23"
     SELECT_ALL_HISTORY = b"\x6c\x00"
     RECEIVE_HISTORY = b"\x6c\x01"
 
@@ -30,6 +34,8 @@ def read_request(command, *, selection=None):
     if not isinstance(command, ReadCommand):
         raise TypeError("Nur ausdrücklich unterstützte Leseabfragen zulässig.")
     payload = bytes(11) if command is ReadCommand.SELECT_ALL_HISTORY else b""
+    if command in (ReadCommand.BROADCAST_SETTINGS, ReadCommand.TRANSMIT_RATE):
+        payload = bytes(3)
     if selection is not None:
         if (command is not ReadCommand.SELECT_ALL_HISTORY or not isinstance(selection, tuple) or len(selection) != 2
                 or any(type(value) is not int for value in selection) or not 0 < selection[0] < selection[1] <= 0xFFFFFFFF):

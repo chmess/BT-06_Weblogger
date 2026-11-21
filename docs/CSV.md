@@ -1,4 +1,4 @@
-# CSV-Vertrag · V0.3.2-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
+# CSV-Vertrag · V0.4.0-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
 
 Originalformat: UTF-8, Semikolon, Dezimalkomma, LF, Header. Browserexport zusätzlich mit UTF-8-BOM für Excel. Zeitstempel in V0.1 explizit UTC (`+00:00`); Anzeige in konfigurierter Zeitzone. Monatsdateien folgen UTC, daher stabile Dateigrenzen auch bei Sommerzeitwechsel. Leere Batterie/RSSI-Felder bedeuten unbekannt.
 
@@ -58,3 +58,10 @@ Messwert-CSV bleibt Schema 3. Bei einer Fortsetzung enthalten neue Monatsdateien
 Die Rekonstruktion prüft CSV-Prüfsummen, Sequenzen und Inhaltskennungen jedes benötigten Glieds. Fehlende/beschädigte Basis blockiert Lesen und Bestätigung eines Wiederimports. Spätestens nach 32 Fortsetzungen wird ein vollständiger Zwischenstand geschrieben (`storage=full`, Tiefe 0). Dies begrenzt die Lesekette, bestätigt jedoch keinen neuen vollständigen Geräteabruf. Alte Stände werden nicht gelöscht. Dateiveröffentlichung bleibt atomar mit fsync. Ältere Programmversionen können Manifestversion 2 nicht lesen.
 
 Bestätigte historische Zeitzonen liegen als reine Zuordnung unter `config/history-timezones.json`. Ein optionaler abgeleiteter Export ergänzt drei Spalten: `ZugeordneteZeit` als ISO-8601 mit Offset, `BestaetigteZeitzone`, `Zeitzuordnung=ZEITZONE_BESTAETIGT_DATUM_UNGEPRUEFT`. Original-CSV und Originalfelder werden nicht ersetzt. Eine bestätigte Zeitzone macht ein falsches Gerätedatum nicht richtig. Ungeprüfte spätere Teile bleiben ohne Zusatzzeit; unklare oder fehlende Zeitumstellungsstunden werden nicht geraten.
+
+
+## V0.4: Einstellungsbelege, getrennt von Messungen
+
+`data/device-settings/bt06-<id>/<zufällige-kennung>.csv` enthält reinen Konfigurations-Leseverkehr mit `Hostzeit;Richtung;DatenHex`. Es enthält keine neu erzeugte Messreihe und ist kein Historienstand. `latest.json` enthält die daraus abgeleiteten Geräteeinstellungen sowie SHA-256, Erfassungszeit und Speicherzeit. Die Erfassungszeit stammt aus dem Original-Capture. Rohbeleg wird vor der Zusammenfassung fsync-gesichert, die Zusammenfassung atomar veröffentlicht. Ein gescheiterter neuer Speicherlauf lässt den bisherigen Beleg erhalten.
+
+Beim Lesen werden Rohdatei-Prüfsumme, erlaubte Lesebefehle, Antworten und daraus erneut abgeleitete Werte gegen die Zusammenfassung geprüft. Bei Widerspruch bleibt das Original erhalten und die Ansicht zeigt einen Fehler. Persönliche Gerätekennungen und reale Einstellungen bleiben außerhalb des öffentlichen Git-Bestands. Zugriffsschlüssel werden nicht ausgelesen oder gespeichert.

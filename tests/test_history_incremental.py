@@ -121,7 +121,7 @@ class IncrementalReaderTests(unittest.TestCase):
         seconds=[1700000000+i*600 for i in range(22)]
         base={'snapshot':'a'*64,'count':20,'first':seconds[0],'last':seconds[19],
               'begin':seconds[4]-1,'overlap':16,'unit':'C','interval_seconds':600}
-        for use_range,automatic in ((True,False),(False,False),(True,True),(False,True)):
+        for use_range,automatic,fresh in ((True,False,False),(False,False,False),(True,True,False),(False,True,False),(True,True,True)):
             selected_base=dict(base)
             if not use_range:selected_base['first']-=600
             rows=range_capture(seconds,base['begin'],seconds[-1]+1) if use_range else capture(seconds)
@@ -132,7 +132,7 @@ class IncrementalReaderTests(unittest.TestCase):
             test_case=self
             class Client:
                 def __init__(self,*args,**options):
-                    test_case.assertEqual(options['timeout'],8 if automatic else 45)
+                    test_case.assertEqual(options['timeout'],(8 if fresh else 35) if automatic else 45)
                     test_case.assertFalse(options['pair'])
                     tx=SimpleNamespace(properties=['write']);rx=SimpleNamespace(properties=['notify'])
                     service=SimpleNamespace(get_characteristic=lambda uuid:tx if uuid==TX_UUID else rx if uuid==RX_UUID else None)
@@ -150,7 +150,7 @@ class IncrementalReaderTests(unittest.TestCase):
                     self.notify(None,response)
                     if raw==read_request(ReadCommand.RECEIVE_HISTORY):
                         for chunk in chunks:self.notify(None,chunk)
-            with patch('backend.linux.history_reader.known_device',AsyncMock(return_value=object())), patch.dict('sys.modules',{'bleak':SimpleNamespace(BleakClient=Client)}):
+            with patch('backend.linux.history_reader.known_device',AsyncMock(return_value=SimpleNamespace(details={'bt06_fresh_discovery':fresh}))), patch.dict('sys.modules',{'bleak':SimpleNamespace(BleakClient=Client)}):
                 if automatic and not use_range:
                     with self.assertRaises(ValueError):asyncio.run(retrieve(config(),lambda *args,**kwargs:None,base=selected_base,automatic=True))
                     self.assertNotIn(read_request(ReadCommand.RECEIVE_HISTORY),sent)

@@ -163,6 +163,27 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/klima/api/history?source=live&logger=bt06-87654321")[0], 400)
         self.assertEqual(self.request("/klima/api/history?source=unknown&logger=bt06-12345678")[0], 400)
 
+    def test_device_settings_are_read_only_explicit_and_share_radio_lock(self):
+        from settings_fixture import observation
+        from test_history_jobs import config
+        self.assertEqual(self.request('/klima/api/device-settings/read', {})[0], 403)
+        self.assertEqual(self.request('/klima/api/device-settings/read', {}, self.auth())[0], 400)
+        saved = self.app.device_settings.save('45678901', observation())
+        selected = config();selected['device']['id'] = '45678901'
+        with patch.object(self.app.receiver, 'status', return_value={'config': selected}), patch('backend.linux.settings_reader.known_device') as radio:
+            status, _, body = self.request('/klima/api/device-settings')
+            self.assertEqual(status, 200)
+            value = json.loads(body)
+            self.assertTrue(value['read_only'])
+            self.assertEqual(value['settings']['values']['record_interval_seconds'], 1230)
+            radio.assert_not_called()
+            with patch.object(self.app.sync, 'busy', return_value=True):
+                self.assertEqual(self.request('/klima/api/device-settings/read', {}, self.auth())[0], 409)
+            with patch.object(self.app.sync, 'start', return_value={'state': 'running'}) as start:
+                self.assertEqual(self.request('/klima/api/device-settings/read', {}, self.auth())[0], 202)
+                self.assertEqual(start.call_args.args[0], {'mode': 'settings'})
+        self.assertEqual(self.request('/klima/api/device-settings/write', {}, self.auth())[0], 404)
+
     def test_device_history_chart_export_and_snapshot_access(self):
         from backend.common.history_capture import decode_capture
         from history_fixture import capture

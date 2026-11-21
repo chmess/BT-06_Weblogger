@@ -1,4 +1,4 @@
-# Architektur · V0.3.2-dev
+# Architektur · V0.4.0-dev
 
 ## Laufzeit
 
@@ -71,3 +71,10 @@ Der manuelle Nachladeauftrag verwendet dieselbe Adaptersperre und Wiederaufnahme
 `common/history_timezones.py` speichert ausschließlich bestätigte historische Zeitzonenzuordnungen, ohne Geräteuhränderung und ohne Originaldateien zu ändern. Bestätigung wird durch Rohpräfixvergleich begrenzt. Zeitzone und Datum sind getrennte Aussagen: selbst eine bestätigte Zeitzone setzt `clock_verified` oder `date_verified` nicht auf wahr. Ein zusätzlicher Export enthält abgeleitete Kalenderzeiten mit dieser Kennzeichnung.
 
 Historienfortsetzungen speichern nur neue CSV-Zeilen; ein vollständiger Zwischenstand begrenzt die Basisverkettung. Die Verlaufszuordnung arbeitet vom längsten Stand aus und erkennt Präfixe beim einmaligen Durchlauf, statt jede ältere Gesamtserie vollständig erneut zu lesen. Regenerierbarer Cache bleibt im Arbeitsspeicher. Keine Datenbank, keine Löschung alter Originale und kein zusätzlicher Backupmechanismus.
+
+
+## V0.4: lesende Geräteeinstellungen
+
+`common/device_settings.py` dekodiert unabhängig die belegten 2.05-Einstellungsantworten und prüft gespeicherte Rohbelege. `linux/settings_reader.py` nutzt eine feste Liste reiner Getter, ohne generischen Byte-Schreibzugriff. HistoryJobs serialisiert diesen Modus mit Historie/Automatik und stellt den gespeicherten Hostempfangswunsch nach jedem Ausgang wieder her. Keine Historien-CSV wird aus Einstellungsantworten erzeugt.
+
+Die Hauptansicht bleibt bei einem beschädigten optionalen Einstellungsbeleg nutzbar; der Fehler wird im Einstellungsbereich angezeigt. UI-Felder kommen aus dekodierten Antworten, nicht aus Defaultwerten der Herstellerbibliothek. Noch keine Schreibfunktion, kein implizites Unlock, Start/Stop oder Konfigurations-Commit. Ein bestätigtes Get ist kein Beleg für die Nebenwirkungsfreiheit eines späteren Set/Save.

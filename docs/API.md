@@ -1,4 +1,4 @@
-# HTTP-API · V0.3.2-dev
+# HTTP-API · V0.4.0-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB. Fehler: `{ "error": "..." }`.
 
@@ -60,3 +60,12 @@ Automatische Aufträge nutzen `mode=incremental` und `trigger=automatic`. Ohne g
 `GET /api/time-assignment?logger=...&snapshot=...` liefert bestätigte Zeitzone, Anzahl zugeordneter/unbestätigter Werte und ausdrücklich `clock_verified=false`, `date_verified=false`. `POST /api/time-assignment` benötigt `logger`, `snapshot`, `timezone` und exakt `timezone_confirmed:true`. Die Bestätigung gilt für den gewählten Stand und exakt passende frühere Präfixe, nicht ungefragt für spätere Messungen oder abweichende Reihen.
 
 `GET /api/export?source=device&logger=...&snapshot=...&time_basis=assigned` ergänzt `ZugeordneteZeit`, `BestaetigteZeitzone`, `Zeitzuordnung`. Originalfelder bleiben erhalten, `Zeitstempel` bleibt leer. Datum ist nicht bestätigt; zugeordnete Kalenderzeiten sind kein Beweis für tatsächliche Messzeitpunkte. Ohne passende Bestätigung wird abgewiesen. Nicht bestätigte spätere Zeilen erhalten leere Zusatzzeit und `BEREICH_NICHT_BESTAETIGT`. Der normale Export bleibt unverändert; Kalenderdiagramme verwenden weiter die ausdrücklich gekennzeichnete Gerätezeitachse.
+
+
+## V0.4: ausschließlich lesende Geräteeinstellungen
+
+`GET /api/device-settings` liefert `read_only=true`, ob ein Gerät gewählt ist, und den letzten geprüften Einstellungsbeleg oder `settings=null`. GET löst keine Verbindung aus. `POST /api/device-settings/read` mit `{}` startet bewusst die feste Lesesequenz für das eingerichtete Gerät. Fortschritt bleibt unter `/api/sync` (`mode=settings`); Ergebnis ist mit `kind=device-settings` von Messwertimporten getrennt. Abfragekonflikte liefern 409, keine automatischen parallelen BLE-Zugriffe. Keine Schreibroute für Geräteeinstellungen vorhanden.
+
+Die Zusammenfassung zeigt nur belegte Felder. Abgewiesene Antworten stehen in `read_errors`, unbekannte Formate in `decode_errors`. `unverified` kennzeichnet noch nicht belegte Parameter. `transmit_rate_code` ist ein Rohcode, `long_range=null`; keine geratene Bool-Zuordnung. Gerätezeitfelder sind ungeprüft, keine automatische Jahres-/UTC-Korrektur. Name, Intervalle und Hardware-Alarme sind keine Programmeinstellungen oder Software-Klimagrenzen.
+
+Für fehlende ungekoppelte BlueZ-Einträge gibt es eine frische Suche am ausgewählten Adapter, beschränkt auf Adresse, Gerätekennung und verifiziertes Firmwareformat. Automatische Verbindungen zu vorhandenen Einträgen warten bis 35 Sekunden; nach frischer Entdeckung acht Sekunden. Gesamtlimit bleibt begrenzt; dies ist kein Nachweis eines zuverlässig connectablen Gerätemodus.

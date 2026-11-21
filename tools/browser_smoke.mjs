@@ -168,7 +168,25 @@ HistoryStore(Path(sys.argv[1])/'data/history').publish('12345678',**decode_captu
   await evaluate(`setSource('simulation');document.querySelector('#period').value='0';loadHistory()`);
   await waitFor(`document.querySelector('#chart-caption').textContent.includes('Testwerte')`);
   assert.equal(await evaluate(`document.querySelector('#run-title').textContent`),'Testlauf');
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','no JS exceptions','no external requests'],screenshots:7};
+  const settingsFixture=spawnSync('python3',['-c',`import sys,json
+from pathlib import Path
+sys.path.insert(0,str(Path.cwd()/'tests'))
+from settings_fixture import observation
+from backend.common.device_settings import DeviceSettingsStore
+print(json.dumps(DeviceSettingsStore(Path(sys.argv[1])/'data/device-settings').save('12345678',observation())))
+`,join(scratch,'data')],{cwd:project,encoding:'utf8'});
+  assert.equal(settingsFixture.status,0,settingsFixture.stderr);
+  const observed=JSON.parse(settingsFixture.stdout);
+  await evaluate(`(async()=>{const originalApi=api;try{api=async(path,...args)=>path==='device-settings'?{settings:${JSON.stringify(observed)},selected:true,read_only:true}:originalApi(path,...args);await refreshDeviceSettings();}finally{api=originalApi;}})()`);
+  await click('[data-page="logger"]');
+  const settingsText=await evaluate(`document.querySelector('#device-settings-values').textContent`);
+  assert.ok(settingsText.includes('Demo BT06')&&settingsText.includes('1230 s')&&settingsText.includes('12,5 s'));
+  assert.ok(settingsText.includes('Bedeutung noch nicht bestätigt'));
+  assert.equal(await evaluate(`document.querySelector('#device-settings-read').disabled`),true);
+  await screenshot('device-settings-mobile.png');
+  assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
+  assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(external.length,0,JSON.stringify(external));
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','no JS exceptions','no external requests'],screenshots:8};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}

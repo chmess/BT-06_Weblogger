@@ -1,4 +1,4 @@
-# Prüfung · V0.3.2-dev · 21.11.2026
+# Prüfung · V0.4.0-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -100,3 +100,12 @@ Chromium-Prüfung erfolgreich: Auto-Sync bleibt beim Speichern eines Intervalls 
 Realer automatischer Verbindungsversuch ohne Tastendruck endete nach etwa acht Sekunden im Timeout; keine Historienänderung, Hostempfang wieder gestartet. Damit ist unbeaufsichtigtes Auslesen im aktuellen Gerätemodus ausdrücklich nicht erfolgreich abgenommen. Privater Bericht: `private/unattended-sync-report.json`. Automatik bleibt aus; geeigneter Gerätemodus und tatsächliches Gerätedatum müssen weiter geklärt werden.
 
 Aktualisierter synthetischer Historienbenchmark (Einzellauf auf DeskPi, 32.000 Ausgangswerte): Vollimport 1,931 s, Wiederimport mit Inhaltsprüfung 2,726 s, Lesen/Diagramm 1,380 s. Drei neue Werte aus 19 übertragenen Vergleichs-/Neuwerten ergänzen: 1,263 s einschließlich synthetischem Capture-Aufbau, zusätzlich 823 Byte Messwert-CSV. Rekonstruktion und Verlaufsindex anschließend 1,784 s. Maximales RSS des gesamten Benchmarkprozesses einschließlich Datengenerator 107.260 KiB (ca. 104,7 MiB); keine Server-Grundlast oder SMApi-Messung. Test enthält zusätzlich zum Ausgangsbestand den vollständigen synthetischen Nachladefixture-Aufbau im selben Prozess.
+
+
+## V0.4.0-dev: lesende Geräteeinstellungen
+
+82 automatisierte Tests bestanden. Neue Fälle: BlueZ-Cache und erneute Suche mit passendem Adapter, Adresse, Kennung und Firmware; Zeitlimits für vorhandene/frisch gefundene Geräte; feste Getter einschließlich benötigter Leseparameter; keine Setter/Paarung; verifizierte Felddekodierung; unbekannte Formate ohne Defaultwerte; negative Antworten; Rohbeleg und Zusammenfassung widerspruchsfrei; Erfassungszeit aus Original; Dateifehler erhalten früheren Stand; gemeinsamer Einstellungsauftrag stellt Empfang wieder her und erzeugt keine Historienmessungen; API/CSRF/Sperre und keine Geräte-Schreibroute.
+
+Chromium-Prüfung: neue lesende Feldanzeige einschließlich unbekannter Funkmodusbedeutung und gesperrter Leseaktion ohne Geräteauswahl. Bestehende Quellen-/Historien-/Zeitzonen-/Automatik-/Export-/Mobilprüfungen erfolgreich, keine JS-Ausnahmen oder externen Requests. Die gespeicherten Originalbelege zusätzlich nur lesend in der neuen Ansicht geprüft. Keine lokale Desktop-Anzeige oder Chat-Visualisierung vorausgesetzt.
+
+Reale Getter-Sequenz erfolgreich (Name, Zeit, Status, Aufzeichnung, Funk, Alarmgrenzen), sauber getrennt und Hostempfang wieder gestartet. Zusätzlich gelang ein nur lesender Verbindungsversuch nach ausschließlich kurzem STOP. Anschließender Versuch ohne Tastenaktion und mit korrigierter längerer Wartezeit: weiterhin Timeout, Historien unverändert, Hostempfang wieder gestartet. Private Belege: `private/gatt-config-read-report.json`, `private/gatt-config-stop-only-report.json`, `private/unattended-sync-interval-report.json`. Kein Geräteschreibtest; V0.4 ist noch nicht vollständig. Neue integrierte UI/API benötigt Dienstneustart und anschließende Geräteabnahme.
