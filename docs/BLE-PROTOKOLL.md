@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.2.0
+# BLE-Protokollstand · V0.3.0-dev
 
 ## Belege
 
@@ -19,7 +19,7 @@ Lokale Gerätefotos vom 21.11.2026 zeigen die Modellaufschrift BT06 und „BLE T
 | Betriebssystem-Kopplung | nur ausdrücklicher `pair=True`-Auftrag | Notwendigkeit/Agent/PIN offen |
 | Geräte-ID/Modell/Firmware | Advertising-Decoder 2.05 | ID zu Foto passend, angekündigte Firmware 2.05 |
 | Live T/rF | belegter Advertising-Decoder | realer Empfang dekodiert und als CSV gespeichert |
-| Historienblöcke/Index/Uhrbasis | eigenständiger Streamparser, noch kein produktiver Import | vollständige Übertragung geprüft; Gerätezeit versetzt, Offset nicht verifiziert |
+| Historienblöcke/Index/Uhrbasis | Streamparser, sicherer CSV-Import und UI in V0.3.0-dev | vollständige Übertragung geprüft; Gerätezeit versetzt, Offset nicht verifiziert |
 | Zugangsschlüssel/Unlock | keine Befehle | offen |
 | Gerätekonfiguration/Start/Stop/Löschen | keine Befehle | offen |
 
@@ -64,6 +64,6 @@ Historienrahmen: uint16 LE Nutzlänge, Typbyte und Nutzdaten. Typ 0 enthält ein
 
 Die erfasste vollständige Historie wurde unabhängig dekodiert: angekündigte und dekodierte Anzahl, Endezähler, Anfang/Ende sowie alle Zeitabstände stimmen überein. Originalantworten und dekodierte Werte bleiben private CSV. Vollständige Übertragung bedeutet noch keine verifizierte UTC-Zeitbasis: Gerätezeit ist gegenüber Hostzeit versetzt. Keine Verschmelzung mit Live-CSV, keine Uhreinstellung und keine automatische Freigabe destruktiver Aktionen.
 
-Der Produktionsdienst bleibt V0.2. Der Web-GATT-Diagnosepfad bleibt ein Inventartest; der neue Lesetest ist noch kein UI-Sync. Wiederholter Import, Dedupe, Recovery, Benutzerführung für das kurze Funkfenster und unbeaufsichtigte Wiederverbindung sind ausstehend.
+Der Produktionsdienst bleibt bis zum geordneten Neustart V0.2. In V0.3.0-dev sind geprüfter Monats-CSV-Import, identische Wiederholungen ohne Kopie, getrennte Historienstände, Gerätezeit-UI und manuelles Sync implementiert. Der Web-GATT-Diagnosepfad bleibt ein Inventartest. Die integrierte BLE-/API-Strecke wurde automatisiert mit simuliertem BLE geprüft; ihre neue Hardwareabnahme im Dienst steht noch aus. Automatischer Sync, zusammengeführte Langzeithistorie, UTC-Zuordnung und unbeaufsichtigte Wiederverbindung bleiben offen. Die März-Historie ist laut Nutzer mit der ersten Inbetriebnahme plausibel; diese Aussage bestätigt keinen UTC-Offset.
 
 BlueZ-Suche und Liveempfang setzen ausdrücklich `DuplicateData=True`, weil Bleak sonst identische Meldungen unterdrückt. Das erhält Empfangszeit und Frischeprüfung auch bei gleichbleibenden Messwerten; es erzwingt keine Funkpakete und löst das kurze Verbindungsfenster nicht. Referenzen: [BlueZ Adapter API](https://bluez.readthedocs.io/en/latest/adapter-api/), [Bleak Linux backend](https://bleak.readthedocs.io/en/latest/backends/linux.html).

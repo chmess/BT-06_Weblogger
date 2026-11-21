@@ -20,29 +20,29 @@
     <button data-page="settings">Einstellungen</button>
     <button data-page="diagnostics">Diagnose</button>
   </nav>
-  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.2.0</span><br>Deine Daten bleiben hier.</p></div>
+  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.3.0-dev</span><br>Deine Daten bleiben hier.</p></div>
 </aside>
 <main>
   <header><div><p class="eyebrow">BT-06 WEBLOGGER</p><h1 id="page-title">Übersicht</h1></div><span class="tag warning">Entwicklung · Testbetrieb</span></header>
   <div id="notice" role="status" aria-live="polite" hidden></div>
-  <div class="source-strip"><label>Datenquelle<select id="source-select"><option value="live">Echte BT06-Empfänge</option><option value="simulation" selected>Synthetische Testdaten</option></select></label></div>
+  <div class="source-strip"><label>Datenquelle<select id="source-select"><option value="live">Echte BT06-Empfänge</option><option value="device">Loggerhistorie · Gerätezeit</option><option value="simulation" selected>Synthetische Testdaten</option></select></label></div>
   <div class="simulation-notice" id="source-notice"><strong>Synthetische Testdaten</strong><span>Alle dargestellten Werte dieser Datenquelle sind simuliert.</span></div>
 
   <section id="page-overview" class="page">
     <div class="section-heading"><h2>Messstellen</h2><button class="secondary" id="overview-export" disabled>CSV exportieren</button></div>
     <p class="muted" id="overview-note">Letzter Testlauf · keine Livewerte und keine Schimmelbewertung.</p>
     <div id="cards" class="cards"><div class="empty"><h3>Noch keine Messdaten</h3><p>Erzeuge einen Testlauf, um die Oberfläche ohne Logger auszuprobieren.</p><button data-go="simulation">Testdaten erzeugen</button></div></div>
-    <article class="panel"><h2>Entwicklungsstand</h2><p>V0.2 empfängt die aktuellen BLE-Aussendungen des bestätigten BT06-Formats 2.05 und speichert sie als CSV. Testdaten bleiben getrennt. Gerätehistorie und Konfiguration folgen nach der GATT-Prüfung; Klimaberechnungen gemäß Roadmap in V0.6.</p></article>
+    <article class="panel"><h2>Entwicklungsstand</h2><p>Liveempfang und manuelles Historienlesen für BT06 2.05 sind verfügbar. Vollständige Historienstände bleiben getrennt von Host-Empfängen und Simulation. Gerätezeit und Zeitzone sind noch nicht verifiziert. Gerätekonfiguration folgt in V0.4, Klimaberechnungen in V0.6.</p></article>
   </section>
 
   <section id="page-history" class="page" hidden>
     <article class="panel">
-      <div class="toolbar"><label id="run-label">Testlauf<select id="run-select"></select></label><label>Messstelle<select id="logger-select"></select></label><label>Zeitraum<select id="period"><option value="24">24 Stunden</option><option value="168">7 Tage</option><option value="720">30 Tage</option><option value="0">Alles</option><option value="custom">Frei wählen</option></select></label></div>
+      <div class="toolbar"><label id="run-label"><span id="run-title">Testlauf</span><select id="run-select"></select></label><label>Messstelle<select id="logger-select"></select></label><label>Zeitraum<select id="period"><option value="24">24 Stunden</option><option value="168">7 Tage</option><option value="720">30 Tage</option><option value="0">Alles</option><option value="custom">Frei wählen</option></select></label></div>
       <div class="toolbar" id="custom-period" hidden><label>Von<input id="range-start" type="datetime-local"></label><label>Bis<input id="range-end" type="datetime-local"></label><button id="apply-range">Zeitraum laden</button></div>
       <div class="section-heading"><p class="muted" id="chart-caption">Keine Daten ausgewählt.</p><div class="button-row"><button class="secondary" id="chart-reset">Zoom zurücksetzen</button><button class="secondary" id="chart-fullscreen">Vollbild</button><button id="chart-export" disabled>CSV exportieren</button></div></div>
       <div id="chart" aria-label="Interaktiver Temperatur- und Feuchteverlauf"></div>
       <label class="inline-check" id="live-follow-label" hidden><input id="live-follow" type="checkbox" checked> Live aktualisieren · manueller Zoom pausiert die Aktualisierung</label>
-      <p class="hint">Temperatur in °C · relative Luftfeuchte in % · Lücken bleiben sichtbar. CSV enthält die Originalauflösung des gewählten Zeitraums, unabhängig vom Grafikzoom.</p>
+      <p id="chart-time-note" class="hint">Temperatur in °C · relative Luftfeuchte in % · Lücken bleiben sichtbar. CSV enthält die Originalauflösung des gewählten Zeitraums, unabhängig vom Grafikzoom.</p>
     </article>
   </section>
 
@@ -69,7 +69,7 @@
         <label>Standardzeitraum in Stunden<input name="default_hours" type="number" min="1" max="2160" required></label>
         <label>Feuchte-Warnlinie in %<input name="humidity_warning" type="number" min="1" max="99" step="0.1" required></label>
         <label>Kritische Feuchtelinie in %<input name="humidity_critical" type="number" min="2" max="100" step="0.1" required></label>
-      </div><p class="hint">Die Schwellen zeichnen Hilfslinien im Diagramm. Eine zeitabhängige Risikobewertung ist in V0.2 noch nicht enthalten. Geräteeinstellungen sind hiervon getrennt.</p>
+      </div><p class="hint">Die Schwellen zeichnen Hilfslinien im Diagramm. Eine zeitabhängige Risikobewertung ist noch nicht enthalten. Geräteeinstellungen sind hiervon getrennt.</p>
       <div class="form-actions"><button id="load-settings" type="button" class="secondary">Load Settings</button><input id="settings-file" type="file" accept=".json,application/json" hidden><button type="submit">Save Settings</button></div></form>
     </article>
   </section>
@@ -79,16 +79,24 @@
       <p id="capture-status" role="status" class="hint">Empfang wird geprüft …</p><div class="button-row"><button id="capture-resume" hidden>Empfang fortsetzen</button><button id="capture-stop" class="secondary" disabled>Empfang pausieren</button></div>
       <p class="hint">Ein bewusst aktivierter Empfang wird nach einem Programmneustart fortgesetzt. Pausieren beendet nur den Empfang am DeskPi; der Logger zeichnet unverändert autonom weiter auf.</p>
     </article>
-    <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. Verbinden liest in V0.2 nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>
+    <article class="panel"><h2>Gespeicherte Loggerhistorie</h2>
+      <p>Den eingerichteten BT06 vollständig auslesen. Der Hostempfang pausiert kurz und wird danach wiederhergestellt. Geräteuhr, Aufzeichnung und Einstellungen bleiben unverändert.</p>
+      <div class="button-row"><button id="sync-start" disabled>Historie jetzt lesen</button></div>
+      <p id="sync-status" class="hint" role="status" aria-live="polite">Historienstatus wird geladen …</p>
+      <p id="sync-button-signal" class="simulation-notice" hidden><strong>Jetzt kurz START, danach kurz STOP antippen.</strong> Nicht halten. Das öffnet das kurze Verbindungsfenster. Handy-App vorher trennen.</p>
+      <p class="hint">Die Gerätezeit wird unverändert übernommen und als ungeprüft gekennzeichnet. Gleiche Historienstände werden nicht doppelt gespeichert; veränderte Stände bleiben getrennt auswählbar. Noch kein automatischer Sync.</p>
+      <div id="snapshot-list" class="run-list"></div>
+    </article>
+    <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. „Verbinden &amp; prüfen“ liest nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>
       <div class="toolbar"><label>Bluetooth-Adapter<input id="ble-adapter" value="hci0" pattern="hci[0-9]{1,3}" required></label><label>CSV-Speicherabstand in Sekunden<input id="capture-interval" type="number" min="10" max="3600" step="1" value="60"></label><button id="ble-scan">Geräte suchen (30 s)</button></div>
       <p class="hint" id="ble-status">Bluetooth-Status wird geladen …</p><div id="ble-devices" class="run-list"></div>
     </article>
-    <article class="panel"><h2>Verbinden und Koppeln</h2><p>Viele BLE-Geräte benötigen eine Verbindung ohne Betriebssystem-Kopplung. „Koppeln &amp; prüfen“ versucht ausdrücklich eine BlueZ-Kopplung. Falls eine PIN oder Bestätigung erforderlich ist, erfolgt sie über den systemeigenen Bluetooth-Agent.</p><p class="hint">Eine Betriebssystem-Kopplung kann gespeichert bleiben. Sie ersetzt keinen möglichen BT06-Zugangsschlüssel. In V0.2 werden keine Loggerparameter, Uhrzeiten oder Speicherinhalte verändert. Der Advertising-Liveempfang benötigt keine Dauerverbindung. Historienauslesung folgt nach der GATT-Prüfung.</p><pre id="ble-result" hidden></pre></article>
+    <article class="panel"><h2>Verbinden und Koppeln</h2><p>Viele BLE-Geräte benötigen eine Verbindung ohne Betriebssystem-Kopplung. „Koppeln &amp; prüfen“ versucht ausdrücklich eine BlueZ-Kopplung. Falls eine PIN oder Bestätigung erforderlich ist, erfolgt sie über den systemeigenen Bluetooth-Agent.</p><p class="hint">Eine Betriebssystem-Kopplung kann gespeichert bleiben. Sie ersetzt keinen möglichen BT06-Zugangsschlüssel. Loggerparameter, Uhrzeiten und Speicherinhalte werden nicht verändert. Der Advertising-Liveempfang benötigt keine Dauerverbindung. Historienlesen ist separat verfügbar; Kopplung war beim geprüften BT06 nicht erforderlich.</p><pre id="ble-result" hidden></pre></article>
   </section>
 
   <section id="page-diagnostics" class="page" hidden>
     <article class="panel"><h2>Programmstatus</h2><dl id="diagnostics"></dl></article>
-    <article class="panel"><h2>BLE-Diagnose</h2><p>Suche und Verbindungsprüfung sind auf der Loggerseite verfügbar. Alternativ lokal:</p><pre>./tools/ble-diagnose.sh scan --seconds 10</pre><p class="hint">Benötigt die optionale Bleak-Umgebung und Zugriff auf BlueZ. Keine Konfigurations- oder Speicherbefehle. BT06-Advertising-Format 2.05 ist dokumentiert; GATT und Historienprotokoll sind noch nicht erfolgreich verifiziert.</p></article>
+    <article class="panel"><h2>BLE-Diagnose</h2><p>Suche und Verbindungsprüfung sind auf der Loggerseite verfügbar. Alternativ lokal:</p><pre>./tools/ble-diagnose.sh scan --seconds 10</pre><p class="hint">Benötigt die optionale Bleak-Umgebung und Zugriff auf BlueZ. Keine Konfigurations- oder Speicherbefehle. BT06-Advertising-Format 2.05 ist dokumentiert; GATT und vollständiger Historientransfer sind am realen BT06 geprüft; automatische Synchronisation und Zeitzuordnung bleiben offen.</p></article>
   </section>
   <footer>BT-06_Weblogger · vollständig lokal · CSV als Datenformat</footer>
 </main>

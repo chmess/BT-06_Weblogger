@@ -18,6 +18,8 @@ class ReadCommand(Enum):
     DEVICE_CLOCK = b"\x72\x51"
     LOG_STATUS = b"\x4c\x01"
     LOG_SETTINGS = b"\x72\x02"
+    SELECT_ALL_HISTORY = b"\x6c\x00"
+    RECEIVE_HISTORY = b"\x6c\x01"
 
 
 class ProtocolError(ValueError):
@@ -27,7 +29,8 @@ class ProtocolError(ValueError):
 def read_request(command):
     if not isinstance(command, ReadCommand):
         raise TypeError("Nur ausdrücklich unterstützte Leseabfragen zulässig.")
-    return b"\x2a\x03" + command.value + b"\x23"
+    payload = bytes(11) if command is ReadCommand.SELECT_ALL_HISTORY else b""
+    return bytes([0x2a, 3 + len(payload)]) + command.value + payload + b"\x23"
 
 
 def read_reply(command, data):

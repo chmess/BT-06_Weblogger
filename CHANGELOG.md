@@ -1,6 +1,14 @@
 # Änderungen
 
-## V0.3 in Entwicklung · 2026-11-21
+## 0.3.0-dev · 2026-11-21
+
+- Vollständige Historien als unveränderliche Monats-CSV-Stände; Veröffentlichung erst nach CSV-/Manifest-fsync und atomarer Umbenennung. Inhaltskennung verhindert identische Kopien auch nach Neustart. Veränderte/überlappende Stände bleiben ausdrücklich getrennt; keine geratenen stabilen Geräteindizes.
+- Manuelles lesendes GATT-Sync mit Fortschritt, begrenztem Empfang, gemeinsamer Adaptersperre, Abbruch beim Beenden und Wiederaufnahme des vorher aktivierten Hostempfangs. Keine automatische Kopplung oder Loggeränderung.
+- Datenquelle Loggerhistorie mit Gerätezeitachse, freier Kalenderauswahl, Historienstandwahl und Original-CSV. UTC-Zeitstempel bleiben bei ungeprüfter Zeitbasis leer; Original-Gerätesekunden bleiben erhalten. Rückwärts laufende Gerätezeit blockiert eine irreführende Kurve, Originalexport bleibt möglich.
+- Offline-Capture-Import und reproduzierbarer Historien-Performancecheck. Original-Capture erfolgreich importiert und wiederholt ohne Kopie geprüft; echte Historienansicht nur lesend geprüft.
+- 49 automatisierte Tests bestanden; synthetische Browserprüfung einschließlich Historie, Export und mobiler Ansicht erfolgreich. Neue integrierte BLE-Strecke noch nicht im Dienst mit Hardware abgenommen; bestehender Dienst bleibt bis Neustart V0.2. Automatischer Sync, inkrementelles Nachladen und UTC-Zuordnung noch offen.
+
+### Vorangegangene Protokollprüfung
 
 - Reale GATT-Verbindung ohne Pairing, reine Geräte-/Uhrzeit-/Statusabfragen und vollständiger Historientransfer geprüft. Private Roh- und dekodierte CSV bleiben außerhalb des Repositorys. Noch kein produktiver Historienimport oder automatischer Sync.
 - Unabhängiger, begrenzter Historienparser für Rahmenfragmentierung, vollständige und kompakte Messwerte, Anzahl-/Ende-/Rahmenzählerprüfung. Fehler sperren die Vollständigkeitsbestätigung; Gerätezeiten erhalten keinen erfundenen UTC-Offset. Jahresbasis der Kalenderantwort muss ausdrücklich festgelegt werden.

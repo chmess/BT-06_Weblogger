@@ -1,8 +1,8 @@
 # BT-06 Weblogger
 
-Lokaler Klimamonitor für Linux und Raspberry Pi. **Aktueller Stand: V0.2.0 – BT06-Liveempfang per Advertising und CSV-Aufzeichnung.** Unterstützt wird zunächst das belegte Format der Firmware 2.05. Gerätehistorie, Gerätekonfiguration und Klimaberechnungen folgen gemäß Roadmap.
+Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.3.0-dev – manuelles Historienlesen und getrennte Historienansicht für BT06 2.05.** Auf dem DeskPi läuft bis zum nächsten Dienstneustart weiterhin V0.2.
 
-V0.3 ist in Entwicklung: vollständiger Historientransfer am realen BT06 und unabhängige Dekodierung erfolgreich, ohne Pairing oder Änderung von Gerätezeit/Aufzeichnung. Der produktive Webimport folgt nach Klärung der Gerätezeit und Prüfung von Dedupe/Recovery. Details und Grenzen: [BLE-Protokoll](docs/BLE-PROTOKOLL.md).
+Vollständiger Historientransfer am realen BT06 und Import der gesicherten Originaldaten sind geprüft. Die neue integrierte BLE-/API-Strecke wurde automatisiert mit simuliertem BLE geprüft; ihre Geräteabnahme im Dienst steht noch aus. Automatischer Sync, zusammengeführte Langzeithistorie und verifizierte Zeitzuordnung sind noch offen. Details: [BLE-Protokoll](docs/BLE-PROTOKOLL.md).
 
 ## Start
 
@@ -25,6 +25,9 @@ Im Browser `http://127.0.0.1:8766/` öffnen. Der Prozess läuft im Vordergrund. 
 - Jeder Testlauf erhält ein eigenes Verzeichnis. Alle Werte bleiben als Simulation gekennzeichnet. Keine erfundenen Batterie-/RSSI-Werte.
 - Interaktiver ECharts-Verlauf mit Temperatur/Feuchte, Tooltip, Zoom, Navigator, Legende, Vollbild, freien Zeiträumen und Schwellenlinien. Lücken bleiben sichtbar. Legendenwahl wird lokal im Browser gespeichert.
 - CSV-Download des gewählten Abfragezeitraums in Originalauflösung. Grafikzoom verändert den Exportzeitraum nicht; die freie Zeitraumwahl steuert ihn.
+- Historie manuell auslesen: **Logger / Bluetooth → Historie jetzt lesen** verwendet den eingerichteten Live-Logger, pausiert den Hostempfang und stellt ihn danach wieder her. Beim angezeigten Signal START und danach STOP jeweils nur kurz antippen; nicht halten, Handy-App vorher trennen. Keine Kopplung oder Änderung von Loggeruhr/Aufzeichnung.
+- Vollständige Historienstände als monatliche Original-CSV mit überprüfter Anzahl/Endemarkierung; identische Wiederholungen erzeugen keine Kopie. Veränderte oder überlappende Stände bleiben getrennt, weil kein dauerhaft stabiler Geräteindex belegt ist.
+- Datenquelle **Loggerhistorie · Gerätezeit**: Verlauf, freie Kalenderbereiche und Original-CSV-Export, ausdrücklich ohne bestätigten UTC-Offset. Keine Verschiebung auf Hostzeit und keine Vermischung mit Liveempfängen.
 - Explizite BLE-Gerätesuche, Geräteauswahl und vorübergehende GATT-Verbindungsprüfung. Betriebssystem-Kopplung nur mit eigenem Button/CLI-Option. Keine Logger-Konfigurationsbefehle.
 
 ## Bluetooth / Kopplung
@@ -49,7 +52,7 @@ Alternativ:
 ./tools/ble-diagnose.sh gatt --device <BEWUSST-GEWAEHLTE-ADRESSE> --adapter hci0 --pair
 ```
 
-Beim ersten Start gibt es keinen automatischen Scan oder Verbindungsversuch. Ein auf der Loggerseite bewusst aktivierter Advertising-Empfang wird nach einem Programmneustart wieder aufgenommen. „Empfang pausieren“ deaktiviert diese Wiederaufnahme; die Aufzeichnung im Logger bleibt unverändert. Der lokale BT06 wurde per Advertising erkannt und anhand seiner Aufkleberkennung zugeordnet. Die bisherigen GATT-Verbindungsprüfungen endeten mit Timeout; eine Kopplung wurde nicht versucht. Advertising-Empfang benötigt diese Verbindung nicht. GATT und Kopplung sind damit noch nicht an echter Hardware abgenommen. Gerätefunktionen, UUIDs und Bytebefehle bleiben bis zur Verifikation offen; siehe [Protokollstand](docs/BLE-PROTOKOLL.md).
+Beim ersten Start gibt es keinen automatischen Scan oder Verbindungsversuch. Ein auf der Loggerseite bewusst aktivierter Advertising-Empfang wird nach einem Programmneustart wieder aufgenommen. „Empfang pausieren“ deaktiviert diese Wiederaufnahme; die Aufzeichnung im Logger bleibt unverändert. Der lokale BT06 wurde per Advertising erkannt und anhand seiner Aufkleberkennung zugeordnet. Nach frühen Timeouts gelangen GATT und vollständige Historienübertragung im kurzen Standard-BLE-Fenster ohne Pairing. Advertising-Empfang benötigt diese Verbindung nicht. Die neue integrierte manuelle Sync-Strecke muss nach Aktivierung im Dienst noch mit Hardware abgenommen werden; automatische Wiederverbindung und Geräteparametrierung bleiben offen. Siehe [Protokollstand](docs/BLE-PROTOKOLL.md).
 
 ## Echte BT06-Empfänge
 
@@ -105,3 +108,16 @@ Weitere Dokumente: [Architektur](docs/ARCHITEKTUR.md), [CSV](docs/CSV.md), [API]
 ## Lizenzen und Referenzen
 
 Apache ECharts 6.0.0 wird unverändert lokal gebündelt; Lizenz, NOTICE und d3-Lizenz liegen in `web/assets/`. [Drittanbieterhinweise](docs/THIRD-PARTY.md). Aus dem TZONE-Android-SDK wurde kein Code übernommen; dessen Wiederverwendungslizenz ist ungeklärt. Private Referenzprojekte wurden nur als Architektur-/Bedienreferenz gelesen und nicht kopiert.
+
+
+## Vorhandene Historien-Capture-CSV offline importieren
+
+Nur für zuvor eindeutig einem BT06 2.05 zugeordnete Captures mit den Spalten `Hostzeit;Richtung;DatenHex` und vollständigem belegtem Lesetransfer:
+
+```sh
+python3 tools/import_history.py /pfad/capture.csv --device-id 12345678 --firmware 2.05
+```
+
+Die Kennung im Beispiel ist synthetisch. Das Werkzeug greift nicht auf Bluetooth zu. Es prüft Befehlsfolge, Metadaten, Rahmen und Vollständigkeit erneut und schreibt unter `data/history/`. Original-Capture bleibt unverändert. Unsichere, unvollständige oder fremde Formate werden abgewiesen. Wiederholung ist sicher; nach Fehler vor der Veröffentlichung erneut vollständig importieren. Nicht veröffentlichte `.pending-*` bleiben zur Diagnose erhalten und werden nicht angezeigt.
+
+Für die vorbereitete DeskPi-Aktualisierung genügen `sudo systemctl restart bt06-weblogger.service` in der normalen SSH-Sitzung und anschließend Neuladen von `/klima/`. Keine Paketinstallation oder System-/Mountänderung nötig. Der aktivierte Liveempfang wird beim Start wieder aufgenommen; Historienlesen startet ausschließlich auf Klick.

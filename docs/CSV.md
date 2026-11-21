@@ -1,4 +1,4 @@
-# CSV-Vertrag · V0.2.0 · Schema 1 (Simulation) und 2 (BLE-Empfang)
+# CSV-Vertrag · V0.3.0-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
 
 Originalformat: UTF-8, Semikolon, Dezimalkomma, LF, Header. Browserexport zusätzlich mit UTF-8-BOM für Excel. Zeitstempel in V0.1 explizit UTC (`+00:00`); Anzeige in konfigurierter Zeitzone. Monatsdateien folgen UTC, daher stabile Dateigrenzen auch bei Sommerzeitwechsel. Leere Batterie/RSSI-Felder bedeuten unbekannt.
 
@@ -29,3 +29,14 @@ Separate Dateien unter `data/bt06-<id>/<UTC-jahr>/<UTC-monat>.csv`, gleiche erst
 Jedes empfangene Paket aktualisiert die Anzeige; dauerhafte Stichproben werden höchstens nach Ablauf des ausdrücklich gewählten Speicherabstands geschrieben. Ein wiederholter Zahlenwert zu einem späteren Empfang ist eine neue Hostbeobachtung. Fehlende Aussendungen werden nicht aufgefüllt. Erfolg wird erst nach fsync bestätigt. Bei unvollständiger Endzeile/abweichendem Header wird das weitere Anhängen blockiert, der Bestand bleibt erhalten und der Fehler erscheint in der Oberfläche. Die Historien-Recovery und Zusammenführung mit Original-Geräteaufzeichnungen gehören zu V0.3.
 
 Fehlende Zeitabschnitte bleiben fehlend. Grafikverdichtung fügt für die Darstellung Nullmarkierungen ein; sie werden nicht in CSV-Originaldaten geschrieben. Zeitbereichsfilter sind an beiden Grenzen inklusiv und verlangen einen Offset. Beschädigte Header oder unvollständige Zeilen erzeugen einen sichtbaren Fehler statt stiller Reparatur. V0.1 liest nur vollständige veröffentlichte Testläufe.
+
+
+## Schema 3: Loggerhistorie mit ungeprüfter Zeitbasis
+
+`data/history/bt06-<id>/<sha256>/<Gerätejahr>/<Gerätejahr-Gerätemonat>.csv`. Ein Verzeichnis enthält einen vollständig geprüften Historienstand, keine fortlaufende Datensatz-ID des Geräts. Gleicher Inhalt wird wiedererkannt; verschiedene Stände werden getrennt ausgewählt und nicht übereinander geplottet. Noch keine automatische Zusammenführung überlappender Messreihen oder Host-Empfänge.
+
+Erste zehn Felder wie zuvor, danach `GeraeteSekunden;Geraetekalender;Sequenz;RohwerteHex;Zeitbasis;Firmware`. `Schema=3`, `Quelle=BT06-Historie`. `Zeitstempel`, Batterie und RSSI bleiben leer. Es wird kein UTC-Offset erfunden. Der naive Gerätekalender wird aus den unveränderten epochförmigen Geräte-Sekunden dargestellt; dies behauptet keine tatsächliche UTC-Zeit. `Qualitaet=ZEIT_UNGEPRUEFT`, gegebenenfalls zusätzlich `SENSOR_UNGUELTIG`. `Sequenz` identifiziert nur die Position innerhalb des vollständigen Standes; identische Zeiten bleiben erhalten. `RohwerteHex` bewahrt die vier Originalwertebytes.
+
+`capture.csv` bewahrt Original-GATT-Übertragung als `Hostzeit;Richtung;DatenHex`, Hostzeit mit echtem Offset. `manifest.json` enthält ausschließlich abgeleitete Anzahl, Zeitgrenzen, Einheit, Intervall, Firmware, Transportprüfung und Datei-Prüfsummen. Keine Originalmesswerte in JSON. Der Gerätezeit-Chart verwendet intern separate Kalenderkoordinaten; diese werden niemals als verifizierter Zeitstempel exportiert.
+
+CSV-Dateien und Manifest werden vor Veröffentlichung fsync-gesichert; ein exklusiver flock serialisiert Importe auch gegenüber dem Offlinewerkzeug. Atomare Verzeichnisumbenennung veröffentlicht alle Monatsdateien gemeinsam. Nach Abbruch/Schreibfehler bleiben bestehende Stände erhalten. Erneuter Vollimport rekonstruiert einen neuen vollständigen Stand; unveröffentlichte Staging-Dateien werden nicht als erfolgreich angeboten. Beschädigte bestehende Dateien blockieren Lesen und die Bestätigung eines doppelten Imports; keine automatische Reparatur/Überschreibung. Inhaltskennung folgt Firmware, Einheit und geordneter Folge von Rohzeiten/Rohwerten, nicht allein Zeitstempeln.

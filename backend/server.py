@@ -7,6 +7,7 @@ import secrets
 import shutil
 import threading
 import time
+from contextlib import nullcontext
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +20,8 @@ from backend.common.storage import chart_data, csv_text, identifier, rows_in_ran
 from backend.linux.ble_jobs import BluetoothJobs, BusyError
 from backend.linux.receiver import Receiver
 from backend.common.live_store import LiveStore, LIVE_FIELDS
+from backend.common.history_store import HistoryStore, HISTORY_FIELDS
+from backend.linux.history_jobs import HistoryJobs
 
 
 class Application:
@@ -44,12 +47,16 @@ class Application:
         self.bluetooth = BluetoothJobs(radio_lock)
         self.live_store = LiveStore(self.root / "data")
         self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock)
+        self.control_lock = threading.RLock()
+        self.history_store = HistoryStore(self.root / "data/history")
+        self.sync = HistoryJobs(self.receiver, self.history_store)
 
     def resume(self):
         if self.receiver.config["enabled"]:
             self.receiver.start()
 
     def close(self):
+        self.sync.close()
         self.receiver.stop(persist=False)
 
     def loggers(self):
@@ -63,8 +70,11 @@ class Application:
 
     def status(self):
         live = self.receiver.status()
+        sync = self.sync.status()
+        syncing = sync["state"] == "running"
         return {"version": VERSION, "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
-                "ble": {"connected": False, "status": "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
+                "ble": {"connected": syncing and sync["phase"] in ("reading_metadata", "receiving"),
+                        "status": "Historienlesen · " + sync["phase"] if syncing else "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
                 "free_bytes": shutil.disk_usage(self.root).free,
                 "local_profiles": (self.root / "private/profiles.json").exists(),
                 "limits": {"max_days": 90, "max_points_per_logger": 80000},
@@ -137,14 +147,20 @@ def handler_for(app):
                     self.send(200, app.receiver.status())
                 elif path == "/api/loggers":
                     self.send(200, {"loggers": app.loggers()})
+                elif path == "/api/sync":
+                    self.send(200, app.sync.status())
+                elif path == "/api/snapshots":
+                    self.send(200, {"snapshots": app.history_store.snapshots()})
                 elif path in ("/api/history", "/api/export"):
-                    allowed = {"source", "run", "logger", "start", "end"}
+                    allowed = {"source", "run", "logger", "start", "end", "snapshot"}
                     if set(query) - allowed or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Ungültige Abfrageparameter.")
                     source = query.get("source", ["simulation"])[0]
                     logger = identifier(query.get("logger", [""])[0])
                     start, end = query.get("start", [None])[0], query.get("end", [None])[0]
                     if source == "simulation":
+                        if "snapshot" in query:
+                            raise ValueError("Historienstand ist kein Testlauf.")
                         run = identifier(query.get("run", [""])[0])
                         runs = list_runs(app.simulation)
                         manifest = next((item for item in runs if item["id"] == run), None)
@@ -153,19 +169,30 @@ def handler_for(app):
                         rows = rows_in_range(app.simulation, run, logger, start, end)
                         interval, fields, label = manifest["options"]["interval_minutes"], None, "Simulation"
                     elif source == "live":
-                        if "run" in query or logger not in {item["id"] for item in app.loggers()}:
+                        if "run" in query or "snapshot" in query or logger not in {item["id"] for item in app.loggers()}:
                             raise ValueError("Unbekannter echter Logger oder ungültige Abfrage.")
                         run = "ble"
                         rows = app.live_store.rows(logger, start, end)
                         interval = app.receiver.status()["config"]["save_interval_seconds"] / 60
                         fields, label = LIVE_FIELDS, "BLE-Advertising"
+                    elif source == "device":
+                        if "run" in query:
+                            raise ValueError("Loggerhistorie ist kein Testlauf.")
+                        snapshot = query.get("snapshot", [""])[0]
+                        meta = app.history_store.metadata(logger, snapshot)
+                        run = snapshot[:16]
+                        interval = meta["interval_seconds"] / 60
+                        rows = (app.history_store.filtered_rows(logger, snapshot, start, end) if path == "/api/export"
+                                else app.history_store.chart_rows(logger, snapshot, start, end))
+                        fields, label = HISTORY_FIELDS, "BT06-Historie"
                     else:
                         raise ValueError("Unbekannte Datenquelle.")
                     if path == "/api/export":
                         export = csv_text(rows, fields) if fields else csv_text(rows)
                         self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}.csv")
                     else:
-                        self.send(200, {"source": label, **chart_data(rows, interval)})
+                        self.send(200, {"source": label, "clock_verified": source != "device",
+                                        "axis_basis": "device_calendar" if source == "device" else "timestamp", **chart_data(rows, interval)})
                 else:
                     assets = {"/": "index.html", "/css/app.css": "css/app.css", "/js/app.js": "js/app.js",
                               "/assets/favicon.svg": "assets/favicon.svg", "/favicon.ico": "assets/favicon.ico",
@@ -202,41 +229,49 @@ def handler_for(app):
                     self.send(413, {"error": "JSON muss zwischen 1 und 16.384 Bytes groß sein."})
                     return
                 value = json.loads(self.rfile.read(length))
-                if path == "/api/settings":
-                    self.send(200, app.settings.save(value))
-                elif path == "/api/ble":
-                    self.send(202, app.bluetooth.start(value))
-                elif path == "/api/live/start":
-                    if not isinstance(value, dict) or set(value) - {"device", "adapter", "save_interval_seconds"}:
-                        raise ValueError("Ungültige Empfangsoptionen.")
-                    if not value:
-                        self.send(202, app.receiver.start())
+                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync"}
+                with app.control_lock if controlled else nullcontext():
+                    if controlled and app.sync.busy():
+                        raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
+                    if path == "/api/settings":
+                        self.send(200, app.settings.save(value))
+                    elif path == "/api/sync":
+                        if app.bluetooth.status()["state"] == "running":
+                            raise BusyError("Bluetooth-Diagnose läuft bereits.")
+                        self.send(202, app.sync.start(value))
+                    elif path == "/api/ble":
+                        self.send(202, app.bluetooth.start(value))
+                    elif path == "/api/live/start":
+                        if not isinstance(value, dict) or set(value) - {"device", "adapter", "save_interval_seconds"}:
+                            raise ValueError("Ungültige Empfangsoptionen.")
+                        if not value:
+                            self.send(202, app.receiver.start())
+                        else:
+                            candidate = app.bluetooth.candidate(value.get("device"), value.get("adapter", "hci0"))
+                            if not candidate or not candidate.get("bt06"):
+                                raise ValueError("Kein verifiziertes BT06-Advertising-Format ausgewählt.")
+                            reading = candidate["bt06"]
+                            config = {"schema_version": 1, "enabled": True, "adapter": value.get("adapter", "hci0"),
+                                      "save_interval_seconds": value.get("save_interval_seconds", 60),
+                                      "device": {"address": candidate["address"], "id": reading["device_id"],
+                                                 "firmware": reading["firmware"], "name": (candidate.get("name") or "BT06")[:80]}}
+                            self.send(202, app.receiver.start(config))
+                    elif path == "/api/live/stop":
+                        if value != {}:
+                            raise ValueError("Stop benötigt ein leeres JSON-Objekt.")
+                        self.send(200, app.receiver.stop())
+                    elif path == "/api/simulation":
+                        if not app.generation_lock.acquire(blocking=False):
+                            self.send(409, {"error": "Ein Generatorlauf ist bereits aktiv."})
+                            return
+                        try:
+                            profiles = load_profiles(app.root / "private/profiles.json")
+                            manifest = generate(app.simulation, value, profiles)
+                        finally:
+                            app.generation_lock.release()
+                        self.send(201, manifest)
                     else:
-                        candidate = app.bluetooth.candidate(value.get("device"), value.get("adapter", "hci0"))
-                        if not candidate or not candidate.get("bt06"):
-                            raise ValueError("Kein verifiziertes BT06-Advertising-Format ausgewählt.")
-                        reading = candidate["bt06"]
-                        config = {"schema_version": 1, "enabled": True, "adapter": value.get("adapter", "hci0"),
-                                  "save_interval_seconds": value.get("save_interval_seconds", 60),
-                                  "device": {"address": candidate["address"], "id": reading["device_id"],
-                                             "firmware": reading["firmware"], "name": (candidate.get("name") or "BT06")[:80]}}
-                        self.send(202, app.receiver.start(config))
-                elif path == "/api/live/stop":
-                    if value != {}:
-                        raise ValueError("Stop benötigt ein leeres JSON-Objekt.")
-                    self.send(200, app.receiver.stop())
-                elif path == "/api/simulation":
-                    if not app.generation_lock.acquire(blocking=False):
-                        self.send(409, {"error": "Ein Generatorlauf ist bereits aktiv."})
-                        return
-                    try:
-                        profiles = load_profiles(app.root / "private/profiles.json")
-                        manifest = generate(app.simulation, value, profiles)
-                    finally:
-                        app.generation_lock.release()
-                    self.send(201, manifest)
-                else:
-                    self.send(404, {"error": "Nicht gefunden."})
+                        self.send(404, {"error": "Nicht gefunden."})
             except BusyError as exc:
                 self.send(409, {"error": str(exc)})
             except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:

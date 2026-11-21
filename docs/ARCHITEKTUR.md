@@ -1,4 +1,4 @@
-# Architektur · V0.2.0
+# Architektur · V0.3.0-dev
 
 ## Laufzeit
 
@@ -13,13 +13,13 @@ Ein Python-Prozess mit Standardbibliotheks-HTTP-Server auf `127.0.0.1`. Die Arch
 - `backend/server.py`: feste Routen, Host-/Origin-Prüfung, CSRF-Schutz für POST.
 - `web/`: lokal gebündelte Oberfläche ohne CDN-Zugriffe.
 
-BLE-Aufträge erstellen ihre Bleak-Objekte vollständig im selben Eventloop. Es gibt keinen automatischen Pairing- oder Characteristic-Zugriff. Advertising-Empfang beginnt nur nach bewusster Aktivierung; dieser Zustand wird für Neustarts gespeichert. Bei BlueZ-Ausfall versucht der Empfänger begrenzt verzögert erneut zu scannen. Eine gemeinsame Adaptersperre schließt parallele Diagnose-/Empfangsaufgaben aus. Ein erfolgreicher GATT-Test bestätigt keine Messwerterfassung. Die Diagnoseverbindung wird anschließend geschlossen. Die Website startet keine Shellbefehle.
+BLE-Aufträge erstellen ihre Bleak-Objekte vollständig im selben Eventloop. Es gibt kein automatisches Pairing. Characteristic-Leseabfragen und Notifications erfolgen nur beim ausdrücklich gestarteten Historienauftrag. Advertising-Empfang beginnt nur nach bewusster Aktivierung; dieser Zustand wird für Neustarts gespeichert. Bei BlueZ-Ausfall versucht der Empfänger begrenzt verzögert erneut zu scannen. Eine gemeinsame Adaptersperre schließt parallele Diagnose-/Empfangsaufgaben aus. Ein erfolgreicher GATT-Test bestätigt keine Messwerterfassung. Die Diagnoseverbindung wird anschließend geschlossen. Die Website startet keine Shellbefehle.
 
 ## Dateien
 
 Alle Laufzeitpfade relativ zum Programmordner, alternativ `python3 app.py --root /anderer/ordner serve`. Assets bleiben beim Quellcode. `status.sh` und `stop.sh` verwalten den Standardordner; bei eigenem Root den gestarteten Vordergrundprozess mit Strg+C beenden.
 
-`config/settings.json`: Programmeinstellungen, `private/`: nur lokale Klimavorlagen und Herkunft, `simulation/<run>/<logger>/<UTC-jahr>/<UTC-monat>.csv`: Testwerte, `runtime/app.lock`: Prozesssperre. V0.2 speichert Host-Empfänge getrennt unter `data/` als CSV-Schema 2. Ein koordinierter Schreiber mit Dateisperre bestätigt erst nach fsync. Beschädigte Endzeilen blockieren weitere Anhänge und bleiben erhalten. Loggerhistorien werden noch nicht ausgelesen. Kein gesondertes Backupverzeichnis oder Backupdienst.
+`config/settings.json`: Programmeinstellungen, `private/`: nur lokale Klimavorlagen und Herkunft, `simulation/<run>/<logger>/<UTC-jahr>/<UTC-monat>.csv`: Testwerte, `runtime/app.lock`: Prozesssperre. V0.2 speichert Host-Empfänge getrennt unter `data/` als CSV-Schema 2. Ein koordinierter Schreiber mit Dateisperre bestätigt erst nach fsync. Beschädigte Endzeilen blockieren weitere Anhänge und bleiben erhalten. Loggerhistorien werden in der Entwicklungsfassung auf ausdrücklichen Auftrag getrennt ausgelesen. Kein gesondertes Backupverzeichnis oder Backupdienst.
 
 Der Testdatengenerator schreibt zunächst in ein verstecktes Staging-Verzeichnis. Sichtbar wird der Lauf erst nach vollständigen CSV-Dateien und Manifest per atomarer Umbenennung. Abgebrochene Staging-Läufe bleiben für Diagnose erhalten, werden aber nicht als vollständige Läufe angeboten. Einstellungen werden separat atomar geschrieben. Für einen späteren produktiven Historienimport sind weitergehende Recovery-/Dedupe-Mechanismen erforderlich; V0.1 behauptet deren Fertigstellung nicht.
 
@@ -46,3 +46,12 @@ Lokale ESPA-Monitor-Dokumentation: Start im Benutzerkontext, Browseroberfläche,
 `common/bt06.py` dekodiert ausschließlich das belegte 2.05-Advertising-Format. `common/live_store.py` speichert lokale Host-Empfänge ohne erfundene Gerätezeit/Prozentbatterie. `linux/receiver.py` prüft Adresse **und** stabile Gerätekennung, aktualisiert den momentanen Empfang bei jedem Paket und schreibt höchstens nach Ablauf des gewählten CSV-Abstands. Andere Geräte und unbekannte Firmwareformate werden nicht als bestätigte Messung übernommen.
 
 Der UI-Bestand wird beim Prozessstart in den Arbeitsspeicher gelesen, damit laufende Prozesse bei einem Quellcodeupdate keine neue UI mit alter API mischen. Der Dienst muss für eine neue Version geordnet neu gestartet werden.
+
+
+## V0.3-Entwicklungsstand
+
+`common/history_capture.py` prüft die erlaubte Lesebefehlsfolge aus Capture-CSV; `common/history_protocol.py` prüft den vollständigen Stream. `common/history_store.py` veröffentlicht unveränderliche, nach Inhalt deduplizierte CSV-Stände mit Dateiprüfsummen. `.pending-*` bleibt nach Fehler zur Diagnose erhalten und ist unsichtbar für die Abfrage. Das separate Offlinewerkzeug darf parallel zum Server importieren, weil es dieselbe Import-Dateisperre verwendet; es schreibt keine Live-CSV und greift nicht auf BLE zu.
+
+`linux/history_reader.py` nutzt den bereits von BlueZ bestätigten Geräteeintrag am ausgewählten Adapter. So wartet die Verbindung schon vor dem kurzen Tastenfenster auf den Logger. Keine geratenen DBus-Pfade, UUIDs oder Gerätebefehle. `linux/history_jobs.py` steuert genau einen manuellen Auftrag. Alle BLE-Steuerungs-POSTs sind serialisiert; andere Aufträge bleiben während Sync gesperrt. Der Empfangswunsch bleibt für Neustart erhalten, auch wenn der Hostempfang gerade pausiert ist. Ein Abbruch bestätigt keinen unvollständigen Import.
+
+Das Frontend behandelt Hostempfang, Gerätekalender und Simulation als getrennte Quellen. Die Gerätezeit ist ausdrücklich ungeprüft; Kalenderkoordinaten des Charts erhalten keine automatische UTC-Korrektur. Zusammengeführte Langzeithistorie, automatischer Sync und die Hardwareabnahme der neuen integrierten Strecke bleiben offen. Dienst und UI werden erst durch geordneten Neustart gemeinsam aktualisiert.

@@ -1,4 +1,4 @@
-# Prüfung · V0.2.0 · 21.11.2026
+# Prüfung · V0.3.0-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -60,3 +60,14 @@ Korrektur der Mountdiagnose: In der normalen Benutzer-/SSH-Ansicht ist `/` schre
 37 automatisierte Tests bestanden. Neue synthetische Fälle: ausschließlich freigegebene Leseopcodes, negative/falsche Antworten, explizite Kalenderjahresbasis, fragmentierte und zusammengefasste Historienrahmen, jede mögliche Trunkierung eines Teststreams, widersprüchliche Anzahl/Endezähler, fehlender Zeitkontext, Nullintervall, Überlauf, unbekannte Typen, wiederholte Zeitstempel und Fahrenheit. Diagnose- und Receiver-Tests prüfen DuplicateData=True am Scanner-Aufruf.
 
 Reale Hardwareprüfung separat erfolgreich: GATT-Inventar, Notifications und belegte Leseabfragen ohne Pairing; vollständige Historie nach expliziter temporärer Tastenaktion übertragen und privat dekodiert. Anzahl, Enderahmenzähler, Anfang/Ende und Zeitabstände passen. Ein anderer Leseopcode wurde abgewiesen, nicht als Erfolg gewertet. Negative Verbindungsversuche haben Hostempfang jeweils wieder aktiviert. Produktionsintegration, Gerätezeit/UTC-Zuordnung, Dedupe und unbeaufsichtigter Sync sind damit nicht getestet oder freigegeben. Laufender Dienst unverändert V0.2.
+
+
+## V0.3.0-dev: Import und Oberfläche
+
+49 automatisierte Tests bestanden außerhalb der Socket-beschränkten Sandbox. Zusätzlich geprüft: atomare Veröffentlichung und unveränderte Bestände bei simuliertem Schreibfehler, Wiederimport nach Neustart ohne Kopie, abweichende Stände getrennt, Monatswechsel, wiederholte Gerätezeiten, rückwärts laufende Uhr, Dateikorruption, Pfad-/Quellenprüfung, unveränderte Originalexportfelder, gemeinsame BLE-Steuerungssperre, simulierte BLE-Lesesequenz ohne Pairing, Fehler/Timeout beim Auftrag sowie Wiederaufnahme des vorherigen Empfangswunsches. Geordnetes Beenden bricht wartende BLE-Aufträge ab.
+
+Synthetische Chromium-Prüfung: Quellenwechsel, Gerätezeitwarnung/-achse, Auswahl eines Historienstands, freie Geräte-Kalenderbereiche, Originalexport, Rückwechsel zur Simulation sowie bestehende Funktionen. 390 Pixel ohne Seitenüberlauf, keine JS-Ausnahmen oder externen Requests. Browserprozesse werden vor Entfernen der temporären Dateien abgewartet.
+
+Die private Original-Capture wurde mit dem neuen Importer vollständig übernommen; wiederholter Import liefert denselben Stand ohne Kopie. Neue Ansicht und Originalexport der realen Historie wurden über einen nur lesenden Vorschauprozess geprüft; kein Start des zweiten BLE-Empfängers oder Änderung am laufenden Dienst. Die neue integrierte BLE-/API-Strecke ist damit noch nicht auf Hardware abgenommen. Keine zusätzliche Geräteaktion für diese Prüfung erforderlich.
+
+Synthetischer `python3 tools/benchmark_history.py`-Einzellauf auf DeskPi: 32.000 Werte, Erzeugen/Dekodieren/Speichern 1,937 s; erneuter Import 1,891 s; Prüfsummen/Lesen/Diagramm 1,312 s; 401 Grafikpunkte; 7.542.480 CSV-Bytes; maximales RSS des gesamten Testprozesses 67.156 KiB (ca. 65,6 MiB). Keine garantierte Latenz, keine isolierte Server-Grundlast und keine SMApi-Messung.

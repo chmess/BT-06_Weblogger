@@ -1,4 +1,4 @@
-# HTTP-API · V0.2.0
+# HTTP-API · V0.3.0-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB. Fehler: `{ "error": "..." }`.
 
@@ -28,4 +28,15 @@ Echte Daten: `/api/history?source=live&logger=bt06-<id>&start=...&end=...`, Expo
 
 Empfangsstart: `{ "device": "<aus letzter Suche>", "adapter": "hci0", "save_interval_seconds": 60 }`. Der Server übernimmt Identität/Firmware aus seinem eigenen verifizierten Suchergebnis, nicht aus vom Browser gelieferten Identitätsfeldern. Leeres `{}` setzt ein bereits bewusst gewähltes Gerät fort. Stop benötigt `{}`. Die Entscheidung wird lokal gespeichert und nach Neustart wieder aufgenommen. Alle POST-Regeln einschließlich CSRF gelten unverändert. Liveempfang und Diagnose teilen eine exklusive Adaptersperre; Konflikte ergeben 409.
 
-Noch nicht implementiert: BT06-Historienprotokoll, Geräteeinstellungen, Messstellenhistorie, Klimaberechnungen, Risikostatistik und dauerhafte Ereignisse. Entsprechende API-Routen werden erst mit verifizierter Funktion eingeführt.
+Noch nicht implementiert: automatische/inkrementelle Historiensynchronisation und bestätigte UTC-Zuordnung, Geräteeinstellungen, Messstellenhistorie, Klimaberechnungen, Risikostatistik und dauerhafte Ereignisse. Entsprechende API-Routen werden erst mit verifizierter Funktion eingeführt.
+
+
+## Manuelle Historie · V0.3.0-dev
+
+- `GET /api/sync`: Zustand `idle/running/done/error`, Phase, empfangene/erwartete Anzahl, Ergebnis und Fehler. Ein Fehler bei Wiederaufnahme des Liveempfangs steht separat in `resume_error`.
+- `POST /api/sync` mit `{}`: ausschließlich den eingerichteten BT06 2.05 vollständig lesen. Der Hostempfang wird ohne Änderung des gespeicherten Aktivierungswunsches pausiert und danach wiederhergestellt. Andere BLE-Steuerungen liefern währenddessen 409. Kein Pairing, kein Logger-Start/Stop, keine Zeitänderung. Timeout begrenzt; Fortschritt pollen. Phase `connecting` ist das Signal für das kurze Standard-BLE-Tastenfenster.
+- `GET /api/snapshots`: vollständige veröffentlichte Historienstände einschließlich Anzahl, Geräte-Kalendergrenzen, Importzeit, Integritätsinformationen und `clock_verified=false`. Unvollständige `.pending-*` werden nicht angeboten.
+- `GET /api/history?source=device&logger=bt06-<id>&snapshot=<Inhaltskennung>`: geprüfte Originalhistorie fürs Diagramm. `axis_basis=device_calendar`, `clock_verified=false`. Numerische Millisekunden sind ausschließlich Kalenderkoordinaten ohne bestätigte UTC-Entsprechung. UI muss sie in UTC formatieren, um die Kalenderfelder unverändert wiederzugeben; **nicht** in der normalen Anzeigezeitzone umrechnen.
+- `GET /api/export` mit denselben Identitätsparametern: Schema 3, Originalauflösung, `Zeitstempel` leer, `Geraetekalender` ohne Offset, `GeraeteSekunden` unverändert.
+
+Optionale `start/end` verwenden bei `source=device` dieselben Kalenderkoordinaten (offsetfähiges ISO-Format zur bestehenden API-Kompatibilität; kein Nachweis der realen Zeitzone). Bereich inklusive. CSV gibt weiterhin Originalfelder aus. Bei rückwärts laufender Uhr gibt es einen sichtbaren Diagrammfehler; der ungefilterte Originalexport bleibt möglich. Veränderte Stände werden nicht automatisch zusammengeführt. `duplicate=true` bestätigt einen bereits vorhandenen unveränderten Inhalt nach erneuter Integritätsprüfung.

@@ -125,6 +125,36 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/klima/api/history?source=live&logger=bt06-87654321")[0], 400)
         self.assertEqual(self.request("/klima/api/history?source=unknown&logger=bt06-12345678")[0], 400)
 
+    def test_device_history_chart_export_and_snapshot_access(self):
+        from backend.common.history_capture import decode_capture
+        from history_fixture import capture
+        result = self.app.history_store.publish('23456789', **decode_capture(capture()))
+        query = f"source=device&logger={result['logger']}&snapshot={result['id']}"
+        status, _, body = self.request('/klima/api/history?' + query)
+        self.assertEqual(status, 200, body)
+        chart = json.loads(body)
+        self.assertFalse(chart['clock_verified'])
+        self.assertEqual(chart['axis_basis'], 'device_calendar')
+        self.assertEqual(chart['raw_count'], 3)
+        status, headers, body = self.request('/klima/api/export?' + query)
+        self.assertEqual(status, 200)
+        self.assertIn(b'Geraetekalender', body)
+        self.assertIn(b'ZEIT_UNGEPRUEFT', body)
+        self.assertNotIn(b'Host-Empfang', body)
+        self.assertEqual(len(json.loads(self.request('/klima/api/snapshots')[2])['snapshots']), 1)
+        for invalid in (query+'&run=x', 'source=device&logger=bt06-23456789&snapshot=missing',
+                        'source=live&logger=bt06-12345678&snapshot=x'):
+            self.assertEqual(self.request('/klima/api/history?'+invalid)[0], 400)
+        self.assertEqual(self.request('/klima/api/sync', {})[0], 403)
+        self.assertEqual(self.request('/klima/api/sync', {}, self.auth())[0], 400)
+
+    def test_history_job_locks_radio_controls_but_leaves_reads_available(self):
+        with patch.object(self.app.sync, 'busy', return_value=True):
+            for route in ('sync','ble','live/start','live/stop'):
+                self.assertEqual(self.request('/klima/api/'+route, {}, self.auth())[0], 409)
+            for route in ('sync','snapshots','status','live'):
+                self.assertEqual(self.request('/klima/api/'+route)[0], 200)
+
     def test_capture_requires_explicit_verified_selection(self):
         self.assertEqual(self.request("/klima/api/live/start", {}, self.auth())[0], 400)
         self.assertEqual(self.request("/klima/api/live/start", {"device": "AA:BB:CC:DD:EE:FF"}, self.auth())[0], 400)

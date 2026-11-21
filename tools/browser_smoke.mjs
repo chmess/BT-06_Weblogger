@@ -29,6 +29,15 @@ async function waitFor(expression) {
 async function click(selector) {await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);}
 async function screenshot(name) {const result=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(join(artifacts,name),Buffer.from(result.data,'base64'));}
 try {
+  const snapshotFixture=spawnSync('python3',['-c',`import sys
+from pathlib import Path
+sys.path.insert(0,str(Path.cwd()/'tests'))
+from history_fixture import capture
+from backend.common.history_capture import decode_capture
+from backend.common.history_store import HistoryStore
+HistoryStore(Path(sys.argv[1])/'data/history').publish('12345678',**decode_capture(capture()))
+`,join(scratch,'data')],{cwd:project,encoding:'utf8'});
+  assert.equal(snapshotFixture.status,0,snapshotFixture.stderr);
   app=spawn('python3',[join(project,'app.py'),'--root',join(scratch,'data'),'serve','--port','0','--base-path','/klima'],{cwd:project,stdio:['ignore','pipe','pipe']});
   let appError='';app.stderr.on('data',chunk=>{appError+=chunk.toString();});
   const url=await new Promise((resolve,reject)=>{
@@ -111,11 +120,27 @@ for seconds in [120,60]:store.append(reading,-55,(datetime.now(timezone.utc)-tim
   await evaluate(`document.querySelector('#source-select').value='simulation';document.querySelector('#source-select').dispatchEvent(new Event('change'))`);
   await waitFor(`document.querySelectorAll('.card').length===3`);
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','no JS exceptions','no external requests'],screenshots:7};
+  await evaluate(`setSource('device');go('history');loadHistory()`);
+  await waitFor(`document.querySelector('#chart-caption').textContent.includes('3 Loggerwerte')`);
+  assert.equal(await evaluate(`state.chartData.axis_basis`),'device_calendar');
+  assert.equal(await evaluate(`state.chartData.clock_verified`),false);
+  assert.equal(await evaluate(`document.querySelector('#source-notice').textContent.includes('ungeprüft')`),true);
+  assert.equal(await evaluate(`document.querySelector('#run-title').textContent`),'Historienstand');
+  assert.equal(await evaluate(`new Date(state.chartData.points[0][0]).toISOString().startsWith('2024-03-31')`),true);
+  const deviceExport=await evaluate(`fetch('api/export?'+state.query).then(r=>r.text())`);
+  assert.ok(deviceExport.includes('Geraetekalender')&&deviceExport.includes('ZEIT_UNGEPRUEFT'));
+  await screenshot('device-history-mobile.png');
+  assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
+  await evaluate(`document.querySelector('#period').value='custom';document.querySelector('#period').dispatchEvent(new Event('change'));document.querySelector('#range-start').value='2024-03-31T00:30';document.querySelector('#range-end').value='2024-03-31T00:40';document.querySelector('#apply-range').click()`);
+  await waitFor(`state.chartData.raw_count===2`);
+  await evaluate(`setSource('simulation');document.querySelector('#period').value='0';loadHistory()`);
+  await waitFor(`document.querySelector('#chart-caption').textContent.includes('Testwerte')`);
+  assert.equal(await evaluate(`document.querySelector('#run-title').textContent`),'Testlauf');
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','no JS exceptions','no external requests'],screenshots:7};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
-  if(browser){try{await send('Browser.close',{},null);}catch{}browser.kill('SIGTERM');}
+  if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}
   if(app){app.kill('SIGTERM');await new Promise(resolve=>{if(app.exitCode!==null)resolve();else{app.once('exit',resolve);setTimeout(resolve,5000);}});}
   for(const item of pending.values()){clearTimeout(item.timer);item.reject(new Error('Browser closed'));}pending.clear();
-  await rm(scratch,{recursive:true,force:true});
+  await rm(scratch,{recursive:true,force:true,maxRetries:5,retryDelay:200});
 }
