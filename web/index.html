@@ -105,6 +105,8 @@
     <article class="panel"><h2>Geräteeinstellungen lesen</h2>
       <p>Vorhandene Einstellungen des ausgewählten BT06 abfragen. Auslesen pausiert den Hostempfang kurz und setzt ihn danach fort.</p>
       <div class="button-row"><button id="device-settings-read" disabled>Einstellungen jetzt lesen</button></div>
+      <p id="device-settings-job" class="hint" role="status" aria-live="polite"></p>
+      <p id="device-settings-button-signal" class="hint" hidden>Jetzt am BT06 kurz START, danach kurz STOP drücken (jeweils unter einer Sekunde, nicht halten). Eine verbundene Handy-App vorher trennen.</p>
       <p id="device-settings-status" class="hint" role="status">Noch keine Geräteeinstellungen gelesen.</p>
       <dl id="device-settings-values"></dl>
       <p class="hint">Nur belegte Werte werden angezeigt. Unbekannte Parameter bleiben unbekannt; der Funkmoduscode ist noch keinem bestätigten Long-Range-Zustand zugeordnet. Diese Ansicht sendet keine Einstellungs-, Speicher-, Start-/Stopp- oder Uhränderung.</p>

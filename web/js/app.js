@@ -212,7 +212,10 @@ async function refreshSync() {
   $('#sync-button-signal').hidden=!(busy&&state.sync.trigger!=='automatic'&&['finding_device','connecting'].includes(state.sync.phase));
   const result=state.sync.result;
   const resultText=result?.kind==='device-settings'?`Geräteeinstellungen gelesen · Stand ${date(result.observed_at)} · ${Object.keys(result.read_errors).length+Object.keys(result.decode_errors).length} nicht verfügbare Abfragen`:(result?(result.last_transfer_scope==='range'?`${result.new_count} neue Werte · ${result.received_count} Werte einschließlich Überlappung geprüft · ${result.count} Werte im Gesamtbestand · ${result.duplicate?'keine Änderung':'dauerhaft gespeichert'}`:`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`):'');
-  $('#sync-status').textContent=[labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} ${state.sync.mode==='settings'?'Abfragen':'Werte'}`:'',resultText,state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
+  const jobText=[state.sync.state==='error'?'Lesen fehlgeschlagen':labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} ${state.sync.mode==='settings'?'Abfragen':'Werte'}`:'',resultText,state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
+  $('#sync-status').textContent=jobText;
+  $('#device-settings-job').textContent=state.sync.mode==='settings'?jobText+(state.sync.state==='error'?' · Kein neuer Einstellungsstand gespeichert; bisheriger Stand bleibt erhalten.':''):'';
+  $('#device-settings-button-signal').hidden=state.sync.mode!=='settings'||$('#sync-button-signal').hidden;
   if(busy&&!syncPolling)syncPolling=setInterval(guard(refreshSync),1000);
   if(!busy&&syncPolling){clearInterval(syncPolling);syncPolling=null;}
   if(previous==='running'&&!busy){await refreshLive();await refreshSnapshots();await refreshBluetooth();await refreshAutoSync();await refreshDeviceSettings();await renderCards();}
