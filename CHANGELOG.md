@@ -2,6 +2,8 @@
 
 ## 0.1.0 · 2026-11-21
 
+- Headless-Betrieb: mehrere ausdrücklich freigegebene Proxy-Adressen und systemd-Beispiel. Auf dem DeskPi unter `/klima/` hinter dem vorhandenen Login mit Dashboard-Kachel eingerichtet; Start nach Neustart als normaler Benutzer. Ursprüngliche System-Mount-Flags nach Installation wiederhergestellt.
+
 - Portable Linux-Grundversion, Standardbibliotheks-HTTP-Server, Prozesssperre, Start/Stop/Status/Install/Update.
 - Lokale responsive Weboberfläche mit eigenem SVG-/ICO-Favicon, ECharts 6.0.0, optionalem `/klima`-Basispfad und Proxy-Origin.
 - Validierte Programmeinstellungen mit Save Settings / Load Settings. Keine gesonderte Backupfunktion; Windows zurückgestellt.

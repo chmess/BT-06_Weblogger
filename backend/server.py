@@ -30,9 +30,9 @@ class Application:
         self.simulation = self.root / "simulation"
         self.csrf = secrets.token_urlsafe(32)
         self.started = time.monotonic()
-        self.public_origin = public_origin
-        if public_origin:
-            parsed = urlsplit(public_origin)
+        self.public_origins = tuple([public_origin] if isinstance(public_origin, str) else public_origin or [])
+        for origin in self.public_origins:
+            parsed = urlsplit(origin)
             if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username:
                 raise ValueError("Public Origin muss eine HTTP(S)-Origin ohne Pfad sein.")
         self.generation_lock = threading.Lock()
@@ -58,8 +58,7 @@ def handler_for(app):
         def valid_host(self):
             host = self.headers.get("Host", "")
             allowed = {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
-            if app.public_origin:
-                allowed.add(urlsplit(app.public_origin).netloc)
+            allowed.update(urlsplit(origin).netloc for origin in app.public_origins)
             return host in allowed
 
         def send(self, status, payload, content_type="application/json; charset=utf-8", filename=None):
@@ -147,8 +146,7 @@ def handler_for(app):
                 if path is None:
                     return
                 origins = {f"http://127.0.0.1:{self.server.server_port}", f"http://localhost:{self.server.server_port}"}
-                if app.public_origin:
-                    origins.add(app.public_origin)
+                origins.update(app.public_origins)
                 if self.headers.get("Origin") not in origins or not secrets.compare_digest(self.headers.get("X-CSRF-Token", ""), app.csrf):
                     self.send(403, {"error": "Schreibzugriff benötigt gleiche Origin und Sitzungstoken."})
                     return

@@ -22,7 +22,7 @@ def main():
     serve = commands.add_parser("serve")
     serve.add_argument("--port", type=int, default=8766)
     serve.add_argument("--base-path", default="")
-    serve.add_argument("--public-origin", help="Explizite Origin des vorgeschalteten, authentifizierenden Reverse Proxy")
+    serve.add_argument("--public-origin", action="append", help="Explizite Origin des authentifizierenden Reverse Proxy; für mehrere Zugangsadressen wiederholen")
     demo = commands.add_parser("generate")
     demo.add_argument("--days", type=int, default=7)
     demo.add_argument("--interval-minutes", type=int, default=5)

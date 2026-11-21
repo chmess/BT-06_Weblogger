@@ -33,6 +33,8 @@ Vor Millionen realer Werte: Streaming-Exporte, Zeitindizes und Statistikkacheln 
 
 Host-Freigabe gegen DNS-Rebinding, explizite Public Origin für Reverse Proxy, zufälliges Sitzungstoken und gleiche Origin für POST. Nur feste statische Assets erreichbar; kein generischer Dateibrowser. JSON auf 16 KiB begrenzt, Generatoroptionen und Kennungen validiert. Keine CORS-Freigabe. Simulationsdaten, Vorlagen, Logs und Einstellungen sind in `.gitignore`. Kein BLE-Zugangsschlüssel in Settings.
 
+Mehrere Public Origins werden über wiederholtes `--public-origin` ausdrücklich freigegeben, z. B. Hostname und private AP-Adresse eines headless Pi. Es gibt keine pauschale Freigabe beliebiger Host-/Origin-Header.
+
 Die Standardbibliothekslösung ist kein ungeschützter Internetserver. Für DeskPi die vorhandene Authentifizierung/Firewall verwenden. nginx darf `/klima/` nur im bereits geschützten Dashboard bereitstellen. Systemdateien werden vom Projekt weder installiert noch verändert.
 
 ## Referenzen / Abgrenzung

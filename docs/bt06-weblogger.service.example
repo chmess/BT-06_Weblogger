@@ -1,0 +1,26 @@
+# Pfade, Benutzer und ausdrücklich erlaubte Dashboard-Adressen anpassen.
+# Venv und Ordner müssen zuvor durch den normalen Benutzer angelegt werden.
+[Unit]
+Description=BT-06 Weblogger - lokaler Klimamonitor
+After=network.target bluetooth.service
+
+[Service]
+Type=simple
+User=YOUR_USER
+Group=YOUR_GROUP
+WorkingDirectory=/path/to/BT-06_Weblogger
+ExecStart=/path/to/BT-06_Weblogger/.venv/bin/python /path/to/BT-06_Weblogger/app.py serve --base-path /klima --public-origin http://YOUR_DASHBOARD_HOST
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=100
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+Nice=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/path/to/BT-06_Weblogger/config /path/to/BT-06_Weblogger/runtime /path/to/BT-06_Weblogger/simulation /path/to/BT-06_Weblogger/logs
+
+[Install]
+WantedBy=multi-user.target

@@ -75,6 +75,8 @@ Die Anwendung läuft eigenständig und kann hinter einem vorhandenen Reverse Pro
 
 Der authentifizierende Proxy muss Pfad und Host erhalten. [nginx-Beispiel](docs/nginx-location.conf.example). Kein ungeschütztes LAN-Binding. Die konfigurierte Public Origin muss exakt dem Browserzugriff entsprechen. Ein neuer Port 80 oder zusätzlicher Proxy wird nicht gestartet.
 
+Für einen **headless** betriebenen Pi erfolgt der Browserzugriff über diesen Proxy, beispielsweise `http://deskpi.fritz.box/klima/`, vom Handy oder anderen Rechner aus. `127.0.0.1` bezeichnet immer das Gerät, auf dem der Browser läuft. Mehrere ausdrücklich erlaubte Dashboard-Adressen sind möglich: `--public-origin http://deskpi.fritz.box --public-origin http://deskpi.local`. Für dauerhaften Betrieb kann der vorhandene systemd verwendet werden; der Dienst soll als normaler Benutzer laufen, Loopback beibehalten und beim Start keine Bluetooth-Verbindung öffnen. Beispiel: [systemd-Dienst](docs/bt06-weblogger.service.example). Installation in Systemverzeichnisse nur bewusst und nach Prüfung der Ziel-Mounts.
+
 SMApi ist ein vorgesehenes Linux-Ziel, **dort noch nicht installiert oder getestet**. CPU/RAM und ein möglicherweise mit SBFspot geteilter Bluetooth-Adapter müssen vor Ort geprüft werden. Ein Prozess, koordinierte Schreibvorgänge und begrenzte Testdatenmengen halten den Grundbetrieb überschaubar. Leistungsgrenzen sind in [Architektur](docs/ARCHITEKTUR.md) beschrieben.
 
 ## Tests / Updates

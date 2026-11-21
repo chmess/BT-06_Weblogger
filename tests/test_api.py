@@ -14,7 +14,7 @@ class ApiTests(unittest.TestCase):
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
         cls.root = Path(cls.temp.name)
-        cls.app = Application(cls.root, "/klima")
+        cls.app = Application(cls.root, "/klima", ["http://deskpi.test", "http://10.43.0.1"])
         cls.server = make_server(cls.app, 0)
         cls.thread = threading.Thread(target=cls.server.serve_forever)
         cls.thread.start()
@@ -91,6 +91,15 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(self.request("/klima/api/simulation", {"days": 1}, self.auth())[0], 409)
         finally:
             self.app.generation_lock.release()
+
+    def test_multiple_explicit_proxy_origins(self):
+        for origin in ("http://deskpi.test", "http://10.43.0.1"):
+            host = origin.removeprefix("http://")
+            headers = {"Host": host, "Origin": origin, "X-CSRF-Token": self.app.csrf}
+            self.assertEqual(self.request("/klima/api/status", headers={"Host": host})[0], 200)
+            self.assertEqual(self.request("/klima/api/settings", DEFAULTS, headers)[0], 200)
+        self.assertEqual(self.request("/klima/api/settings", DEFAULTS,
+                                      {"Host": "deskpi.test", "Origin": "http://not-approved.test", "X-CSRF-Token": self.app.csrf})[0], 403)
 
 
 if __name__ == "__main__":
