@@ -1,4 +1,4 @@
-# Architektur · V0.1.0
+# Architektur · V0.2.0
 
 ## Laufzeit
 
@@ -13,13 +13,13 @@ Ein Python-Prozess mit Standardbibliotheks-HTTP-Server auf `127.0.0.1`. Die Arch
 - `backend/server.py`: feste Routen, Host-/Origin-Prüfung, CSRF-Schutz für POST.
 - `web/`: lokal gebündelte Oberfläche ohne CDN-Zugriffe.
 
-BLE-Aufträge erstellen ihre Bleak-Objekte vollständig im selben Eventloop. Es gibt keinen automatischen Scan, Reconnect, Pairing oder Characteristic-Zugriff. Ein erfolgreicher GATT-Test bestätigt keine Messwerterfassung. Die Diagnoseverbindung wird anschließend geschlossen. Die Website startet keine Shellbefehle.
+BLE-Aufträge erstellen ihre Bleak-Objekte vollständig im selben Eventloop. Es gibt keinen automatischen Pairing- oder Characteristic-Zugriff. Advertising-Empfang beginnt nur nach bewusster Aktivierung; dieser Zustand wird für Neustarts gespeichert. Bei BlueZ-Ausfall versucht der Empfänger begrenzt verzögert erneut zu scannen. Eine gemeinsame Adaptersperre schließt parallele Diagnose-/Empfangsaufgaben aus. Ein erfolgreicher GATT-Test bestätigt keine Messwerterfassung. Die Diagnoseverbindung wird anschließend geschlossen. Die Website startet keine Shellbefehle.
 
 ## Dateien
 
 Alle Laufzeitpfade relativ zum Programmordner, alternativ `python3 app.py --root /anderer/ordner serve`. Assets bleiben beim Quellcode. `status.sh` und `stop.sh` verwalten den Standardordner; bei eigenem Root den gestarteten Vordergrundprozess mit Strg+C beenden.
 
-`config/settings.json`: Programmeinstellungen, `private/`: nur lokale Klimavorlagen und Herkunft, `simulation/<run>/<logger>/<UTC-jahr>/<UTC-monat>.csv`: Testwerte, `runtime/app.lock`: Prozesssperre. Echtdaten unter `data/` werden durch V0.1 weder angelegt noch verändert. Kein gesondertes Backupverzeichnis oder Backupdienst.
+`config/settings.json`: Programmeinstellungen, `private/`: nur lokale Klimavorlagen und Herkunft, `simulation/<run>/<logger>/<UTC-jahr>/<UTC-monat>.csv`: Testwerte, `runtime/app.lock`: Prozesssperre. V0.2 speichert Host-Empfänge getrennt unter `data/` als CSV-Schema 2. Ein koordinierter Schreiber mit Dateisperre bestätigt erst nach fsync. Beschädigte Endzeilen blockieren weitere Anhänge und bleiben erhalten. Loggerhistorien werden noch nicht ausgelesen. Kein gesondertes Backupverzeichnis oder Backupdienst.
 
 Der Testdatengenerator schreibt zunächst in ein verstecktes Staging-Verzeichnis. Sichtbar wird der Lauf erst nach vollständigen CSV-Dateien und Manifest per atomarer Umbenennung. Abgebrochene Staging-Läufe bleiben für Diagnose erhalten, werden aber nicht als vollständige Läufe angeboten. Einstellungen werden separat atomar geschrieben. Für einen späteren produktiven Historienimport sind weitergehende Recovery-/Dedupe-Mechanismen erforderlich; V0.1 behauptet deren Fertigstellung nicht.
 
@@ -40,3 +40,9 @@ Die Standardbibliothekslösung ist kein ungeschützter Internetserver. Für Desk
 ## Referenzen / Abgrenzung
 
 Lokale ESPA-Monitor-Dokumentation: Start im Benutzerkontext, Browseroberfläche, bewusster Verbindungsaufbau. Growbox-S3-Dokumentation: kompakte Status-/Konfigurations-/Diagnosebereiche. Keine Übernahme privaten Quellcodes. Windows wird erst nach funktionierendem Linux geplant.
+
+## V0.2-Module
+
+`common/bt06.py` dekodiert ausschließlich das belegte 2.05-Advertising-Format. `common/live_store.py` speichert lokale Host-Empfänge ohne erfundene Gerätezeit/Prozentbatterie. `linux/receiver.py` prüft Adresse **und** stabile Gerätekennung, aktualisiert den momentanen Empfang bei jedem Paket und schreibt höchstens nach Ablauf des gewählten CSV-Abstands. Andere Geräte und unbekannte Firmwareformate werden nicht als bestätigte Messung übernommen.
+
+Der UI-Bestand wird beim Prozessstart in den Arbeitsspeicher gelesen, damit laufende Prozesse bei einem Quellcodeupdate keine neue UI mit alter API mischen. Der Dienst muss für eine neue Version geordnet neu gestartet werden.

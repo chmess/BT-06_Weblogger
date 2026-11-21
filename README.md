@@ -1,6 +1,6 @@
 # BT-06 Weblogger
 
-Lokaler Klimamonitor für Linux und Raspberry Pi. **Aktueller Stand: V0.1.0 – Offline-Testbetrieb und BLE-Diagnose.** Noch keine produktive BT06-Messwerterfassung, Historienauslesung oder Schimmelbewertung.
+Lokaler Klimamonitor für Linux und Raspberry Pi. **Aktueller Stand: V0.2.0 – BT06-Liveempfang per Advertising und CSV-Aufzeichnung.** Unterstützt wird zunächst das belegte Format der Firmware 2.05. Gerätehistorie, Gerätekonfiguration und Klimaberechnungen folgen gemäß Roadmap.
 
 ## Start
 
@@ -16,6 +16,8 @@ Im Browser `http://127.0.0.1:8766/` öffnen. Der Prozess läuft im Vordergrund. 
 ## Was funktioniert
 
 - Deutsche responsive Oberfläche, hell/dunkel, Übersicht, Klimaverlauf, Testdaten, Logger/Bluetooth, Einstellungen und Diagnose.
+- Echte BT06-Advertising-Empfänge und synthetische Testdaten sind getrennte Datenquellen. Temperatur, relative Feuchte, Batteriespannung, RSSI, Firmware und Aufzeichnungsstatus aus dem verifizierten Format. Kein erfundener Batterie-Prozentwert.
+- Bewusst aktivierbarer Empfang mit CSV-Speicherabstand (Standard 60 Sekunden), Datenalter, sichtbaren Schreibfehlern und Wiederaufnahme nach Programmneustart. Der Logger bleibt autonom; kein GATT, Pairing oder Logger-Schreibbefehl für diesen Empfang nötig.
 - **Save Settings** speichert Programmeinstellungen atomar und lädt dieselbe JSON-Datei im Browser herunter. **Load Settings** liest eine Datei zunächst zur Prüfung in das Formular; erst Save Settings übernimmt sie. Keine gesonderte Backupfunktion.
 - Testdatengenerator: Tagesgang, Feuchtespitzen, Lüftung, Datenlücken; 1–90 Tage, 1–60 Minuten, bis 80.000 Werte je Testmessstelle.
 - Jeder Testlauf erhält ein eigenes Verzeichnis. Alle Werte bleiben als Simulation gekennzeichnet. Keine erfundenen Batterie-/RSSI-Werte.
@@ -45,7 +47,15 @@ Alternativ:
 ./tools/ble-diagnose.sh gatt --device <BEWUSST-GEWAEHLTE-ADRESSE> --adapter hci0 --pair
 ```
 
-Beim Start gibt es keinen automatischen Scan oder Verbindungsversuch. Der lokale BT06 wurde per Advertising erkannt und anhand seiner Aufkleberkennung zugeordnet. Zwei GATT-Verbindungsprüfungen endeten mit Timeout; eine Kopplung wurde nicht versucht. GATT und Kopplung sind damit noch nicht an echter Hardware abgenommen. Gerätefunktionen, UUIDs und Bytebefehle bleiben bis zur Verifikation offen; siehe [Protokollstand](docs/BLE-PROTOKOLL.md).
+Beim ersten Start gibt es keinen automatischen Scan oder Verbindungsversuch. Ein auf der Loggerseite bewusst aktivierter Advertising-Empfang wird nach einem Programmneustart wieder aufgenommen. „Empfang pausieren“ deaktiviert diese Wiederaufnahme; die Aufzeichnung im Logger bleibt unverändert. Der lokale BT06 wurde per Advertising erkannt und anhand seiner Aufkleberkennung zugeordnet. Die bisherigen GATT-Verbindungsprüfungen endeten mit Timeout; eine Kopplung wurde nicht versucht. Advertising-Empfang benötigt diese Verbindung nicht. GATT und Kopplung sind damit noch nicht an echter Hardware abgenommen. Gerätefunktionen, UUIDs und Bytebefehle bleiben bis zur Verifikation offen; siehe [Protokollstand](docs/BLE-PROTOKOLL.md).
+
+## Echte BT06-Empfänge
+
+Auf **Logger / Bluetooth** nach Geräten suchen (30 Sekunden). Bei einem BT06 mit verifiziertem 2.05-Format **Liveempfang starten** wählen. Der CSV-Speicherabstand ist unabhängig vom Aufzeichnungsintervall im Gerät: Änderungen daran verändern nur den DeskPi. Vor einer neuen Suche/GATT-Prüfung den Liveempfang pausieren; ein Adapter wird innerhalb der Anwendung nur von einer Aufgabe benutzt.
+
+Unter **Datenquelle → Echte BT06-Empfänge** erscheinen Übersicht und Verlauf. CSV-Dateien liegen unter `data/bt06-<geräte-id>/<UTC-jahr>/<UTC-monat>.csv`. Zeitbasis ist ausdrücklich **Host-Empfang**, da Advertising keine verifizierten Logger-Messzeitstempel liefert. Das ist keine vollständige Loggerhistorie. Ohne Hostempfang entstehen echte Lücken. Der CSV-Export behält die ursprüngliche Empfangsauflösung.
+
+`config/receiver.json` enthält das lokal gewählte Gerät und den bewusst aktivierten Empfangszustand; es wird nicht veröffentlicht. Save/Load Settings betrifft weiterhin die allgemeinen Programmeinstellungen, nicht Loggerparameter.
 
 ## Testdaten und private Zigbee-Vorlagen
 

@@ -15,11 +15,19 @@ class BusyError(RuntimeError):
 
 
 class BluetoothJobs:
-    def __init__(self):
+    def __init__(self, radio_lock=None):
         self.lock = threading.Lock()
         self.worker = None
         self.value = {"state": "idle", "command": None, "result": None, "error": None}
         self.candidates = {}
+        self.candidate_details = {}
+        self.radio_lock = radio_lock or threading.Lock()
+
+    def candidate(self, address, adapter):
+        with self.lock:
+            if self.candidates.get(address) != adapter:
+                raise ValueError("Gerät zuerst auf diesem Adapter suchen und bewusst auswählen.")
+            return deepcopy(self.candidate_details.get(address))
 
     def status(self):
         with self.lock:
@@ -45,12 +53,20 @@ class BluetoothJobs:
             device = options.get("device")
             if command == "gatt" and (not isinstance(device, str) or self.candidates.get(device) != adapter):
                 raise ValueError("Gerät zuerst auf diesem Adapter suchen und bewusst auswählen.")
+            if not self.radio_lock.acquire(blocking=False):
+                raise BusyError("Liveempfang aktiv. Vor Diagnose oder neuer Suche den Empfang pausieren.")
             self.value = {"state": "running", "command": command, "result": None, "error": None}
             if command == "scan":
                 self.candidates = {}
+                self.candidate_details = {}
             args = SimpleNamespace(command=command, adapter=adapter, seconds=seconds, device=device, pair=pair)
             self.worker = threading.Thread(target=self._run, args=(args,), name="bt06-ble-job")
-            self.worker.start()
+            try:
+                self.worker.start()
+            except BaseException:
+                self.value.update(state="error", error="Bluetooth-Auftrag konnte nicht gestartet werden.")
+                self.radio_lock.release()
+                raise
         return self.status()
 
     def _run(self, args):
@@ -59,6 +75,7 @@ class BluetoothJobs:
             with self.lock:
                 if args.command == "scan":
                     self.candidates = {item["address"]: args.adapter for item in result["devices"]}
+                    self.candidate_details = {item["address"]: item for item in result["devices"]}
                 self.value.update(state="done", result=result)
         except Exception as exc:
             # No raw OS/DBus error payloads: they can contain device identifiers.
@@ -72,3 +89,5 @@ class BluetoothJobs:
                 message = "Bluetooth-Auftrag fehlgeschlagen. Adapter und BlueZ-Berechtigungen prüfen. Für Kopplung ggf. einen systemeigenen BlueZ-Agent verwenden."
             with self.lock:
                 self.value.update(state="error", error=message)
+        finally:
+            self.radio_lock.release()

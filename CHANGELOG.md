@@ -1,8 +1,18 @@
 # Änderungen
 
+## 0.2.0 · 2026-11-21
+
+- Auf dem headless DeskPi aktiviert: realer BT06-Empfang und wiederholte CSV-Speicherung im Dienst, tatsächliche Browseransicht samt Verlauf/Export geprüft. 28 automatisierte Tests bestanden.
+
+- Lesender BT06-Advertising-Decoder für das belegte Firmwareformat 2.05; Temperatur, Feuchte, Spannung, RSSI und Status. Keine Gerätebefehle oder Kopplung für den Liveempfang.
+- Eigene Datenquelle für echte Empfänge, monatliche CSV-Dateien mit Host-Zeitbasis, wählbarer Speicherabstand, sichtbare Datenalter-/Schreibfehler, Start/Pause und Wiederaufnahme nach Neustart.
+- Gemeinsame Adaptersperre verhindert parallelen Liveempfang und Diagnose. Unbekannte Firmware/Identitäten werden abgewiesen.
+- Diagramme/Export wechseln zwischen echten Empfängen und Simulation; manueller Zoom pausiert die Liveaktualisierung. UI und API bleiben während Updates bis zum Prozessneustart zusammen.
+- Taupunkt und Klimaberechnungen bleiben gemäß Benutzerkorrektur bei V0.6. Historienimport bleibt V0.3 und benötigt eine funktionierende GATT-Verbindung.
+
 ## 0.1.0 · 2026-11-21
 
-- Headless-Betrieb: mehrere ausdrücklich freigegebene Proxy-Adressen und systemd-Beispiel. Auf dem DeskPi unter `/klima/` hinter dem vorhandenen Login mit Dashboard-Kachel eingerichtet; Start nach Neustart als normaler Benutzer. Ursprüngliche System-Mount-Flags nach Installation wiederhergestellt.
+- Headless-Betrieb: mehrere ausdrücklich freigegebene Proxy-Adressen und systemd-Beispiel. Auf dem DeskPi unter `/klima/` hinter dem vorhandenen Login mit Dashboard-Kachel eingerichtet; Start nach Neustart als normaler Benutzer. Host- und Sandbox-Mountansichten müssen bei der Installation unterschieden werden.
 
 - Portable Linux-Grundversion, Standardbibliotheks-HTTP-Server, Prozesssperre, Start/Stop/Status/Install/Update.
 - Lokale responsive Weboberfläche mit eigenem SVG-/ICO-Favicon, ECharts 6.0.0, optionalem `/klima`-Basispfad und Proxy-Origin.

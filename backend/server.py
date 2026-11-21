@@ -1,4 +1,4 @@
-"""Loopback-only offline web application. BLE operations are deliberately CLI-only."""
+"""Loopback web app, synthetic tests and explicitly enabled BLE advertising."""
 from __future__ import annotations
 
 import json
@@ -17,12 +17,16 @@ from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import chart_data, csv_text, identifier, rows_in_range
 from backend.linux.ble_jobs import BluetoothJobs, BusyError
+from backend.linux.receiver import Receiver
+from backend.common.live_store import LiveStore, LIVE_FIELDS
 
 
 class Application:
     def __init__(self, root, base_path="", public_origin=None):
         self.root = Path(root)
         self.web = Path(__file__).resolve().parents[1] / "web"
+        # Keep UI and backend from the same process start together during updates.
+        self.assets = {str(path.relative_to(self.web)): path.read_bytes() for path in self.web.rglob("*") if path.is_file()}
         self.base_path = base_path.rstrip("/")
         if self.base_path and (not self.base_path.startswith("/") or any(c not in "/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in self.base_path)):
             raise ValueError("Ungültiger Basispfad.")
@@ -36,15 +40,35 @@ class Application:
             if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username:
                 raise ValueError("Public Origin muss eine HTTP(S)-Origin ohne Pfad sein.")
         self.generation_lock = threading.Lock()
-        self.bluetooth = BluetoothJobs()
+        radio_lock = threading.Lock()
+        self.bluetooth = BluetoothJobs(radio_lock)
+        self.live_store = LiveStore(self.root / "data")
+        self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock)
+
+    def resume(self):
+        if self.receiver.config["enabled"]:
+            self.receiver.start()
+
+    def close(self):
+        self.receiver.stop(persist=False)
+
+    def loggers(self):
+        ids = {p.name for p in (self.root / "data").glob("bt06-*") if p.is_dir()}
+        config = self.receiver.status()["config"]
+        if config["device"]:
+            ids.add("bt06-" + config["device"]["id"])
+        return [{"id": identifier(logger), "name": "BT06 " + logger.removeprefix("bt06-"),
+                 "source": "BLE-Advertising", "interval_minutes": config["save_interval_seconds"] / 60}
+                for logger in sorted(ids)]
 
     def status(self):
-        return {"version": VERSION, "mode": "offline-simulation", "uptime_seconds": round(time.monotonic() - self.started),
-                "ble": {"connected": False, "status": "Nicht verbunden · Suche und Verbindungsprüfung auf der Loggerseite"},
+        live = self.receiver.status()
+        return {"version": VERSION, "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
+                "ble": {"connected": False, "status": "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
                 "free_bytes": shutil.disk_usage(self.root).free,
                 "local_profiles": (self.root / "private/profiles.json").exists(),
                 "limits": {"max_days": 90, "max_points_per_logger": 80000},
-                "data_notice": "Testdaten sind synthetisch. Keine BT06-Messung und keine Schimmelbewertung."}
+                "data_notice": "Echte BLE-Empfänge und synthetische Testdaten sind getrennt. Klimabewertung folgt gemäß Roadmap."}
 
 
 def handler_for(app):
@@ -109,32 +133,50 @@ def handler_for(app):
                     self.send(200, {"runs": list_runs(app.simulation)})
                 elif path == "/api/ble":
                     self.send(200, app.bluetooth.status())
+                elif path == "/api/live":
+                    self.send(200, app.receiver.status())
+                elif path == "/api/loggers":
+                    self.send(200, {"loggers": app.loggers()})
                 elif path in ("/api/history", "/api/export"):
-                    allowed = {"run", "logger", "start", "end"}
+                    allowed = {"source", "run", "logger", "start", "end"}
                     if set(query) - allowed or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Ungültige Abfrageparameter.")
-                    run, logger = identifier(query.get("run", [""])[0]), identifier(query.get("logger", [""])[0])
+                    source = query.get("source", ["simulation"])[0]
+                    logger = identifier(query.get("logger", [""])[0])
                     start, end = query.get("start", [None])[0], query.get("end", [None])[0]
-                    runs = list_runs(app.simulation)
-                    manifest = next((item for item in runs if item["id"] == run), None)
-                    if not manifest or logger not in {item["id"] for item in manifest["loggers"]}:
-                        raise ValueError("Unbekannter Testlauf oder Messstelle.")
-                    rows = rows_in_range(app.simulation, run, logger, start, end)
-                    if path == "/api/export":
-                        self.send(200, csv_text(rows).encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}.csv")
+                    if source == "simulation":
+                        run = identifier(query.get("run", [""])[0])
+                        runs = list_runs(app.simulation)
+                        manifest = next((item for item in runs if item["id"] == run), None)
+                        if not manifest or logger not in {item["id"] for item in manifest["loggers"]}:
+                            raise ValueError("Unbekannter Testlauf oder Messstelle.")
+                        rows = rows_in_range(app.simulation, run, logger, start, end)
+                        interval, fields, label = manifest["options"]["interval_minutes"], None, "Simulation"
+                    elif source == "live":
+                        if "run" in query or logger not in {item["id"] for item in app.loggers()}:
+                            raise ValueError("Unbekannter echter Logger oder ungültige Abfrage.")
+                        run = "ble"
+                        rows = app.live_store.rows(logger, start, end)
+                        interval = app.receiver.status()["config"]["save_interval_seconds"] / 60
+                        fields, label = LIVE_FIELDS, "BLE-Advertising"
                     else:
-                        self.send(200, {"source": "Simulation", **chart_data(rows, manifest["options"]["interval_minutes"])})
+                        raise ValueError("Unbekannte Datenquelle.")
+                    if path == "/api/export":
+                        export = csv_text(rows, fields) if fields else csv_text(rows)
+                        self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}.csv")
+                    else:
+                        self.send(200, {"source": label, **chart_data(rows, interval)})
                 else:
                     assets = {"/": "index.html", "/css/app.css": "css/app.css", "/js/app.js": "js/app.js",
                               "/assets/favicon.svg": "assets/favicon.svg", "/favicon.ico": "assets/favicon.ico",
                               "/assets/echarts.min.js": "assets/echarts.min.js"}
                     target = assets.get(path)
-                    if not target or not (app.web / target).is_file():
+                    if not target or target not in app.assets:
                         self.send(404, {"error": "Nicht gefunden."})
                     else:
                         mime = {".svg": "image/svg+xml", ".ico": "image/x-icon", ".js": "text/javascript; charset=utf-8",
                                 ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8"}.get(Path(target).suffix)
-                        self.send(200, (app.web / target).read_bytes(), mime or mimetypes.guess_type(target)[0] or "application/octet-stream")
+                        self.send(200, app.assets[target], mime or mimetypes.guess_type(target)[0] or "application/octet-stream")
             except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
                 self.send(400, {"error": str(exc)})
             except OSError:
@@ -164,6 +206,25 @@ def handler_for(app):
                     self.send(200, app.settings.save(value))
                 elif path == "/api/ble":
                     self.send(202, app.bluetooth.start(value))
+                elif path == "/api/live/start":
+                    if not isinstance(value, dict) or set(value) - {"device", "adapter", "save_interval_seconds"}:
+                        raise ValueError("Ungültige Empfangsoptionen.")
+                    if not value:
+                        self.send(202, app.receiver.start())
+                    else:
+                        candidate = app.bluetooth.candidate(value.get("device"), value.get("adapter", "hci0"))
+                        if not candidate or not candidate.get("bt06"):
+                            raise ValueError("Kein verifiziertes BT06-Advertising-Format ausgewählt.")
+                        reading = candidate["bt06"]
+                        config = {"schema_version": 1, "enabled": True, "adapter": value.get("adapter", "hci0"),
+                                  "save_interval_seconds": value.get("save_interval_seconds", 60),
+                                  "device": {"address": candidate["address"], "id": reading["device_id"],
+                                             "firmware": reading["firmware"], "name": (candidate.get("name") or "BT06")[:80]}}
+                        self.send(202, app.receiver.start(config))
+                elif path == "/api/live/stop":
+                    if value != {}:
+                        raise ValueError("Stop benötigt ein leeres JSON-Objekt.")
+                    self.send(200, app.receiver.stop())
                 elif path == "/api/simulation":
                     if not app.generation_lock.acquire(blocking=False):
                         self.send(409, {"error": "Ein Generatorlauf ist bereits aktiv."})

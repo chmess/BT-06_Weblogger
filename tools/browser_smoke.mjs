@@ -1,5 +1,5 @@
 // Optional UI verification with installed Chromium and Node, no npm dependencies.
-import {spawn} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {mkdtemp, mkdir, writeFile, readFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
@@ -84,8 +84,34 @@ try {
   assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
   await click('[data-page="logger"]');await screenshot('logger-mobile.png');
   assert.equal(await evaluate(`document.querySelector('#ble-status').textContent.includes('fehlt')`),true);
+  // Synthetic protocol vectors only, in the disposable QA root. Never use production files.
+  const fixture=spawnSync('python3',['-c',`import sys
+from pathlib import Path
+from datetime import datetime,timedelta,timezone
+sys.path.insert(0,sys.argv[1])
+from backend.common.bt06 import decode
+from backend.common.live_store import LiveStore
+p=bytearray(24);p[:3]=bytes.fromhex('090205');p[4:8]=bytes.fromhex('12345678');p[11]=100;p[12]=2;p[15:19]=bytes.fromhex('c9002602')
+reading=decode(p).json();reading['quality']='SYNTHETISCHER_TESTVEKTOR'
+store=LiveStore(Path(sys.argv[2])/'data')
+for seconds in [120,60]:store.append(reading,-55,(datetime.now(timezone.utc)-timedelta(seconds=seconds)).isoformat())
+`,project,join(scratch,'data')],{encoding:'utf8'});
+  assert.equal(fixture.status,0,fixture.stderr);
+  await evaluate(`refreshLive()`);
+  await evaluate(`document.querySelector('#source-select').value='live';document.querySelector('#source-select').dispatchEvent(new Event('change'))`);
+  await click('[data-page="overview"]');
+  await waitFor(`document.querySelectorAll('.card').length===1&&document.querySelector('#cards').textContent.includes('20,1')`);
+  assert.equal(await evaluate(`document.querySelector('#source-notice strong').textContent`),'Echte BT06-Empfänge');
+  await click('[data-page="history"]');await waitFor(`document.querySelector('#chart-caption').textContent.includes('BLE-Empfänge')`);
+  const exported=await evaluate(`fetch('api/export?'+state.query).then(r=>r.text())`);
+  assert.ok(exported.includes('Host-Empfang')&&exported.includes('SYNTHETISCHER_TESTVEKTOR')&&!exported.includes('Simulation'));
+  await evaluate(`state.chart.dispatchAction({type:'dataZoom',start:20,end:80})`);
+  assert.equal(await evaluate(`state.follow`),false);
+  await screenshot('history-live-fixture-mobile.png');
+  await evaluate(`document.querySelector('#source-select').value='simulation';document.querySelector('#source-select').dispatchEvent(new Event('change'))`);
+  await waitFor(`document.querySelectorAll('.card').length===3`);
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','no JS exceptions','no external requests'],screenshots:6};
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','no JS exceptions','no external requests'],screenshots:7};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}browser.kill('SIGTERM');}

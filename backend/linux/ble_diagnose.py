@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import json
 import sys
+from backend.common.bt06 import advertised_reading
 
 
 async def diagnose(args):
@@ -16,7 +17,8 @@ async def diagnose(args):
             {"address": device.address, "name": advertisement.local_name or device.name,
              "rssi": advertisement.rssi, "service_uuids": advertisement.service_uuids,
              "manufacturer_data": {str(key): value.hex() for key, value in advertisement.manufacturer_data.items()},
-             "service_data": {key: value.hex() for key, value in advertisement.service_data.items()}}
+             "service_data": {key: value.hex() for key, value in advertisement.service_data.items()},
+             "bt06": advertised_reading(advertisement.manufacturer_data)}
             for device, advertisement in devices.values()]}
     # Connect as soon as the selected peripheral advertises, instead of waiting
     # for the full scan window. Slow-advertising loggers have short connect windows.

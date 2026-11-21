@@ -20,7 +20,7 @@ Nice=10
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/path/to/BT-06_Weblogger/config /path/to/BT-06_Weblogger/runtime /path/to/BT-06_Weblogger/simulation /path/to/BT-06_Weblogger/logs
+ReadWritePaths=/path/to/BT-06_Weblogger/data /path/to/BT-06_Weblogger/config /path/to/BT-06_Weblogger/runtime /path/to/BT-06_Weblogger/simulation /path/to/BT-06_Weblogger/logs
 
 [Install]
 WantedBy=multi-user.target

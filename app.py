@@ -48,8 +48,10 @@ def main():
             signal.signal(signal.SIGINT, stop)
             print(f"BT-06 Weblogger {VERSION}: http://127.0.0.1:{server.server_port}{app.base_path}/", flush=True)
             try:
+                app.resume()
                 server.serve_forever(poll_interval=.25)
             finally:
+                app.close()
                 server.server_close()
     except (ValueError, OSError, RuntimeError) as exc:
         print(f"Start fehlgeschlagen: {exc}", file=sys.stderr)

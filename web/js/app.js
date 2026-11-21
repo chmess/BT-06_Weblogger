@@ -1,6 +1,6 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
-const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0};
+const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true};
 const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
@@ -60,19 +60,21 @@ async function refreshRuns(preferRun) {
   for(const run of state.runs) {
     const row=element('div',null,'run-item'), details=element('div');
     details.append(element('strong',`${date(run.created_at)} · ${run.options.days} Tage`),element('p',`${scenarios[run.options.scenario]||run.options.scenario} · ${run.options.interval_minutes} min · Seed ${run.options.seed} · ${run.loggers.reduce((sum,l)=>sum+l.count,0).toLocaleString('de-DE')} Werte`));
-    const button=element('button','Ansehen','secondary'); button.addEventListener('click',guard(async()=>{await refreshRuns(run.id);go('history');await loadHistory();}));
+    const button=element('button','Ansehen','secondary'); button.addEventListener('click',guard(async()=>{setSource('simulation');await refreshRuns(run.id);go('history');await loadHistory();}));
     row.append(details,button);list.append(row);
   }
   await renderCards();
 }
 function chooseLogger() {
   const select=$('#logger-select'), previous=state.logger;select.replaceChildren();
-  for(const logger of state.run?.loggers||[]) addOption(select,logger.id,logger.name);
-  state.logger=state.run?.loggers.find(l=>l.id===previous)?.id||state.run?.loggers[0]?.id||null;
+  const loggers=state.source==='live'?state.liveLoggers:state.run?.loggers||[];
+  for(const logger of loggers) addOption(select,logger.id,logger.name);
+  state.logger=loggers.find(l=>l.id===previous)?.id||loggers[0]?.id||null;
   select.value=state.logger||'';
   $('#chart-export').disabled=!state.logger;$('#overview-export').disabled=!state.logger;
 }
 async function renderCards() {
+  if(state.source==='live')return renderLiveCards();
   const cards=$('#cards'); if(!state.run) return;
   const run=state.run;
   const values=await Promise.all(run.loggers.map(logger=>api(`history?${new URLSearchParams({run:run.id,logger:logger.id,end:run.options.end,start:new Date(new Date(run.options.end).getTime()-86400000).toISOString()})}`)));
@@ -91,8 +93,9 @@ async function renderCards() {
   });
 }
 function buildQuery() {
-  if(!state.run||!state.logger) return null;
-  const query=new URLSearchParams({run:state.run.id,logger:state.logger});
+  if(!state.logger||state.source==='simulation'&&!state.run) return null;
+  const query=new URLSearchParams({source:state.source,logger:state.logger});
+  if(state.source==='simulation')query.set('run',state.run.id);
   const period=$('#period').value;
   if(period==='custom') {
     if(!$('#range-start').value||!$('#range-end').value) throw new Error('Beginn und Ende angeben. Freie Zeitangaben gelten in der Browser-Zeitzone.');
@@ -100,7 +103,7 @@ function buildQuery() {
     if(start>end) throw new Error('Beginn liegt nach dem Ende.');
     query.set('start',start.toISOString());query.set('end',end.toISOString());
   } else if(Number(period)>0) {
-    const end=new Date(state.run.options.end);query.set('end',end.toISOString());query.set('start',new Date(end.getTime()-Number(period)*3600000).toISOString());
+    const end=state.source==='live'?new Date():new Date(state.run.options.end);query.set('end',end.toISOString());query.set('start',new Date(end.getTime()-Number(period)*3600000).toISOString());
   }
   return query;
 }
@@ -108,6 +111,7 @@ function initChart() {
   if(!window.echarts) {notice('Lokale Diagrammbibliothek fehlt. Installation prüfen.',true);return;}
   state.chart=echarts.init($('#chart'),null,{renderer:'canvas'});
   state.chart.on('legendselectchanged',event=>{state.selection=event.selected;localStorage.setItem('bt06-curves',JSON.stringify(state.selection));});
+  state.chart.on('datazoom',()=>{if(state.source==='live'){state.follow=false;$('#live-follow').checked=false;}});
   new ResizeObserver(()=>state.chart.resize()).observe($('#chart'));
   if(state.chartData)renderChart(state.chartData);
 }
@@ -123,11 +127,11 @@ function renderChart(data, reset=false) {
     dataZoom:[{type:'inside',xAxisIndex:0,start:savedZoom?.[0]?.start??0,end:savedZoom?.[0]?.end??100},{type:'slider',xAxisIndex:0,bottom:12,height:25,start:savedZoom?.[1]?.start??0,end:savedZoom?.[1]?.end??100,textStyle:{color:text}}],
     series:[{name:'Temperatur',type:'line',showSymbol:false,connectNulls:false,data:data.points.map(p=>[p[0],p[1]])},{name:'Relative Feuchte',type:'line',showSymbol:false,connectNulls:false,yAxisIndex:1,data:data.points.map(p=>[p[0],p[2]]),markLine:{silent:true,symbol:'none',label:{show:false},data:lines}}]}, {notMerge:true});
 }
-async function loadHistory() {
-  const query=buildQuery(); if(!query) return;
+async function loadHistory(refresh=false) {
+  const query=buildQuery(); if(!query) {state.query=null;state.chartData=null;state.chart?.clear();$('#chart-caption').textContent='Keine Daten ausgewählt.';return;}
   const request=++state.loading; const data=await api(`history?${query}`);if(request!==state.loading)return;
-  const reset=state.query?.toString()!==query.toString();state.query=query;state.chartData=data;
-  $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} Testwerte · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.saved.timezone}`;
+  const reset=!refresh&&state.query?.toString()!==query.toString();state.query=query;state.chartData=data;
+  $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.saved.timezone}`;
   renderChart(data,reset);
 }
 function exportCSV() { if(!state.query) throw new Error('Zuerst einen Verlauf laden.');const link=document.createElement('a');link.href=`api/export?${state.query}`;link.click(); }
@@ -135,24 +139,66 @@ async function diagnostics() {
   const data=await api('status');$('#version').textContent=data.version;
   $('#template-note').textContent=data.local_profiles?'Lokale Zigbee-Klimavorlagen verfügbar. Erzeugte Werte bleiben synthetisch.':'Allgemeine synthetische Klimavorlagen. Zigbee-Vorlagen können lokal eingelesen werden.';
   const target=$('#diagnostics');target.replaceChildren();
-  for(const [key,value] of [['Version',data.version],['Betrieb','Offline / Simulation'],['Laufzeit',`${data.uptime_seconds} Sekunden`],['Bluetooth',data.ble.status],['Freier Speicher',`${number(data.free_bytes/1073741824)} GiB`],['Einstellungen','JSON · Save / Load'],['Originaldaten','Keine BT06-Daten erfasst']])target.append(element('dt',key),element('dd',value));
+  for(const [key,value] of [['Version',data.version],['Betrieb',data.mode==='advertising'?'BLE-Advertising-Empfang':'Offline'],['Laufzeit',`${data.uptime_seconds} Sekunden`],['Bluetooth',data.ble.status],['Freier Speicher',`${number(data.free_bytes/1073741824)} GiB`],['Einstellungen','JSON · Save / Load'],['Datenquellen','BLE-Empfänge / Simulation getrennt']])target.append(element('dt',key),element('dd',value));
+}
+function setSource(source) {
+  state.source=source;localStorage.setItem('bt06-source',source);$('#source-select').value=source;
+  const live=source==='live';$('#run-label').hidden=live;$('#live-follow-label').hidden=!live;
+  $('#source-notice').classList.toggle('real-notice',live);
+  $('#source-notice strong').textContent=live?'Echte BT06-Empfänge':'Synthetische Testdaten';
+  $('#source-notice span').textContent=live?'BLE-Advertising · Zeitbasis: Host-Empfang · keine Loggerhistorie':'Alle dargestellten Werte dieser Datenquelle sind simuliert.';
+  $('#overview-note').textContent=live?'Aktuelle Aussendungen und lokal gespeicherte Empfänge. Veraltete Werte werden gekennzeichnet.':'Letzter Testlauf · keine Livewerte und keine Schimmelbewertung.';
+  chooseLogger();
+}
+async function refreshLive() {
+  const [live,loggers]=await Promise.all([api('live'),api('loggers')]);state.live=live;state.liveLoggers=loggers.loggers;
+  const active=['starting','receiving','retrying'].includes(live.state);
+  $('#capture-stop').disabled=!active;$('#capture-resume').hidden=!live.config.device||active;
+  const latest=live.latest;
+  $('#capture-status').textContent=[`Empfang: ${live.state}`,live.config.device?`BT06 ${live.config.device.id} · Firmware ${live.config.device.firmware}`:'Noch kein Gerät ausgewählt.',latest?`Letzter Empfang: ${date(latest.received_at)} (${live.fresh?'aktuell':'veraltet'})`:'Noch kein Livepaket in dieser Sitzung.',`CSV-Abstand ${live.config.save_interval_seconds} s`,live.last_stored_at?`Zuletzt gespeichert: ${date(live.last_stored_at)}`:'Noch nichts gespeichert.',live.error||''].filter(Boolean).join(' · ');
+  $('#ble-scan').disabled=active||$('#ble-scan').disabled;
+}
+async function renderLiveCards() {
+  const cards=$('#cards');const loggers=state.liveLoggers;
+  if(!loggers.length){cards.replaceChildren();const empty=element('div',null,'empty');empty.append(element('h3','Noch kein echter Logger ausgewählt'),element('p','Auf Logger / Bluetooth suchen und den Liveempfang bewusst starten.'));const button=element('button','Logger auswählen');button.addEventListener('click',()=>go('logger'));empty.append(button);cards.append(empty);return;}
+  const end=new Date(),start=new Date(end.getTime()-86400000);
+  const values=await Promise.all(loggers.map(logger=>api(`history?${new URLSearchParams({source:'live',logger:logger.id,start:start.toISOString(),end:end.toISOString()})}`)));
+  if(state.source!=='live')return;
+  cards.replaceChildren();
+  loggers.forEach((logger,index)=>{
+    const data=values[index],current=state.live?.latest,selected='bt06-'+current?.device_id===logger.id;
+    const reading=selected?current:null,fresh=selected&&state.live.fresh;
+    const card=element('article',null,'card');card.append(element('div',fresh?'BLE · AKTUELLER EMPFANG':'BLE · GESPEICHERT / VERALTET','source'),element('h3',logger.name));
+    const readings=element('div',null,'readings');
+    for(const [label,value,unit,cls] of [['Temperatur',reading?reading.temperature_c:data.latest?.[1],'°C','temperature'],['Relative Feuchte',reading?reading.humidity_pct:data.latest?.[2],'%','humidity']]){const block=element('div',null,'reading');block.append(element('strong',`${number(value)} ${unit}`,cls),element('span',label));readings.append(block);}
+    card.append(readings,element('p',reading?`${number(reading.voltage_v,2)} V · ${reading.rssi} dBm · ${reading.recording} · Firmware ${reading.firmware}`:'Keine aktuelle Aussendung in dieser Sitzung.','hint'));
+    card.append(element('time',reading?`Empfangen: ${date(reading.received_at)}`:data.latest?`Zuletzt gespeichert: ${date(data.latest[0])}`:'Noch kein gespeicherter Wert.'));
+    if(state.live?.error)card.append(element('p',state.live.error,'hint'));
+    const button=element('button','Verlauf ansehen','secondary');button.addEventListener('click',guard(async()=>{state.logger=logger.id;$('#logger-select').value=logger.id;go('history');await loadHistory();}));card.append(button);cards.append(card);
+  });
+}
+async function startReceive(device) {
+  const value=device?{device:device.address,adapter:$('#ble-adapter').value,save_interval_seconds:Number($('#capture-interval').value)}:{};
+  await post('live/start',value);await refreshLive();setSource('live');await renderCards();await refreshBluetooth();go('overview');notice('BLE-Empfang aktiviert. Keine Verbindung oder Änderung am Logger.');
 }
 let blePolling=null;
 async function refreshBluetooth() {
   const data=await api('ble');
   $('#ble-status').textContent=!data.available?'Optionale Bluetooth-Unterstützung fehlt. Mit ./install.sh --ble lokal installieren und das Programm neu starten.':data.state==='running'?'Bluetooth-Auftrag läuft …':data.error||`Bereit. Sichtbare Adapter: ${data.adapters.join(', ')||'keine erkannt'}.`;
-  $('#ble-scan').disabled=!data.available||data.state==='running';
-  for(const button of document.querySelectorAll('[data-ble-action]'))button.disabled=data.state==='running';
+  const busy=data.state==='running'||['starting','receiving','retrying'].includes(state.live?.state);
+  $('#ble-scan').disabled=!data.available||busy;
+  for(const button of document.querySelectorAll('[data-ble-action]'))button.disabled=busy;
   if(data.state==='running') { if(!blePolling)blePolling=setInterval(guard(refreshBluetooth),1000);return; }
   if(blePolling){clearInterval(blePolling);blePolling=null;}
   if(data.command==='scan'&&data.result) {
     const target=$('#ble-devices');target.replaceChildren();
     if(!data.result.devices.length)target.append(element('p','Keine BLE-Geräte gefunden. Reichweite und Betriebszustand prüfen.','muted'));
     for(const device of data.result.devices) {
-      const row=element('div',null,'run-item'),details=element('div');details.append(element('strong',device.name||'Unbenanntes BLE-Gerät'),element('p',`${device.address} · ${device.rssi} dBm · Modell unbestätigt`));
+      const row=element('div',null,'run-item'),details=element('div');details.append(element('strong',device.name||'Unbenanntes BLE-Gerät'),element('p',`${device.address} · ${device.rssi} dBm · ${device.bt06?`BT06 ${device.bt06.device_id} · Format ${device.bt06.firmware}`:'Modell/Format unbestätigt'}`));
       const actions=element('div',null,'button-row');
+      if(device.bt06){const receive=element('button','Liveempfang starten');receive.dataset.bleAction='true';receive.disabled=busy;receive.addEventListener('click',guard(()=>startReceive(device)));actions.append(receive);}
       for(const [label,pair] of [['Verbinden & prüfen',false],['Koppeln & prüfen',true]]) {
-        const button=element('button',label,'secondary');button.dataset.bleAction='true';button.addEventListener('click',guard(()=>startBluetooth('gatt',device.address,pair)));actions.append(button);
+        const button=element('button',label,'secondary');button.dataset.bleAction='true';button.disabled=busy;button.addEventListener('click',guard(()=>startBluetooth('gatt',device.address,pair)));actions.append(button);
       }
       row.append(details,actions);target.append(row);
     }
@@ -161,7 +207,7 @@ async function refreshBluetooth() {
 }
 async function startBluetooth(command, device, pair=false) {
   const adapter=$('#ble-adapter').value;if(!/^hci[0-9]{1,3}$/.test(adapter))throw new Error('Adapter als hci0, hci1, … angeben.');
-  const value={command,adapter,seconds:10};if(device){value.device=device;value.pair=pair;}
+  const value={command,adapter,seconds:30};if(device){value.device=device;value.pair=pair;}
   await post('ble',value);await refreshBluetooth();
 }
 async function main() {
@@ -174,21 +220,25 @@ async function main() {
   $('#run-select').addEventListener('change',guard(async()=>{state.run=state.runs.find(r=>r.id===$('#run-select').value);chooseLogger();await loadHistory();}));
   $('#logger-select').addEventListener('change',guard(async()=>{state.logger=$('#logger-select').value;await loadHistory();}));
   $('#period').addEventListener('change',guard(async()=>{$('#custom-period').hidden=$('#period').value!=='custom';if($('#period').value!=='custom')await loadHistory();}));
-  $('#apply-range').addEventListener('click',guard(loadHistory));
+  $('#apply-range').addEventListener('click',guard(()=>loadHistory()));
   $('#chart-reset').addEventListener('click',()=>{if(state.chartData)renderChart(state.chartData,true);});
   $('#chart-fullscreen').addEventListener('click',guard(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else await $('#chart').requestFullscreen();}));
   $('#chart-export').addEventListener('click',guard(exportCSV));
   $('#ble-scan').addEventListener('click',guard(()=>startBluetooth('scan')));
+  $('#capture-resume').addEventListener('click',guard(()=>startReceive()));
+  $('#capture-stop').addEventListener('click',guard(async()=>{await post('live/stop',{});await refreshLive();await refreshBluetooth();await renderCards();notice('Empfang am DeskPi pausiert. Loggeraufzeichnung unverändert.');}));
+  $('#source-select').addEventListener('change',guard(async()=>{setSource($('#source-select').value);await renderCards();await loadHistory();}));
+  $('#live-follow').addEventListener('change',guard(async()=>{state.follow=$('#live-follow').checked;if(state.follow)await loadHistory();}));
   $('#overview-export').addEventListener('click',guard(async()=>{await loadHistory();exportCSV();}));
   $('#simulation-form').addEventListener('submit',guard(async event=>{
     event.preventDefault();const button=event.target.querySelector('button[type=submit]');button.disabled=true;button.textContent='Wird erzeugt …';
-    try{const form=new FormData(event.target);const result=await post('simulation',{scenario:form.get('scenario'),days:Number(form.get('days')),interval_minutes:Number(form.get('interval_minutes')),seed:Number(form.get('seed'))});await refreshRuns(result.id);go('history');await loadHistory();notice('Testdaten gespeichert. Alle Werte sind synthetisch.');}finally{button.disabled=false;button.textContent='Testdaten erzeugen';}
+    try{const form=new FormData(event.target);const result=await post('simulation',{scenario:form.get('scenario'),days:Number(form.get('days')),interval_minutes:Number(form.get('interval_minutes')),seed:Number(form.get('seed'))});setSource('simulation');await refreshRuns(result.id);go('history');await loadHistory();notice('Testdaten gespeichert. Alle Werte sind synthetisch.');}finally{button.disabled=false;button.textContent='Testdaten erzeugen';}
   }));
   $('#settings-form').addEventListener('input',dirty);
   $('#settings-form').addEventListener('submit',guard(async event=>{event.preventDefault();const result=await post('settings',checkSettings(formSettings()));state.saved=result;fillSettings(result);applySettings();downloadSettings(result);notice('Einstellungen gespeichert und als JSON zum Download bereitgestellt.');}));
   $('#load-settings').addEventListener('click',()=>$('#settings-file').click());
   $('#settings-file').addEventListener('change',guard(async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>16384)throw new Error('Einstellungsdatei ist zu groß.');fillSettings(checkSettings(JSON.parse(await file.text())));notice('Einstellungen eingelesen. Mit Save Settings übernehmen.');}finally{event.target.value='';}}));
-  await diagnostics();await refreshBluetooth();await refreshRuns();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
-  let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();}),1000);
+  await diagnostics();await refreshLive();await refreshBluetooth();await refreshRuns();setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
+  let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshLive();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
 }
 guard(main)();

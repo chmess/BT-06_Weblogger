@@ -4,9 +4,11 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.common.settings import DEFAULTS
 from backend.server import Application, make_server
+from backend.common.bt06 import decode
 
 
 class ApiTests(unittest.TestCase):
@@ -100,6 +102,39 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(self.request("/klima/api/settings", DEFAULTS, headers)[0], 200)
         self.assertEqual(self.request("/klima/api/settings", DEFAULTS,
                                       {"Host": "deskpi.test", "Origin": "http://not-approved.test", "X-CSRF-Token": self.app.csrf})[0], 403)
+
+    def test_real_source_export_is_separate_and_requires_known_logger(self):
+        from datetime import datetime, timezone
+        payload = bytearray(24)
+        payload[:3] = bytes.fromhex("090205")
+        payload[4:8] = bytes.fromhex("12345678")
+        payload[11], payload[12] = 100, 2
+        payload[15:19] = bytes.fromhex("c9002602")
+        reading = decode(payload).json()
+        self.app.live_store.append(reading, -55, datetime.now(timezone.utc).isoformat())
+        status, _, body = self.request("/klima/api/history?source=live&logger=bt06-12345678")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["source"], "BLE-Advertising")
+        self.assertEqual(json.loads(body)["raw_count"], 1)
+        status, headers, body = self.request("/klima/api/export?source=live&logger=bt06-12345678")
+        self.assertEqual(status, 200)
+        self.assertIn(b"Batteriespannung", body)
+        self.assertIn(b"Host-Empfang", body)
+        self.assertNotIn(b"Simulation", body)
+        self.assertEqual(self.request("/klima/api/history?source=live&run=x&logger=bt06-12345678")[0], 400)
+        self.assertEqual(self.request("/klima/api/history?source=live&logger=bt06-87654321")[0], 400)
+        self.assertEqual(self.request("/klima/api/history?source=unknown&logger=bt06-12345678")[0], 400)
+
+    def test_capture_requires_explicit_verified_selection(self):
+        self.assertEqual(self.request("/klima/api/live/start", {}, self.auth())[0], 400)
+        self.assertEqual(self.request("/klima/api/live/start", {"device": "AA:BB:CC:DD:EE:FF"}, self.auth())[0], 400)
+        self.app.bluetooth.candidates["AA:BB:CC:DD:EE:FF"] = "hci0"
+        self.app.bluetooth.candidate_details["AA:BB:CC:DD:EE:FF"] = {"address": "AA:BB:CC:DD:EE:FF", "name": "Synthetic test logger", "bt06": {"device_id": "12345678", "firmware": "2.05"}}
+        with patch.object(self.app.receiver, "start", return_value={"state": "starting"}) as start:
+            status = self.request("/klima/api/live/start", {"device": "AA:BB:CC:DD:EE:FF", "adapter": "hci0", "save_interval_seconds": 60}, self.auth())[0]
+            self.assertEqual(status, 202)
+            self.assertEqual(start.call_args.args[0]["device"]["id"], "12345678")
+        self.assertEqual(self.request("/klima/api/live/stop", {})[0], 403)
 
 
 if __name__ == "__main__":
