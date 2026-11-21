@@ -1,8 +1,8 @@
 # BT-06 Weblogger
 
-Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.4.1-dev – kontrollierte Geräteänderungen vorbereitet.** Der Einstellungs-Leseweg läuft auf dem DeskPi und wurde dort geprüft. Vorbereitung, Bestätigungsablauf und Schreiben werden mit dem nächsten Dienstneustart aktiv; bisher ausschließlich mit simuliertem Gerät geprüft.
+Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.4.2-dev – gezieltes Schreiben mit korrigierter Zwischenprüfung.** V0.4.1 ist installiert; Vorbereitung und voller Historienabruf sind am Gerät bestätigt. Erster bestätigter Schreibtest wurde vor Save abgebrochen. Die Korrektur wird mit dem nächsten Dienstneustart aktiv.
 
-Funkparameter, Aufzeichnungsintervall/-einheit, Name, Status, Gerätezeitfelder und Alarmgrenzen wurden am realen BT06 2.05 rein lesend abgefragt. Die neue Oberfläche zeigt nur belegte Werte; die Bedeutung des Funkmoduscodes sowie weitere Parameter bleiben offen. Erster gezielter Schreibpfad für Name, Sendeleistung/-intervall und Aufzeichnungsintervall implementiert, noch kein realer Schreibtest. Manuelle Historie/Nachladen funktionieren; unbeaufsichtigter Zugriff war auch mit längerem Zeitfenster nicht erfolgreich. Die Automatik bleibt ausgeschaltet.
+Funkparameter, Aufzeichnungsintervall/-einheit, Name, Status, Gerätezeitfelder und Alarmgrenzen wurden am realen BT06 2.05 rein lesend abgefragt. Die neue Oberfläche zeigt nur belegte Werte; die Bedeutung des Funkmoduscodes sowie weitere Parameter bleiben offen. Gezielter Schreibpfad für Name, Sendeleistung/-intervall und Aufzeichnungsintervall implementiert. App-Stopp und Aufzeichnungs-Setter am realen BT06 bestätigt; noch kein vollständig erfolgreicher Save-/Rücklesetest. Die anschließend gelesenen Einstellungen zeigen den bisherigen Intervallwert und App-Stopp. Manuelle Historie/Nachladen funktionieren; unbeaufsichtigter Zugriff war auch mit längerem Zeitfenster nicht erfolgreich. Die Automatik bleibt ausgeschaltet.
 
 ## Start
 

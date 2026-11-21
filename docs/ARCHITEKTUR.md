@@ -1,4 +1,4 @@
-# Architektur · V0.4.1-dev
+# Architektur · V0.4.2-dev
 
 ## Laufzeit
 
@@ -90,3 +90,5 @@ Vorbereitung liest alle unterstützten Getter und die gesamte Historie in einer 
 Ausführung liest aktuelle Einstellungen und Historie erneut vollständig. Erst dauerhaft gespeicherte, geprüfte Originale erlauben einen bestätigten Stopp. Danach nochmals Vollauslesung, um letzte Werte vor dem Stopp zu erhalten; keine Range-Herkunft als Ersatz. Unbekannte Nichtnullfelder im Aufzeichnungsblock werden blockiert. Gestoppten Zustand erneut prüfen, feste Setter aus `settings_commands.py`, alle Werte vor Save prüfen/speichern, belegtes Save plus Abschluss, danach alle Werte erneut lesen und mit den erwarteten Rohblöcken vergleichen. Kein Reset, Uhrsetzen, Zugangsschlüssel, geratenes Funkmodus-Mapping oder Aufzeichnungsstart.
 
 `data/device-settings/changes/` enthält Auftrags-JSON und Original-Schreibverkehr als CSV, keine Kopie der Messdaten: Historien-/Einstellungsbelege werden referenziert. Vor jedem möglicherweise wirksamen Befehl werden Absicht und Rohframe fsync-gesichert. Unvollständiger ACK/Timeout/Abbruch nach möglichem Schreibbeginn gilt als unklar; kein Retry, Rollback oder automatischer Aufzeichnungsstart. `latest.json` macht den letzten Zustand nach einem Prozessabbruch sichtbar. Temporäre Vorbereitungen verfallen; laufende Änderungen werden nicht automatisch fortgesetzt. Die getrennte Historien-/Livezeitbasis bleibt unverändert.
+
+V0.4.2 trennt die Prüfung vor und nach Commit: vor Save dürfen ausschließlich tatsächlich geänderte Blöcke noch exakt den Ausgangswert oder bereits den Zielwert zeigen. Eine dritte Variante, veränderte Gegenbytes oder Änderungen anderer Blöcke blockieren weiterhin. Der Zwischenbeleg wird vor dem Vergleich gespeichert und bleibt bei Abweichung erhalten. Nach Save/Abschluss gilt weiterhin der exakte Zielblock, einschließlich unveränderter Gegenwerte. Die Auftragsbelege referenzieren Stopp-/Zwischenantworten und die Sichtbarkeit vor Commit. Ein Gerät, das bereits im zulässigen Stoppzustand ist, erhält keinen erneuten Stop-Befehl; sein aktueller Gesamtbestand wird dennoch vollständig gesichert.

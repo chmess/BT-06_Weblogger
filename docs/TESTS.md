@@ -1,4 +1,4 @@
-# Prüfung · V0.4.1-dev · 21.11.2026
+# Prüfung · V0.4.2-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -121,3 +121,9 @@ Reale Getter-Sequenz erfolgreich (Name, Zeit, Status, Aufzeichnung, Funk, Alarmg
 Weitere Schutzfälle: aktuelle Advertising-Identität erforderlich, veränderte Einstellungen/Identität/Adapter, Ablauf/Abbruch/ersetzter Beleg, falsche boolesche Bestätigung, verbrauchter Token und Prozessneustart, unbekannte Nichtnullfelder im Aufzeichnungsblock, Wertebereiche/Antwortopcode/Status/Länge, CSRF/Steuersperre und kein Umgehen über `/api/sync`. API bleibt ohne generische Byte-, Reset- oder Start-Schnittstelle.
 
 Browserprüfung mit synthetischer Vorbereitung: Aufzeichnungsintervall in Minuten wird korrekt als Sekunden übertragen; Alt-/Neuwert, geprüfter Vollstand und Folgen sichtbar; Schreiben erst mit beiden Bestätigungen möglich; neue Entwurfseingabe löscht Bestätigungen und sperrt abweichenden Auftrag. Unklarer Schreibzustand wird nicht als Erfolg ausgegeben. Bestehende UI-/Export-/Favicon-/Mobilprüfungen weiterhin bestanden. **Keine reale Geräteänderung ausgeführt.** Aktivierung und erster realer, bewusst bestätigter Hardwaretest stehen aus. Ein erfolgreicher simulierter Save ist kein Nachweis von Firmware-Nebenwirkungen oder Reset-/Restore-Fähigkeit.
+
+## V0.4.2: Hardwareversuch und Zwischenprüfung
+
+Reale integrierte Vorbereitung und bestätigter Schreibversuch in V0.4.1: vollständige Historie/Original-CSV vor Stop und danach geprüft, App-Stopp und Parameterbefehl mit Status 1 beantwortet. Vor-Save-Vergleich abgebrochen; kein Save/Abschluss gesendet. Originalbelege und private Vergleichsberichte belegen anschließenden Zustand App-Stopp, alten Intervallwert und unveränderte übrige Konfiguration. Hostempfang wieder aktuell. Keine erfolgreiche Intervalländerung behauptet. Private Belege: `private/v041-preparation-verified.json`, `private/v041-first-write-journal.json`, `private/v041-postwrite-comparison.json`.
+
+103 Python-Tests: zusätzlicher simuliert verzögerter Setter (Getter bleibt bis Save alt), finales Zurücklesen muss dennoch den neuen Wert liefern; dritter Zwischenwert sperrt Save und bleibt als Originalbeleg erhalten; alter Wert trotz positivem Save-ACK bleibt Fehler; bereits gestopptes Gerät erhält keinen Stop, jedoch weiterhin zwingend Vollauslesung. Vor- und Nach-Commit-Prüfung sind getrennt. Korrigierter Save-/Abschlussweg noch ohne realen Erfolgstest, Dienstaktualisierung erforderlich. Browserprüfung unverändert einschließlich expliziter Bestätigungen und unklarem Ausgang.

@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.4.1-dev
+# BLE-Protokollstand · V0.4.2-dev
 
 ## Belege
 
@@ -104,3 +104,9 @@ Erneut geprüfte Fakten aus derselben privaten Herstellerreferenz: App-Stopp `52
 Wichtige Verkettung: `SetSaveChanged` sendet `52A3` ohne Payload und nach erfolgreicher Antwort zusätzlich `43FF` ohne Payload. Sein boolescher SDK-Parameter wird nicht zur Schonung der Historie genutzt. Der eigene Treiber bildet diese feste belegte Sequenz ab; Rolle und Nebenwirkungen des Abschlusses werden nicht als am Gerät abgenommen behauptet. Jede Antwort muss im ersten Hardwaretest exakt zum erwarteten Opcode passen, Status 1 haben und einen leeren Payload enthalten; abweichende Antworten blockieren alle weiteren Schreibschritte und werden als unklar protokolliert.
 
 Statusbelegung laut SDK: 5 = App-Stopp, 17 = Startverzögerung; bisher nur Aufzeichnungscode 16 am realen Gerät bestätigt. Der Schreibablauf akzeptiert nur belegte gestoppte Zustände 1/2/4/5 oder zuvor explizit zu stoppenden Zustand 16; Verzögerung/Initialisierung/Unbekannt blockieren. Er startet die Aufzeichnung nicht selbst. Start `52A0` ist in der Referenz identifiziert, bleibt aber außerhalb der implementierten Befehlsliste. Keine Reset- oder Unlock-Sequenz wird geraten oder gesendet. Ein Reset ist vom Nutzer nur nach vollständiger Sicherung sämtlicher Daten und Einstellungen erlaubt; diese Vollständigkeit ist für bislang unbekannte Felder nicht nachgewiesen.
+
+### Erster realer Schreibtest / V0.4.2-Korrektur
+
+Nach ausdrücklich bestätigtem konkretem Auftrag: vollständige Historie vor Stopp und danach nochmals gespeichert. Reale Antworten auf `52A1` und `4302`: jeweils Opcode-Echo, Status 1, leerer Payload. Der nachfolgende Zwischenvergleich scheiterte; `52A3` und `43FF` wurden nicht gesendet. Reines erneutes Auslesen nach Disconnect zeigt bisherigen Intervallwert, unveränderte übrige Parameter und Status 5 (App-Stopp). Damit ist Code 5 nun auch am Gerät bestätigt. Ein erfolgreicher Setter-ACK belegt keinen dauerhaft gespeicherten Zielwert. Die ursprüngliche abweichende Zwischenantwort wurde nicht separat gespeichert; aus ihr wird keine zusätzliche Protokollbedeutung behauptet.
+
+V0.4.2 lässt vor Save nur den vollständigen alten oder den angeforderten Zielblock zu, während alle ungeänderten Blöcke exakt bleiben müssen. Das unterstützt bis Save verzögerte Getter-Sichtbarkeit, ohne sie als bereits real belegtes Verhalten zu behaupten. Alle Zwischenantworten werden nun vor Prüfung gespeichert. Nach Save bleibt das exakte Ziel Pflicht. Reales Save-/Abschluss-/Rückleseverhalten ist weiterhin nicht abgenommen; kein blindes Wiederholen.

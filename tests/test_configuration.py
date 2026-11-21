@@ -37,6 +37,7 @@ class ConfigurationTests(unittest.TestCase):
         self.payloads = copy.deepcopy(self.sample['payloads'])
         self.sent = []; self.connections = 0; self.fail_opcode = None; self.corrupt_readback = False
         self.fail_history = False
+        self.deferred_setter = False; self.pending_log = None; self.third_value = False; self.ignore_save = False
         test = self
         rows = capture()
         metadata = bytes.fromhex(rows[3]['DatenHex'])[4:-1]
@@ -56,14 +57,19 @@ class ConfigurationTests(unittest.TestCase):
                 if wire in (STOP, SAVE, FINISH) or wire[2:4] == b'\x43\x02':
                     durable = json.loads((test.workflow.root / 'latest.json').read_text())
                     test.assertTrue(durable['may_have_changed'])
-                    test.assertGreaterEqual(len(durable['histories']), 1 if wire == STOP else 2)
+                    test.assertGreaterEqual(len(durable['histories']), 1 if wire == STOP or STOP not in test.sent else 2)
                     for item in durable['histories']:
                         test.assertEqual(len(test.history.rows(item['logger'], item['id'])), item['count'])
                 if wire[2:4] == test.fail_opcode:raise TimeoutError()
                 if wire == STOP:
                     raw = bytearray(test.payloads['log_status']); raw[3] = 5; test.payloads['log_status'] = bytes(raw)
                 elif wire[2:4] == b'\x43\x02':
-                    test.payloads['log_settings'] = wire[4:-1]
+                    if test.deferred_setter:
+                        test.pending_log = wire[4:-1]
+                    else:
+                        test.payloads['log_settings'] = ((900).to_bytes(2,'little') + wire[6:-1]) if test.third_value else wire[4:-1]
+                elif wire == SAVE and test.pending_log is not None and not test.ignore_save:
+                    test.payloads['log_settings'] = test.pending_log
                 elif wire == SAVE and test.corrupt_readback:
                     test.payloads['broadcast_settings'] = bytes([6,100,0])
                 commands = {read_request(command): key for key, command in SETTINGS_QUERIES}
@@ -226,6 +232,46 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIsNone(self.workflow.status()['prepared'])
         with self.assertRaises(ValueError):self.apply(prepared)
         self.assertEqual(self.mutations(), [])
+
+    def test_getter_can_expose_committed_old_value_until_save_but_final_target_is_required(self):
+        prepared = self.prepare(); self.deferred_setter = True
+        self.apply(prepared); self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'], 'done', self.jobs.status())
+        report = self.workflow.status()['last_change']
+        self.assertEqual(report['precommit_visibility'], {'log_settings':'previous_visible'})
+        self.assertEqual(report['status'], 'verified')
+        self.assertEqual(self.settings.latest('12345678')['values']['record_interval_seconds'], 1500)
+        self.assertEqual(len(self.mutations()), 4)
+
+    def test_third_intermediate_value_is_saved_as_evidence_but_never_committed(self):
+        prepared = self.prepare(); self.third_value = True
+        self.apply(prepared); self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'], 'error')
+        report = self.workflow.status()['last_change']
+        self.assertEqual(report['status'], 'uncertain')
+        self.assertTrue(report['staged_settings_capture'])
+        self.assertEqual(self.settings.latest('12345678')['values']['record_interval_seconds'], 900)
+        self.assertNotIn(SAVE, self.sent)
+        self.assertNotIn(FINISH, self.sent)
+
+    def test_old_value_after_save_ack_is_never_reported_as_success(self):
+        prepared = self.prepare(); self.deferred_setter = True; self.ignore_save = True
+        self.apply(prepared); self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'], 'error')
+        self.assertEqual(self.workflow.status()['last_change']['status'], 'uncertain')
+        self.assertEqual(self.settings.latest('12345678')['values']['record_interval_seconds'], 600)
+        self.assertEqual(len(self.mutations()), 4)
+
+    def test_already_stopped_device_is_not_stopped_again_and_full_history_is_still_required(self):
+        raw=bytearray(self.payloads['log_status']);raw[3]=5;self.payloads['log_status']=bytes(raw)
+        self.deferred_setter=True
+        prepared=self.prepare()
+        self.assertFalse(prepared['will_stop'])
+        self.apply(prepared);self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        self.assertNotIn(STOP,self.sent)
+        self.assertEqual(len(self.workflow.status()['last_change']['histories']),1)
+        self.assertEqual(self.settings.latest('12345678')['values']['record_interval_seconds'],1500)
 
 
 if __name__ == '__main__':unittest.main()

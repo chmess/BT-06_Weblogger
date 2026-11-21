@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.4.2-dev · 2026-11-21
+
+- Erste integrierte Gerätevorbereitung erfolgreich: vollständige Historie und alle acht unterstützten Einstellungsabfragen dauerhaft geprüft gespeichert, Hostempfang wieder aufgenommen. Nach konkreter Nutzerbestätigung bestätigte der BT06 App-Stopp und Aufzeichnungs-Setter. Zweite vollständige Historie nach Stopp ebenfalls gesichert. Zwischenprüfung brach anschließend vor Save/Abschluss ab. Erneutes reines Auslesen: bisheriger Intervallwert, App-Stopp, keine Historienlöschung.
+- Die Vor-Save-Prüfung verlangte bereits den endgültigen Zielwert. Korrigiert: nur bei konkret geänderten Blöcken sind vor Commit exakt Ausgangs- oder Zielblock erlaubt; jeder dritte Wert und jede Abweichung ungeänderter Felder blockieren Save. Nach Commit bleibt ausschließlich der Zielwert zulässig. Getrennte Protokollierung der Sichtbarkeit vor Commit; Zwischenbeleg auch bei Abweichung dauerhaft erhalten, ebenso Stoppbeleg vor zweiter Vollauslesung.
+- 103 Python-Tests einschließlich verzögert sichtbarer Setter, unverändertem Wert trotz Save-ACK, unzulässigem Zwischenwert und bereits gestopptem Gerät; Browserprüfung. Korrigierter Save-Ablauf noch nicht am realen Gerät abgenommen. Keine automatische Wiederholung, kein Start und kein Reset. Aktivierung der Korrektur erfordert Dienstneustart.
+
 ## 0.4.1-dev · 2026-11-21
 
 - Kontrollierter, expliziter Schreibablauf für Name, gemeinsame Funkparameter und Aufzeichnungsintervall vorbereitet. Getrennte Geräte-/Historienvorbereitung und Bestätigung; einmalige, zehn Minuten gültige Vorbereitung an Identität/Firmware/Adapter und aktuellen Einstellungsbeleg gebunden. Keine generische Byte-, Reset-, Unlock-, Uhr- oder Start-Route.

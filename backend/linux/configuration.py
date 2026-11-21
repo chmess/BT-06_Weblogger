@@ -192,6 +192,8 @@ class ConfigurationWorkflow:
                         progress('stopping_logger')
                         await self.send(client, STOP, 'stop', journal)
                         stopped = await retrieve_settings(config, progress, client=client)
+                        stopped_saved = self.settings_store.save(config['device']['id'], stopped)
+                        journal.save(stopped_settings_capture=stopped_saved['capture'])
                         if complete(stopped)['recording_code'] not in (1, 2, 4, 5):
                             raise ProtocolError('Loggerstopp nicht bestätigt; keine Parameteränderung.')
                         same_configuration(before['payloads'], stopped['payloads'])
@@ -206,11 +208,12 @@ class ConfigurationWorkflow:
                         await self.send(client, frame, 'parameters', journal)
                     progress('verifying_settings')
                     staged = await retrieve_settings(config, progress, client=client)
-                    if complete(staged)['recording_code'] not in (1, 2, 4, 5):
-                        raise ProtocolError('Logger zeichnet vor dem Speichern wieder auf; kein Save.')
-                    self.verify(before['payloads'], staged['payloads'], context['desired'])
                     staged_saved = self.settings_store.save(config['device']['id'], staged)
                     journal.save(staged_settings_capture=staged_saved['capture'])
+                    if complete(staged)['recording_code'] not in (1, 2, 4, 5):
+                        raise ProtocolError('Logger zeichnet vor dem Speichern wieder auf; kein Save.')
+                    visibility = self.verify(before['payloads'], staged['payloads'], context['desired'], before_commit=True)
+                    journal.save(precommit_visibility=visibility)
                     progress('committing_settings')
                     await self.send(client, SAVE, 'save', journal)
                     await self.send(client, FINISH, 'finish', journal)
@@ -244,11 +247,26 @@ class ConfigurationWorkflow:
         return result
 
     @staticmethod
-    def verify(before, after, desired):
+    def verify(before, after, desired, *, before_commit=False):
         expected = dict(before)
+        changed = set()
         for frame in configuration_frames(before, desired):
             key = {b'\x43\x33': 'device_info', b'\x43\x35': 'broadcast_settings', b'\x43\x02': 'log_settings'}[frame[2:4]]
             expected[key] = frame[4:-1]
+            changed.add(key)
+        if before_commit:
+            # A getter can still expose committed settings before Save. Only
+            # the entire original or intended block is admissible; unrelated
+            # bytes and every unedited block must remain exact.
+            visibility = {}
+            for key in changed:
+                actual = after.get(key)
+                if actual not in (before[key], expected[key]):
+                    raise ProtocolError('Zwischenprüfung: Geräteparameter weichen von Ausgangs- und Zielwert ab; kein Save.')
+                visibility[key] = 'target_visible' if actual == expected[key] else 'previous_visible'
+            same_configuration({key: value for key, value in before.items() if key not in changed},
+                               {key: value for key, value in after.items() if key not in changed})
+            return visibility
         same_configuration(expected, after)
 
     @staticmethod
