@@ -38,6 +38,7 @@ class ConfigurationTests(unittest.TestCase):
         self.sent = []; self.connections = 0; self.fail_opcode = None; self.corrupt_readback = False
         self.fail_history = False
         self.deferred_setter = False; self.pending_log = None; self.third_value = False; self.ignore_save = False
+        self.final_status = None
         test = self
         rows = capture()
         metadata = bytes.fromhex(rows[3]['DatenHex'])[4:-1]
@@ -72,6 +73,8 @@ class ConfigurationTests(unittest.TestCase):
                     test.payloads['log_settings'] = test.pending_log
                 elif wire == SAVE and test.corrupt_readback:
                     test.payloads['broadcast_settings'] = bytes([6,100,0])
+                elif wire == FINISH and test.final_status is not None:
+                    test.payloads['log_status']=test.final_status
                 commands = {read_request(command): key for key, command in SETTINGS_QUERIES}
                 if wire in commands:
                     self.notify(None, b'\x26' + wire[2:4] + b'\x01' + test.payloads[commands[wire]] + b'#')
@@ -272,6 +275,60 @@ class ConfigurationTests(unittest.TestCase):
         self.assertNotIn(STOP,self.sent)
         self.assertEqual(len(self.workflow.status()['last_change']['histories']),1)
         self.assertEqual(self.settings.latest('12345678')['values']['record_interval_seconds'],1500)
+
+    def test_zero_summary_after_commit_verifies_parameters_without_claiming_stopped_state(self):
+        prepared=self.prepare();self.final_status=bytes(8)
+        self.apply(prepared);self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        self.assertEqual(self.jobs.status()['result']['kind'],'configuration-parameters-verified')
+        report=self.workflow.status()['last_change']
+        self.assertEqual(report['status'],'parameters_verified');self.assertFalse(report['recording_state_verified'])
+        self.assertEqual(self.settings.latest('12345678')['values']['record_interval_seconds'],1500)
+
+    def uncertain_after_finished_commit(self):
+        prepared=self.prepare();self.final_status=b'\x01'*8
+        self.apply(prepared);self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'error')
+        self.assertEqual(self.workflow.status()['last_change']['status'],'uncertain')
+
+    def test_read_only_reconciliation_checks_all_acknowledgements_and_never_repeats_writes(self):
+        self.uncertain_after_finished_commit();before=list(self.mutations())
+        self.payloads['log_status']=bytes(8)
+        report=self.workflow.status()['last_change'];path=self.workflow.root/(report['id']+'.csv');raw=path.read_bytes()
+        self.workflow.verify_last({});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        report=self.workflow.status()['last_change'];self.assertTrue(report['reconciled_read_only'])
+        self.assertEqual(report['status'],'parameters_verified')
+        self.assertEqual(self.mutations(),before);self.assertEqual(path.read_bytes(),raw)
+
+    def test_reconciliation_without_complete_acknowledgements_never_connects(self):
+        prepared=self.prepare();self.fail_opcode=b'\x52\xa3'
+        self.apply(prepared);self.jobs.worker.join(5)
+        count=self.connections
+        with self.assertRaises(ValueError):self.workflow.verify_last({})
+        self.assertEqual(self.connections,count)
+
+    def test_reconciliation_still_rejects_old_target_and_damaged_original(self):
+        self.uncertain_after_finished_commit();before=list(self.mutations())
+        self.payloads['log_status']=bytes(8);self.payloads['log_settings']=(600).to_bytes(2,'little')+bytes(13)
+        self.workflow.verify_last({});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'error');self.assertEqual(self.mutations(),before)
+        report=self.workflow.status()['last_change']
+        path=self.settings.root/'bt06-12345678'/report['staged_settings_capture'];path.write_bytes(b'corrupt')
+        count=self.connections
+        with self.assertRaises(ValueError):self.workflow.verify_last({})
+        self.assertEqual(self.connections,count)
+
+    def test_verified_postcommit_original_can_reconcile_without_any_new_bluetooth_request(self):
+        prepared=self.prepare();self.final_status=bytes(8)
+        self.apply(prepared);self.jobs.worker.join(5)
+        connections=self.connections;sent=list(self.sent)
+        self.workflow.verify_last({});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        report=self.workflow.status()['last_change']
+        self.assertEqual(report['verification_source'],'stored_postcommit_capture')
+        self.assertTrue(report['reconciled_read_only'])
+        self.assertEqual(self.connections,connections);self.assertEqual(self.sent,sent)
 
 
 if __name__ == '__main__':unittest.main()

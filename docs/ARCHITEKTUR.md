@@ -1,4 +1,4 @@
-# Architektur · V0.4.2-dev
+# Architektur · V0.4.3-dev
 
 ## Laufzeit
 
@@ -92,3 +92,7 @@ Ausführung liest aktuelle Einstellungen und Historie erneut vollständig. Erst 
 `data/device-settings/changes/` enthält Auftrags-JSON und Original-Schreibverkehr als CSV, keine Kopie der Messdaten: Historien-/Einstellungsbelege werden referenziert. Vor jedem möglicherweise wirksamen Befehl werden Absicht und Rohframe fsync-gesichert. Unvollständiger ACK/Timeout/Abbruch nach möglichem Schreibbeginn gilt als unklar; kein Retry, Rollback oder automatischer Aufzeichnungsstart. `latest.json` macht den letzten Zustand nach einem Prozessabbruch sichtbar. Temporäre Vorbereitungen verfallen; laufende Änderungen werden nicht automatisch fortgesetzt. Die getrennte Historien-/Livezeitbasis bleibt unverändert.
 
 V0.4.2 trennt die Prüfung vor und nach Commit: vor Save dürfen ausschließlich tatsächlich geänderte Blöcke noch exakt den Ausgangswert oder bereits den Zielwert zeigen. Eine dritte Variante, veränderte Gegenbytes oder Änderungen anderer Blöcke blockieren weiterhin. Der Zwischenbeleg wird vor dem Vergleich gespeichert und bleibt bei Abweichung erhalten. Nach Save/Abschluss gilt weiterhin der exakte Zielblock, einschließlich unveränderter Gegenwerte. Die Auftragsbelege referenzieren Stopp-/Zwischenantworten und die Sichtbarkeit vor Commit. Ein Gerät, das bereits im zulässigen Stoppzustand ist, erhält keinen erneuten Stop-Befehl; sein aktueller Gesamtbestand wird dennoch vollständig gesichert.
+
+V0.4.3 erkennt die reale achtbyteige Null-Statusantwort ohne ein Aufnahmeflag zu erfinden. Nach Commit können Parameter vollständig verifiziert sein, während Statusdetails fehlen; eigener Ergebnis-/Auftragsstatus verhindert die irreführende Behauptung „gestoppt“. Vor neuen Änderungen bleibt der unbekannte Aufnahmezustand gesperrt. Originalantworten werden nach Commit vor jeder inhaltlichen Prüfung gespeichert.
+
+Eine getrennte, strikt lesende Nachprüfung rekonstruiert die erwartete Befehlsfolge aus unverändertem Zwischenbeleg und ursprünglichen Zielwerten, prüft jede positive Antwort sowie die referenzierten vollständigen Historien. Ein neuerer originaler Einstellungsbeleg nach Abschluss kann bei strikter Übereinstimmung ohne BLE genutzt werden; andernfalls nur Getter über neue Verbindung. Sie ergänzt ausschließlich den bestehenden Auftragsbeleg und ändert weder ursprüngliche Schreib-CSV noch Messdaten. Keine Wiederholung mutierender Befehle. Der Zeitpunkt der bestätigten Originalbeobachtung bleibt sichtbar. Dekoderversion 2 kann alte abgeleitete Nullstatus-Zusammenfassungen anhand ihrer unveränderten CSV im Speicher aktualisieren, ohne einen schreibenden GET einzuführen.

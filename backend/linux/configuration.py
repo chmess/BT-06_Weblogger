@@ -3,6 +3,8 @@ import asyncio
 import csv
 import json
 import os
+import re
+import hashlib
 import secrets
 import threading
 import time
@@ -16,6 +18,7 @@ from backend.common.history_store import sync_directory
 from backend.common.settings import atomic_json
 from backend.common.settings_commands import STOP, SAVE, FINISH, configuration_frames, configuration_reply
 from backend.common.settings_preview import settings_preview
+from backend.common.storage import parse_time
 from .history_reader import known_device, retrieve
 from .settings_reader import retrieve_settings
 
@@ -27,10 +30,12 @@ def binding(config):
     return (config['adapter'], device['address'].lower(), device['id'], device['firmware'])
 
 
-def complete(observation):
+def complete(observation, *, after_commit=False):
     decoded = decode_settings(observation['payloads'])
     if observation['read_errors'] or decoded['decode_errors'] or len(observation['payloads']) != 8:
         raise ProtocolError('Geräteeinstellungen nicht vollständig geprüft; Schreiben gesperrt.')
+    if after_commit and decoded['values'].get('status_variant')=='zero_summary':
+        return decoded['values']
     if decoded['values'].get('recording_code') not in (1, 2, 4, 5, 16):
         raise ProtocolError('Aufzeichnungszustand unbekannt oder Startverzögerung aktiv; Schreiben gesperrt.')
     return decoded['values']
@@ -209,7 +214,7 @@ class ConfigurationWorkflow:
                     progress('verifying_settings')
                     staged = await retrieve_settings(config, progress, client=client)
                     staged_saved = self.settings_store.save(config['device']['id'], staged)
-                    journal.save(staged_settings_capture=staged_saved['capture'])
+                    journal.save(staged_settings_capture=staged_saved['capture'],staged_settings_sha256=staged_saved['capture_sha256'])
                     if complete(staged)['recording_code'] not in (1, 2, 4, 5):
                         raise ProtocolError('Logger zeichnet vor dem Speichern wieder auf; kein Save.')
                     visibility = self.verify(before['payloads'], staged['payloads'], context['desired'], before_commit=True)
@@ -219,14 +224,12 @@ class ConfigurationWorkflow:
                     await self.send(client, FINISH, 'finish', journal)
                     progress('verifying_settings')
                     after = await retrieve_settings(config, progress, client=client)
-                    actual = complete(after)
                     saved = self.settings_store.save(config['device']['id'], after)
+                    actual = complete(after, after_commit=True)
                     self.verify(before['payloads'], after['payloads'], context['desired'])
-                    if actual['recording_code'] not in (1, 2, 4, 5):
-                        raise ProtocolError('Aufzeichnungszustand nach Speichern unerwartet. Zustand manuell prüfen.')
-                    journal.save(status='verified', settings_capture=saved['capture'],
-                                 notice='Geänderte Werte zurückgelesen. Aufzeichnung gestoppt; kein automatischer Start.')
-                    return {'kind': 'configuration-verified', 'report': deepcopy(journal.report), 'settings': saved}
+                    kind, outcome = self.outcome(actual)
+                    journal.save(**outcome, settings_capture=saved['capture'])
+                    return {'kind':kind, 'report':deepcopy(journal.report), 'settings':saved}
             except BaseException:
                 journal.save(status='uncertain' if journal.report['may_have_changed'] else 'blocked',
                              notice='Kein bestätigter Gesamterfolg. Zustand neu lesen; keine automatische Wiederholung, kein Rollback und kein automatischer Start.')
@@ -234,6 +237,88 @@ class ConfigurationWorkflow:
             finally:
                 journal.close()
         return self.jobs.start_task('configuration_write', operation)
+
+    def verify_last(self, request):
+        """Reconcile completed acknowledgements by reading, never resend writes."""
+        if request!={}:
+            raise ValueError('Nachprüfung benötigt ein leeres Objekt; keine neuen Zielwerte.')
+        config=self.receiver.status()['config']
+        report_path=self.root/'latest.json'
+        if not report_path.exists():
+            raise ValueError('Kein Konfigurationsauftrag nachzuprüfen.')
+        report=json.loads(report_path.read_text())
+        if (not config['device'] or config['device']['id']!=report.get('device_id')
+                or config['device']['firmware']!='2.05' or report.get('status') not in ('uncertain','writing','parameters_verified')):
+            raise ValueError('Kein passender unbestätigter Auftrag für das gewählte Gerät.')
+        if not isinstance(report.get('id'),str) or not re.fullmatch('[0-9a-f]{32}',report['id']):
+            raise ValueError('Ungültiger Auftragsbeleg.')
+        capture=report.get('staged_settings_capture','')
+        if not isinstance(capture,str) or not re.fullmatch(r'[0-9a-f]{32}\.csv',capture):
+            raise ValueError('Originaler Zwischenbeleg fehlt; keine Bestätigung möglich.')
+        folder=self.settings_store.root/('bt06-'+report['device_id'])
+        original=(folder/capture).read_bytes()
+        if report.get('staged_settings_sha256') and hashlib.sha256(original).hexdigest()!=report['staged_settings_sha256']:
+            raise ValueError('Zwischenbeleg beschädigt; keine Bestätigung möglich.')
+        import io
+        before,errors,_=settings_capture(csv.DictReader(io.StringIO(original.decode('utf-8')),delimiter=';'))
+        if errors:
+            raise ValueError('Zwischenbeleg unvollständig.')
+        desired={item['field']:item['after'] for item in report['changes']}
+        frames=configuration_frames(before,desired)
+        with (self.root/(report['id']+'.csv')).open(encoding='utf-8') as stream:
+            rows=list(csv.DictReader(stream,delimiter=';'))
+        expected=([STOP] if rows and rows[0]['DatenHex']==STOP.hex() else [])+frames+[SAVE,FINISH]
+        if len(rows)!=2*len(expected):
+            raise ValueError('Nicht alle Schreib-/Save-/Abschlussantworten belegt; keine Wiederholung.')
+        for index,frame in enumerate(expected):
+            tx,rx=rows[2*index:2*index+2]
+            if tx['Richtung']!='TX' or rx['Richtung']!='RX' or tx['DatenHex']!=frame.hex():
+                raise ValueError('Schreibbeleg widersprüchlich.')
+            configuration_reply(frame,bytes.fromhex(rx['DatenHex']))
+        if not report.get('histories'):
+            raise ValueError('Vollständiger gespeicherter Historienbeleg fehlt.')
+        for history in report['histories']:
+            if (history['scope']!='full' or history['logger']!='bt06-'+report['device_id']
+                    or len(self.history_store.rows(history['logger'],history['id']))!=history['count']):
+                raise ValueError('Gespeicherter Historienbeleg nicht verifiziert.')
+        selected=binding(config)
+        cached=None
+        latest=self.settings_store.latest(report['device_id'])
+        if latest and parse_time(latest['observed_at'])>parse_time(rows[-1]['Hostzeit']):
+            with (folder/latest['capture']).open(encoding='utf-8') as stream:
+                payloads,read_errors,_=settings_capture(csv.DictReader(stream,delimiter=';'))
+            observation={'payloads':payloads,'read_errors':read_errors}
+            try:
+                actual=complete(observation,after_commit=True)
+                self.verify(before,payloads,desired)
+                self.outcome(actual)
+                cached=(latest,actual)
+            except ProtocolError:
+                pass
+
+        async def operation(actual_config,progress):
+            if binding(actual_config)!=selected:
+                raise ProtocolError('Geräteauswahl geändert; keine Bestätigung.')
+            if cached:
+                saved,actual=cached
+                source='stored_postcommit_capture'
+            else:
+                async with self.session(actual_config,progress) as client:
+                    observation=await retrieve_settings(actual_config,progress,client=client)
+                    saved=self.settings_store.save(actual_config['device']['id'],observation)
+                    actual=complete(observation,after_commit=True)
+                    self.verify(before,observation['payloads'],desired)
+                source='fresh_read'
+            kind,outcome=self.outcome(actual)
+            if json.loads(report_path.read_text())['id']!=report['id']:
+                raise ProtocolError('Auftragsbeleg inzwischen ersetzt; keine Bestätigung.')
+            report.update(**outcome,settings_capture=saved['capture'],reconciled_read_only=True,
+                          reconciled_at=datetime.now(timezone.utc).isoformat(),verification_source=source,
+                          verification_observed_at=saved['observed_at'])
+            atomic_json(self.root/(report['id']+'.json'),report)
+            atomic_json(report_path,report)
+            return {'kind':kind,'report':deepcopy(report),'settings':saved}
+        return self.jobs.start_task('configuration_verify',operation)
 
     async def full_history(self, config, client, progress, payloads):
         progress('securing_history')
@@ -245,6 +330,17 @@ class ConfigurationWorkflow:
         if result['last_transfer_scope'] != 'full':
             raise ProtocolError('Vollständiger Historienabruf nicht bestätigt.')
         return result
+
+    @staticmethod
+    def outcome(actual):
+        if actual.get('status_variant')=='zero_summary':
+            return 'configuration-parameters-verified', {
+                'status':'parameters_verified','recording_state_verified':False,
+                'notice':'Alle Zielparameter zurückgelesen. Status ohne Aufzeichnungsdetails; kein automatischer Start. Aktuellen Advertising-Zustand beachten.'}
+        if actual.get('recording_code') not in (1,2,4,5):
+            raise ProtocolError('Aufzeichnungszustand nach Speichern unerwartet. Zustand manuell prüfen.')
+        return 'configuration-verified', {'status':'verified','recording_state_verified':True,
+                'notice':'Geänderte Werte zurückgelesen. Aufzeichnung gestoppt; kein automatischer Start.'}
 
     @staticmethod
     def verify(before, after, desired, *, before_commit=False):

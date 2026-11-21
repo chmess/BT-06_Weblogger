@@ -260,7 +260,7 @@ def handler_for(app):
                     self.send(413, {"error": "JSON muss zwischen 1 und 16.384 Bytes groß sein."})
                     return
                 value = json.loads(self.rfile.read(length))
-                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync", "/api/device-settings/read", "/api/device-settings/preview", "/api/device-settings/prepare", "/api/device-settings/apply", "/api/device-settings/cancel"}
+                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync", "/api/device-settings/read", "/api/device-settings/preview", "/api/device-settings/prepare", "/api/device-settings/apply", "/api/device-settings/cancel", "/api/device-settings/verify"}
                 with app.control_lock if controlled else nullcontext():
                     if controlled and path != "/api/autosync" and app.sync.busy():
                         raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
@@ -285,6 +285,10 @@ def handler_for(app):
                         self.send(202, app.configuration.apply(value))
                     elif path == "/api/device-settings/cancel":
                         self.send(200, app.configuration.cancel(value))
+                    elif path == "/api/device-settings/verify":
+                        if app.bluetooth.status()['state']=='running':
+                            raise BusyError('Bluetooth-Diagnose läuft bereits.')
+                        self.send(202,app.configuration.verify_last(value))
                     elif path == "/api/device-settings/read":
                         if value != {}:
                             raise ValueError("Geräteeinstellungen lesen benötigt ein leeres JSON-Objekt.")

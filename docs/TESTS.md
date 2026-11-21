@@ -1,4 +1,4 @@
-# Prüfung · V0.4.2-dev · 21.11.2026
+# Prüfung · V0.4.3-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -127,3 +127,9 @@ Browserprüfung mit synthetischer Vorbereitung: Aufzeichnungsintervall in Minute
 Reale integrierte Vorbereitung und bestätigter Schreibversuch in V0.4.1: vollständige Historie/Original-CSV vor Stop und danach geprüft, App-Stopp und Parameterbefehl mit Status 1 beantwortet. Vor-Save-Vergleich abgebrochen; kein Save/Abschluss gesendet. Originalbelege und private Vergleichsberichte belegen anschließenden Zustand App-Stopp, alten Intervallwert und unveränderte übrige Konfiguration. Hostempfang wieder aktuell. Keine erfolgreiche Intervalländerung behauptet. Private Belege: `private/v041-preparation-verified.json`, `private/v041-first-write-journal.json`, `private/v041-postwrite-comparison.json`.
 
 103 Python-Tests: zusätzlicher simuliert verzögerter Setter (Getter bleibt bis Save alt), finales Zurücklesen muss dennoch den neuen Wert liefern; dritter Zwischenwert sperrt Save und bleibt als Originalbeleg erhalten; alter Wert trotz positivem Save-ACK bleibt Fehler; bereits gestopptes Gerät erhält keinen Stop, jedoch weiterhin zwingend Vollauslesung. Vor- und Nach-Commit-Prüfung sind getrennt. Korrigierter Save-/Abschlussweg noch ohne realen Erfolgstest, Dienstaktualisierung erforderlich. Browserprüfung unverändert einschließlich expliziter Bestätigungen und unklarem Ausgang.
+
+## V0.4.3: Parameter gespeichert, Status ohne Details
+
+Realer V0.4.2-Folgetest: vollständige Historie nochmals gesichert, kein erneuter Stop beim bereits gestoppten Gerät; Setter, Save und Abschluss positiv beantwortet. Zwischenbeleg zeigt den alten Wert bis Save. Neue lesende Verbindung nach Abschluss bestätigt den gewünschten Parameter und unveränderte übrige Konfiguration. Statuspayload exakt acht Nullbytes, daher alte Dekodierung noch fehlerhaft; frisches Advertising meldet Initialzustand. Kein automatischer Start, kein Reset. Die gesamten Originalmessdaten bleiben auf dem DeskPi erhalten. Private Belege: `private/v042-write-journal.json`, `private/v042-postsave-comparison.json`, `private/v042-postsave-live.json`.
+
+110 Python-Tests einschließlich Nullstatus ohne erfundenen Aufnahmezustand/Historienspeicher, Ablehnung anderer Varianten, Legacy-Zusammenfassung ohne Dateiänderung, beschädigter Zusammenfassung, konsequenter Trennung von Parametern und Status, rein lesender Nachprüfung vollständiger ACK-/Historienbelege, fehlender ACKs ohne Verbindungsaufbau, beschädigtem Original und weiterhin falschem Zielwert. Nachprüfung eines belegten post-Commit-Originals sendet keine zusätzliche Bluetooth-Anfrage. Browserprüfung zeigt Parametererfolg ohne falsche Stoppaussage und behält ausdrücklich lesende Nachprüfung bei. Der aktivierte V0.4.3-Nachprüfpfad ist noch zu bestätigen.

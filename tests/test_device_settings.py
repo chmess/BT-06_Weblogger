@@ -84,5 +84,34 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(jobs.status()['state'],'done');self.assertEqual(receiver.resumed,1)
             self.assertEqual(jobs.status()['result']['kind'],'device-settings');self.assertEqual(history.snapshots(),[])
 
+    def test_zero_summary_is_known_but_never_guesses_recording_or_empty_history(self):
+        sample=observation();sample['payloads']['log_status']=bytes(8)
+        result=decode_settings(sample['payloads'])
+        self.assertEqual(result['decode_errors'],{})
+        self.assertEqual(result['values']['status_variant'],'zero_summary')
+        self.assertIsNone(result['values']['recording_code'])
+        self.assertNotIn('history_count',result['values'])
+        for raw in (bytes(7),bytes(9),b'\x01'+bytes(7)):
+            sample['payloads']['log_status']=raw
+            self.assertIn('log_status',decode_settings(sample['payloads'])['decode_errors'])
+
+    def test_legacy_zero_summary_is_upgraded_from_verified_original_without_rewriting(self):
+        with tempfile.TemporaryDirectory() as temp:
+            sample=observation();sample['payloads']['log_status']=bytes(8)
+            for row in sample['capture']:
+                if row['Richtung']=='RX' and row['DatenHex'].startswith('264c0101'):
+                    row['DatenHex']=(bytes.fromhex('264c0101')+bytes(8)+b'#').hex()
+            store=DeviceSettingsStore(Path(temp)/'settings');saved=store.save('12345678',sample)
+            path=store.root/'bt06-12345678'/'latest.json'
+            legacy=json.loads(path.read_text());legacy.pop('decoder_version')
+            for key in ('recording','recording_code','status_variant'):legacy['values'].pop(key)
+            legacy['decode_errors']={'log_status':'Antwortformat oder Feldwert nicht verifiziert.'}
+            path.write_text(json.dumps(legacy));before=path.read_bytes()
+            upgraded=store.latest('12345678')
+            self.assertEqual(upgraded['values'],saved['values']);self.assertEqual(upgraded['decode_errors'],{})
+            self.assertEqual(path.read_bytes(),before)
+            legacy['values']['name']='Tampered';path.write_text(json.dumps(legacy))
+            with self.assertRaises(ValueError):store.latest('12345678')
+
 
 if __name__=='__main__':unittest.main()

@@ -43,7 +43,7 @@ class HistoryJobs:
 
     def start_task(self, mode, operation):
         """Internal configuration workflow only, never dispatched from /api/sync."""
-        if mode not in ('configuration_prepare', 'configuration_write') or not callable(operation):
+        if mode not in ('configuration_prepare', 'configuration_write', 'configuration_verify') or not callable(operation):
             raise ValueError('Unbekannter Konfigurationsauftrag.')
         config = self.receiver.status()['config']
         self.receiver.validate(config)

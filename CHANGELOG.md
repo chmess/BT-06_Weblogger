@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.4.3-dev · 2026-11-21
+
+- Reale Parameteränderung nach erneuter vollständiger Historienprüfung: Setter, Save und Abschluss jeweils mit Status 1 bestätigt; anschließende neue Leseverbindung zeigt gewünschten Aufzeichnungswert bei unveränderten übrigen Parametern. Kein Reset oder Aufzeichnungsstart. Advertising meldet initialisiert; bisherige Original-CSV bleiben erhalten.
+- Ursache der verbleibenden Fehlermeldung: nach Save liefert `4C01` acht Nullbytes statt des bisherigen 30-Byte-Status. Neues, eng begrenztes Antwortformat als „keine Aufzeichnungsdetails“ erkannt; weder Aufnahme, Stopp noch leere Historie daraus abgeleitet. Parameterprüfung separat vom Aufnahmezustand. Finale Originalantworten werden vor inhaltlicher Prüfung gespeichert.
+- Rein lesende Nachprüfung unklarer Aufträge: vollständige positive Setter-/Save-/Abschlussbelege und geprüfte Historienreferenzen Pflicht, Zielwerte strikt prüfen, niemals Schreibbefehle wiederholen. Bereits vorhandener originaler Lesebeleg nach Abschluss kann ohne neue Bluetooth-Kommunikation verwendet werden; sonst neuer Leseauftrag. Ergebnis `parameters_verified` bei fehlenden Statusdetails ausdrücklich vom bestätigten Stopp unterschieden. Alte abgeleitete Statuszusammenfassungen werden nur nach Originalprüfung im Speicher aktualisiert, ohne Originaldateien umzuschreiben.
+- 110 Python-Tests und Browserprüfung einschließlich alter Zusammenfassungen, unbekannter Statusvarianten, fehlender ACKs, beschädigter Belege, altem Zielwert und Nachprüfung ohne weitere BLE-Anfrage. Aktivierung der Statuskorrektur erfordert Dienstneustart. Vollständige V0.4, Aufzeichnungsstart, Reset und zuverlässiger unbeaufsichtigter Zugriff bleiben offen.
+
 ## 0.4.2-dev · 2026-11-21
 
 - Erste integrierte Gerätevorbereitung erfolgreich: vollständige Historie und alle acht unterstützten Einstellungsabfragen dauerhaft geprüft gespeichert, Hostempfang wieder aufgenommen. Nach konkreter Nutzerbestätigung bestätigte der BT06 App-Stopp und Aufzeichnungs-Setter. Zweite vollständige Historie nach Stopp ebenfalls gesichert. Zwischenprüfung brach anschließend vor Save/Abschluss ab. Erneutes reines Auslesen: bisheriger Intervallwert, App-Stopp, keine Historienlöschung.

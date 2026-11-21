@@ -1,4 +1,4 @@
-# HTTP-API · V0.4.2-dev
+# HTTP-API · V0.4.3-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB. Fehler: `{ "error": "..." }`.
 
@@ -87,6 +87,16 @@ Der Auftrag vergleicht aktuelle Einstellungen und Aufzeichnungszustand erneut. V
 Erfolg ausschließlich `kind=configuration-verified`. Jeder möglicherweise verändernde Befehl wird **vor dem Senden** dauerhaft protokolliert. Fehler danach: Auftragsbeleg `uncertain`, Zustand neu lesen, keine Wiederholung oder automatischer Rollback. Ein ACK alleine gilt nicht als Gesamterfolg. Vor dem ersten Befehl blockierte Aufträge heißen `blocked`; nach Prozessabbruch wird ein begonnenes Schreiben nicht erneut gestartet. Keine Wiederverwendung eines Tokens. `POST /api/sync` darf diese internen Modi nicht starten. Es gibt keine generische Write-/Save-/Reset-Route.
 
 V0.4.2: Die Zwischenprüfung vor Save akzeptiert bei jedem konkret geänderten Parameterblock exakt dessen Ausgangs- oder Zielbytes. Ein Getter darf vor Commit noch den gespeicherten Ausgangswert zeigen. Ungeänderte Blöcke müssen weiterhin exakt passen; ein dritter Wert verhindert Save. `precommit_visibility` im Auftragsbeleg nennt pro geändertem Block `previous_visible` oder `target_visible`. `staged_settings_capture` wird bereits vor dieser Prüfung dauerhaft gespeichert, auch wenn die Prüfung scheitert. Nach Save/Abschluss müssen alle Zielwerte strikt zurückgelesen sein; ein unveränderter alter Wert ist dann ein Fehler. `stopped_settings_capture` hält den Zustand nach Stop auch bei einer später scheiternden Vollauslesung fest.
+
+### V0.4.3: Status ohne Details und rein lesende Nachprüfung
+
+Ein `4C01`-Payload aus exakt acht Nullbytes ist als `status_variant=zero_summary` bekannt. `recording_code=null`, keine Ableitung eines Stopp-/Aufnahmezustands oder Historienzählers. Andere neue Längen/Inhalte bleiben ungültig. Ein solcher Zustand erlaubt keine neue Vorbereitung/Schreibfreigabe; nur nach Commit darf die reine Parameterprüfung unabhängig davon erfolgreich sein: `kind=configuration-parameters-verified`, Auftragsstatus `parameters_verified`, `recording_state_verified=false`. Ein bewiesener Stopp bleibt separat `configuration-verified`/`verified`. Alter Zielwert nach Save ist weiterhin Fehler.
+
+`POST /api/device-settings/verify` mit exakt `{}` startet `configuration_verify` unter der gemeinsamen Sperre. Keine neuen Zielwerte, Tokens oder Frames zulässig. Zulässiger Ausgang ist ein passender unklarer/parameterbestätigter Auftrag mit vollständigen, positiven Setter-/Save-/Abschlussantworten, ursprünglichem Zwischenbeleg und prüfbaren vollständigen Historienreferenzen. Fehlende/widersprüchliche ACKs, beschädigte Referenzen und andere Geräte blockieren vor einem BLE-Auftrag. Es werden keine Setter, Save, Stop, Start oder Reset gesendet.
+
+Falls der letzte geprüfte Einstellungsbeleg zeitlich nach dem belegten Abschluss liegt und alle Ziel-/Gegenwerte strikt bestätigt, wird ausschließlich dieser Originalbeleg verwendet: `verification_source=stored_postcommit_capture`. Andernfalls neue lesende Verbindung mit fester Getterliste (`fresh_read`). `verification_observed_at` kennzeichnet den Zeitpunkt des Originalbelegs; es ist keine Garantie gegen spätere externe Änderungen. Erfolg ergänzt `reconciled_read_only=true` und den Bestätigungszeitpunkt im bestehenden Auftrags-JSON. Ursprüngliche Schreib-CSV und Messdaten werden nicht geändert. Der Modus ist nicht über `/api/sync` aufrufbar.
+
+Zusammenfassungen vor Dekoderversion 2 mit diesem bisher unbekannten Nullstatus werden nur dann als abgeleitete Ansicht aktualisiert, wenn CSV-Prüfsumme und sämtliche alten Zusammenfassungsfelder exakt zum Original passen. GET schreibt dabei keine Dateien. Änderungen anderer Werte oder unbekannte Dekoderversionen werden weiterhin abgewiesen.
 
 Die Zusammenfassung zeigt nur belegte Felder. Abgewiesene Antworten stehen in `read_errors`, unbekannte Formate in `decode_errors`. `unverified` kennzeichnet noch nicht belegte Parameter. `transmit_rate_code` ist ein Rohcode, `long_range=null`; keine geratene Bool-Zuordnung. Gerätezeitfelder sind ungeprüft, keine automatische Jahres-/UTC-Korrektur. Name, Intervalle und Hardware-Alarme sind keine Programmeinstellungen oder Software-Klimagrenzen.
 

@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.4.2-dev
+# BLE-Protokollstand · V0.4.3-dev
 
 ## Belege
 
@@ -110,3 +110,9 @@ Statusbelegung laut SDK: 5 = App-Stopp, 17 = Startverzögerung; bisher nur Aufze
 Nach ausdrücklich bestätigtem konkretem Auftrag: vollständige Historie vor Stopp und danach nochmals gespeichert. Reale Antworten auf `52A1` und `4302`: jeweils Opcode-Echo, Status 1, leerer Payload. Der nachfolgende Zwischenvergleich scheiterte; `52A3` und `43FF` wurden nicht gesendet. Reines erneutes Auslesen nach Disconnect zeigt bisherigen Intervallwert, unveränderte übrige Parameter und Status 5 (App-Stopp). Damit ist Code 5 nun auch am Gerät bestätigt. Ein erfolgreicher Setter-ACK belegt keinen dauerhaft gespeicherten Zielwert. Die ursprüngliche abweichende Zwischenantwort wurde nicht separat gespeichert; aus ihr wird keine zusätzliche Protokollbedeutung behauptet.
 
 V0.4.2 lässt vor Save nur den vollständigen alten oder den angeforderten Zielblock zu, während alle ungeänderten Blöcke exakt bleiben müssen. Das unterstützt bis Save verzögerte Getter-Sichtbarkeit, ohne sie als bereits real belegtes Verhalten zu behaupten. Alle Zwischenantworten werden nun vor Prüfung gespeichert. Nach Save bleibt das exakte Ziel Pflicht. Reales Save-/Abschluss-/Rückleseverhalten ist weiterhin nicht abgenommen; kein blindes Wiederholen.
+
+### Erfolgreicher Parameter-Save und neues Statusformat
+
+Im realen, weiterhin bestätigten Versuch mit V0.4.2: vor Save zeigte der Getter exakt den Ausgangsblock (`previous_visible`); Setter `4302`, Save `52A3` und Abschluss `43FF` jeweils mit passendem Echo, Status 1 und leerem Payload bestätigt. Das nachfolgende `4C01` lieferte exakt acht Nullbytes; damit scheiterte noch die alte Statusdekodierung, obwohl der Zielparameter gespeichert war. Eine neue, ausschließlich lesende Verbindung bestätigte anschließend den Zielblock und sämtliche unveränderten Name-/Einheits-/Funk-/Alarmparameter. Die getrennte Geräteuhr bleibt ungeprüft. Keine pauschale Abnahme anderer Setter.
+
+Exakt acht Nullbytes sind nun ein belegtes Format ohne Aufzeichnungsdetails, kein Nachweis für einen bestimmten Aufnahmezustand oder einen leeren Messspeicher. Frisches Advertising meldete in diesem konkreten Versuch Initialzustand. Das Programm startet nicht automatisch. Die ACKs und das strikte Rücklesen belegen die Parameteränderung; der Aufnahmezustand wird separat ausgedrückt. Nachprüfung verwendet entweder den belegten Original-Lesestand nach Abschluss oder eine neue Getterverbindung, niemals erneut einen Setter/Save.

@@ -84,6 +84,11 @@ def decode_settings(payloads):
                            'limit':int.from_bytes(raw[offset+4:offset+6],'little',signed=True)/10}
         return result
     def status(raw):
+        if raw == bytes(8):
+            # Observed after Save on 2.05. This contains no recording-state
+            # detail; never interpret zero bytes as a stopped/recording flag.
+            return {'recording_code':None,'recording':'Keine Aufzeichnungsdetails',
+                    'status_variant':'zero_summary'}
         if len(raw)!=30 or raw[:3]!=b'\x16\x00\x02':
             raise ProtocolError('Statusformat unbekannt.')
         code=raw[3]
@@ -111,6 +116,8 @@ class DeviceSettingsStore:
             folder=self._folder(device_id);path=folder/'latest.json'
             if not path.exists():return None
             data=json.loads(path.read_text())
+            if type(data.get('decoder_version',1)) is not int or data.get('decoder_version',1) not in (1,2):
+                raise ValueError('Unbekannte Geräteeinstellungs-Dekodierung.')
             if data.get('schema_version')!=1 or data.get('device_id')!=device_id or not re.fullmatch(r'[0-9a-f]{32}\.csv',data.get('capture','')):
                 raise ValueError('Geräteeinstellungsbeleg beschädigt.')
             raw=(folder/data['capture']).read_bytes()
@@ -120,7 +127,15 @@ class DeviceSettingsStore:
             if reader.fieldnames!=CAPTURE_FIELDS:raise ValueError('Geräteeinstellungs-Capture-Schemafehler.')
             payloads,errors,observed=settings_capture(reader)
             decoded=decode_settings(payloads)
-            if (data.get('values')!=decoded['values'] or data.get('decode_errors')!=decoded['decode_errors']
+            values,decode_errors=decoded['values'],decoded['decode_errors']
+            if data.get('decoder_version',1)==1 and payloads.get('log_status')==bytes(8):
+                legacy_values={key:value for key,value in values.items() if key not in ('recording_code','recording','status_variant')}
+                legacy_errors={**decode_errors,'log_status':'Antwortformat oder Feldwert nicht verifiziert.'}
+                if data.get('values')==legacy_values and data.get('decode_errors')==legacy_errors:
+                    # Upgrade only the derived view after verifying old fields
+                    # against the original. GET never rewrites either file.
+                    data={**data,'values':values,'decode_errors':decode_errors,'decoder_version':2}
+            if (data.get('values')!=values or data.get('decode_errors')!=decode_errors
                     or data.get('read_errors')!=errors or data.get('observed_at')!=observed):
                 raise ValueError('Geräteeinstellungs-Zusammenfassung widerspricht dem Originalbeleg.')
             return data
@@ -135,7 +150,7 @@ class DeviceSettingsStore:
             folder=self._folder(device_id);folder.mkdir(parents=True,exist_ok=True,mode=0o700)
             capture=csv_text(observation['capture'],CAPTURE_FIELDS).encode('utf-8')
             filename=uuid.uuid4().hex+'.csv'
-            data={'schema_version':1,'kind':'device-settings','device_id':device_id,'firmware':'2.05','read_only':True,
+            data={'schema_version':1,'decoder_version':2,'kind':'device-settings','device_id':device_id,'firmware':'2.05','read_only':True,
                   'observed_at':observed,'saved_at':datetime.now(timezone.utc).isoformat(),'capture':filename,
                   'capture_sha256':hashlib.sha256(capture).hexdigest(),**decoded,'read_errors':errors}
             durable_file(folder/filename,capture)

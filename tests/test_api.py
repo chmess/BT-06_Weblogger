@@ -213,7 +213,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIsNone(json.loads(body)['prepared'])
         self.assertFalse(json.loads(body)['reset_available'])
-        for route in ('prepare', 'apply', 'cancel'):
+        for route in ('prepare', 'apply', 'cancel', 'verify'):
             path = '/klima/api/device-settings/' + route
             self.assertEqual(self.request(path, {})[0], 403)
             with patch.object(self.app.sync, 'busy', return_value=True):
@@ -221,7 +221,9 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request('/klima/api/device-settings/prepare', {}, self.auth())[0], 400)
         self.assertEqual(self.request('/klima/api/device-settings/apply', {'token':'invented','confirm_history_loss':True,'confirm_stop':True}, self.auth())[0], 400)
         self.assertEqual(self.request('/klima/api/device-settings/cancel', {}, self.auth())[0], 200)
-        for mode in ('configuration_prepare', 'configuration_write'):
+        self.assertEqual(self.request('/klima/api/device-settings/verify', {}, self.auth())[0], 400)
+        self.assertEqual(self.request('/klima/api/device-settings/verify', {'confirmed':True}, self.auth())[0], 400)
+        for mode in ('configuration_prepare', 'configuration_write', 'configuration_verify'):
             self.assertEqual(self.request('/klima/api/sync', {'mode':mode}, self.auth())[0], 400)
 
     def test_device_history_chart_export_and_snapshot_access(self):
