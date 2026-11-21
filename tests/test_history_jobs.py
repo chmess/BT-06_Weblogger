@@ -83,8 +83,8 @@ class HistoryJobTests(unittest.TestCase):
         self.assertEqual(transfer['metadata'],decode_capture(rows)['metadata'])
 
     def test_success_error_and_save_failure_restore_previous_receive_intent(self):
-        async def success(*args):return decode_capture(capture())
-        async def failure(*args):raise TimeoutError()
+        async def success(*args, **kwargs):return decode_capture(capture())
+        async def failure(*args, **kwargs):raise TimeoutError()
         for enabled in (True,False):
             for mode in ('success','timeout','disk'):
                 with self.subTest(enabled=enabled,mode=mode), tempfile.TemporaryDirectory() as temp:
@@ -100,7 +100,7 @@ class HistoryJobTests(unittest.TestCase):
 
     def test_busy_rejected_and_shutdown_cancels_without_resume(self):
         ready=threading.Event()
-        async def waiting(*args):
+        async def waiting(*args, **kwargs):
             ready.set();await asyncio.sleep(100)
         with tempfile.TemporaryDirectory() as temp:
             receiver=FakeReceiver()

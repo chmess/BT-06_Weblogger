@@ -73,7 +73,7 @@ class Application:
         sync = self.sync.status()
         syncing = sync["state"] == "running"
         return {"version": VERSION, "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
-                "ble": {"connected": syncing and sync["phase"] in ("reading_metadata", "receiving"),
+                "ble": {"connected": syncing and sync["phase"] in ("reading_metadata", "selecting_range", "full_fallback", "receiving"),
                         "status": "Historienlesen · " + sync["phase"] if syncing else "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
                 "free_bytes": shutil.disk_usage(self.root).free,
                 "local_profiles": (self.root / "private/profiles.json").exists(),
@@ -151,6 +151,8 @@ def handler_for(app):
                     self.send(200, app.sync.status())
                 elif path == "/api/snapshots":
                     self.send(200, {"snapshots": app.history_store.snapshots()})
+                elif path == "/api/series":
+                    self.send(200, {"series": app.history_store.series()})
                 elif path in ("/api/history", "/api/export"):
                     allowed = {"source", "run", "logger", "start", "end", "snapshot"}
                     if set(query) - allowed or any(len(v) != 1 for v in query.values()):

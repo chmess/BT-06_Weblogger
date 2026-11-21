@@ -147,12 +147,23 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(self.request('/klima/api/history?'+invalid)[0], 400)
         self.assertEqual(self.request('/klima/api/sync', {})[0], 403)
         self.assertEqual(self.request('/klima/api/sync', {}, self.auth())[0], 400)
+        first_series = json.loads(self.request('/klima/api/series')[2])['series']
+        self.assertEqual(len(first_series), 1)
+        self.assertEqual(first_series[0]['count'], 3)
+        original = decode_capture(capture())
+        begin = int.from_bytes(original['metadata'][2:6], 'little')
+        extended = self.app.history_store.publish('23456789', **decode_capture(capture(seconds=[begin + i * 600 for i in range(4)])))
+        series = json.loads(self.request('/klima/api/series')[2])['series']
+        self.assertEqual(len(series), 1)
+        self.assertEqual(series[0]['id'], extended['id'])
+        self.assertEqual(series[0]['member_count'], 2)
+        self.assertEqual(len(json.loads(self.request('/klima/api/snapshots')[2])['snapshots']), 2)
 
     def test_history_job_locks_radio_controls_but_leaves_reads_available(self):
         with patch.object(self.app.sync, 'busy', return_value=True):
             for route in ('sync','ble','live/start','live/stop'):
                 self.assertEqual(self.request('/klima/api/'+route, {}, self.auth())[0], 409)
-            for route in ('sync','snapshots','status','live'):
+            for route in ('sync','snapshots','series','status','live'):
                 self.assertEqual(self.request('/klima/api/'+route)[0], 200)
 
     def test_capture_requires_explicit_verified_selection(self):

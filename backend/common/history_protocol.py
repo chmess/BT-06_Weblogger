@@ -23,6 +23,19 @@ def _value(pair):
     return (-1 if number & 0x8000 else 1) * (number & 0x7FFF) / 10
 
 
+def history_record(ordinal, seconds, values, unit):
+    if len(values) != 4 or not 0 <= seconds <= 0xFFFFFFFF or unit not in ("C", "F"):
+        raise ProtocolError("Ungültiger Historienwert.")
+    temperature, humidity = _value(values[:2]), _value(values[2:])
+    if temperature is not None and unit == "F":
+        temperature = (temperature - 32) * 5 / 9
+    if temperature is not None and not -40 <= temperature <= 80:
+        temperature = None
+    if humidity is not None and not 0 <= humidity <= 100:
+        humidity = None
+    return HistoryRecord(ordinal, seconds, temperature, humidity, values.hex())
+
+
 class HistoryDecoder:
     def __init__(self, expected_count, *, unit):
         if type(expected_count) is not int or not 0 <= expected_count <= 65535:
@@ -106,14 +119,7 @@ class HistoryDecoder:
                 self.next_seconds += self.interval
             if not 0 <= seconds <= 0xFFFFFFFF or len(self.records) >= self.expected_count:
                 raise ProtocolError("Historienzeit/Anzahl außerhalb des Wertebereichs.")
-            temperature, humidity = _value(values[:2]), _value(values[2:])
-            if temperature is not None and self.unit == "F":
-                temperature = (temperature - 32) * 5 / 9
-            if temperature is not None and not -40 <= temperature <= 80:
-                temperature = None
-            if humidity is not None and not 0 <= humidity <= 100:
-                humidity = None
-            self.records.append(HistoryRecord(len(self.records) + 1, seconds, temperature, humidity, values.hex()))
+            self.records.append(history_record(len(self.records) + 1, seconds, values, self.unit))
 
     def finish(self):
         if self.failed or self.pending or not self.ended:

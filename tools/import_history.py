@@ -15,9 +15,13 @@ def main():
     parser.add_argument('--device-id', required=True, help='Explizit zugeordnete achtstellige BT06-Kennung')
     parser.add_argument('--firmware', required=True, choices=['2.05'])
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--base-snapshot', help='Geprüfter Basisstand für ein Capture eines Nachladebereichs')
     args = parser.parse_args()
     try:
-        result = HistoryStore(args.root / 'data/history').publish(args.device_id, **read_capture(args.capture))
+        transfer = read_capture(args.capture)
+        if args.base_snapshot:
+            transfer['base_snapshot'] = args.base_snapshot
+        result = HistoryStore(args.root / 'data/history').publish(args.device_id, **transfer)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         parser.exit(1, f'Historienimport fehlgeschlagen: {exc}\n')
     print(json.dumps({key: result[key] for key in ('id','count','duplicate','clock_verified','transport_complete')}, ensure_ascii=False))

@@ -26,11 +26,27 @@ class ProtocolError(ValueError):
     pass
 
 
-def read_request(command):
+def read_request(command, *, selection=None):
     if not isinstance(command, ReadCommand):
         raise TypeError("Nur ausdrücklich unterstützte Leseabfragen zulässig.")
     payload = bytes(11) if command is ReadCommand.SELECT_ALL_HISTORY else b""
+    if selection is not None:
+        if (command is not ReadCommand.SELECT_ALL_HISTORY or not isinstance(selection, tuple) or len(selection) != 2
+                or any(type(value) is not int for value in selection) or not 0 < selection[0] < selection[1] <= 0xFFFFFFFF):
+            raise ValueError("Ungültiger Historien-Lesebereich.")
+        payload = b"\x02\x00\x00" + selection[0].to_bytes(4, "little") + selection[1].to_bytes(4, "little")
     return bytes([0x2a, 3 + len(payload)]) + command.value + payload + b"\x23"
+
+
+def requested_range(data):
+    """Recognize only the independently verified fixed time-range read frame."""
+    data = bytes(data)
+    if len(data) != 16 or data[:7] != b"\x2a\x0e\x6c\x00\x02\x00\x00" or data[-1] != 0x23:
+        raise ProtocolError("Ungültige Historienbereichsabfrage.")
+    selection = (int.from_bytes(data[7:11], "little"), int.from_bytes(data[11:15], "little"))
+    if read_request(ReadCommand.SELECT_ALL_HISTORY, selection=selection) != data:
+        raise ProtocolError("Ungültiger Historien-Lesebereich.")
+    return selection
 
 
 def read_reply(command, data):

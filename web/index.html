@@ -20,7 +20,7 @@
     <button data-page="settings">Einstellungen</button>
     <button data-page="diagnostics">Diagnose</button>
   </nav>
-  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.3.0-dev</span><br>Deine Daten bleiben hier.</p></div>
+  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.3.1-dev</span><br>Deine Daten bleiben hier.</p></div>
 </aside>
 <main>
   <header><div><p class="eyebrow">BT-06 WEBLOGGER</p><h1 id="page-title">Übersicht</h1></div><span class="tag warning">Entwicklung · Testbetrieb</span></header>
@@ -32,7 +32,7 @@
     <div class="section-heading"><h2>Messstellen</h2><button class="secondary" id="overview-export" disabled>CSV exportieren</button></div>
     <p class="muted" id="overview-note">Letzter Testlauf · keine Livewerte und keine Schimmelbewertung.</p>
     <div id="cards" class="cards"><div class="empty"><h3>Noch keine Messdaten</h3><p>Erzeuge einen Testlauf, um die Oberfläche ohne Logger auszuprobieren.</p><button data-go="simulation">Testdaten erzeugen</button></div></div>
-    <article class="panel"><h2>Entwicklungsstand</h2><p>Liveempfang und manuelles Historienlesen für BT06 2.05 sind verfügbar. Vollständige Historienstände bleiben getrennt von Host-Empfängen und Simulation. Gerätezeit und Zeitzone sind noch nicht verifiziert. Gerätekonfiguration folgt in V0.4, Klimaberechnungen in V0.6.</p></article>
+    <article class="panel"><h2>Entwicklungsstand</h2><p>Liveempfang und manuelles Historienlesen für BT06 2.05 sind verfügbar. Geprüfte Fortsetzungen bilden einen Verlauf; Host-Empfänge und Simulation bleiben eigene Datenquellen. Gerätezeit und Zeitzone sind noch nicht verifiziert. Gerätekonfiguration folgt in V0.4, Klimaberechnungen in V0.6.</p></article>
   </section>
 
   <section id="page-history" class="page" hidden>
@@ -81,10 +81,10 @@
     </article>
     <article class="panel"><h2>Gespeicherte Loggerhistorie</h2>
       <p>Den eingerichteten BT06 vollständig auslesen. Der Hostempfang pausiert kurz und wird danach wiederhergestellt. Geräteuhr, Aufzeichnung und Einstellungen bleiben unverändert.</p>
-      <div class="button-row"><button id="sync-start" disabled>Historie jetzt lesen</button></div>
+      <div class="button-row"><button id="sync-incremental" disabled>Neue Werte nachladen</button><button id="sync-start" class="secondary" disabled>Alles vollständig lesen</button></div>
       <p id="sync-status" class="hint" role="status" aria-live="polite">Historienstatus wird geladen …</p>
       <p id="sync-button-signal" class="simulation-notice" hidden><strong>Jetzt kurz START, danach kurz STOP antippen.</strong> Nicht halten. Das öffnet das kurze Verbindungsfenster. Handy-App vorher trennen.</p>
-      <p class="hint">Die Gerätezeit wird unverändert übernommen und als ungeprüft gekennzeichnet. Gleiche Historienstände werden nicht doppelt gespeichert; veränderte Stände bleiben getrennt auswählbar. Noch kein automatischer Sync.</p>
+      <p class="hint">Die Gerätezeit wird unverändert übernommen und als ungeprüft gekennzeichnet. Nachladen prüft die letzten 16 gespeicherten Werte erneut und ergänzt nur passende neue Messungen. Ohne geeignete Basis wird vollständig gelesen. Übereinstimmende Fortsetzungen erscheinen als ein Verlauf, frühere Einzelstände bleiben erreichbar. Noch kein automatischer Sync.</p>
       <div id="snapshot-list" class="run-list"></div>
     </article>
     <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. „Verbinden &amp; prüfen“ liest nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>

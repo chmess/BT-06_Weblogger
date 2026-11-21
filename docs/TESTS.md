@@ -1,4 +1,4 @@
-# Prüfung · V0.3.0-dev · 21.11.2026
+# Prüfung · V0.3.1-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -78,3 +78,12 @@ Synthetischer `python3 tools/benchmark_history.py`-Einzellauf auf DeskPi: 32.000
 Nach Dienstneustart startete der Nutzer das manuelle Historienlesen in der Oberfläche. Der Dienst bestätigte vollständige Übertragung und dauerhafte Speicherung. Anschließend unabhängig lesend geprüft: empfangene und erwartete Anzahl gleich, alle Datei-Prüfsummen gültig, Original-CSV-Export exakt gleich dem gespeicherten Stand. Der frühere Historienstand ist unverändert erhalten; seine komplette Folge aus Geräte-Sekunden und Rohwerten entspricht dem Anfang des neuen Standes. Zusätzliche Messungen folgen unverändert dem Zehn-Minuten-Intervall. Aktivierter Hostempfang nach dem Auftrag wieder `receiving` mit frischen Werten; keine Sync-, Wiederaufnahme- oder Livefehler. Privater Prüfbericht: `private/installed-v03-hardware-report.json`.
 
 Damit ist die integrierte manuelle BLE-/API-/CSV-Strecke auf dem realen BT06 geprüft. Dies ersetzt keine Prüfung von automatischem Sync, inkrementeller Zusammenführung, längerem Dauerbetrieb oder tatsächlicher UTC-Zuordnung.
+
+
+## V0.3.1-dev: Nachladebereich und Präfixverlauf
+
+56 automatisierte Tests bestanden. Neue Fälle: feste begrenzte Lesebereichsrahmen, ungültige Grenzwerte/Reservierungsbytes, Wiederholung ohne neue Daten, identisches Ergebnis aus Vollimport und aus Basis plus Bereich, geänderte Vergleichswerte/Zähler/Anfangsgrenzen, fehlende Basis, getrennte abweichende Reihen, wiederholte Zeitstempel, beschädigte CSV nach warmem Indexcache und simulierter BLE-Bereichspfad einschließlich Vollauslesung bei ungeeigneter Basis.
+
+Chromium: exakt fortgesetzte synthetische Stände erscheinen als ein Verlauf mit korrekter Rohanzahl; frühere Einzelstände bleiben auswählbar. Nachlade-Button ohne Gerät gesperrt. Bestehende Quellen-, Kalender-, Export-, Zoom- und Mobilprüfungen weiterhin erfolgreich; keine JS-Fehler oder externen Requests.
+
+Hardware getrennt geprüft: kleine Bereichsabfrage gegen bekannte Originalwerte; danach neuer Treiber mit Basis und 16 Vergleichswerten. Bereichsanzahl, Endemarkierung und Rohwertüberlappung stimmen; neue Messungen wurden ergänzt und vorherige Daten erhalten. Fortgesetzter Originalverlauf anschließend nur lesend in der Browser-Vorschau geprüft. Private Berichte unter `private/gatt-range-verification.json` und `private/incremental-driver-report.json`. Die neue UI/API benötigt noch Dienstneustart. Kein Nachweis für automatischen Sync oder korrekte UTC-Zeitbasis.

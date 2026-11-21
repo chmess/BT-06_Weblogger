@@ -1,6 +1,6 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
-const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], snapshot:null, sync:null};
+const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null};
 const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
@@ -146,10 +146,15 @@ async function diagnostics() {
   for(const [key,value] of [['Version',data.version],['Betrieb',data.mode==='advertising'?'BLE-Advertising-Empfang':'Offline'],['Laufzeit',`${data.uptime_seconds} Sekunden`],['Bluetooth',data.ble.status],['Freier Speicher',`${number(data.free_bytes/1073741824)} GiB`],['Einstellungen','JSON · Save / Load'],['Datenquellen','BLE-Empfänge / Simulation getrennt']])target.append(element('dt',key),element('dd',value));
 }
 function populateSnapshots() {
-  const selected=state.snapshots.filter(s=>s.logger===state.logger);
-  state.snapshot=selected.find(s=>s.id===state.snapshot?.id)||selected[0]||null;
+  const selected=state.snapshots.filter(s=>s.logger===state.logger),heads=state.series.filter(s=>s.logger===state.logger);
+  state.snapshot=selected.find(s=>s.id===state.snapshot?.id)||heads[0]||selected[0]||null;
   const select=$('#run-select');select.replaceChildren();
-  for(const item of selected)addOption(select,item.id,`${item.first_device_calendar.replace('T',' ')} – ${item.last_device_calendar.replace('T',' ')} · ${item.count} Werte`);
+  for(const [label,items] of [['Fortgesetzte Verläufe',heads],['Frühere Einzelstände',selected.filter(s=>!heads.some(h=>h.id===s.id))]]){
+    if(!items.length)continue;
+    const group=element('optgroup');group.label=label;
+    for(const item of items)addOption(group,item.id,`${item.first_device_calendar.replace('T',' ')} – ${item.last_device_calendar.replace('T',' ')} · ${item.count} Werte`);
+    select.append(group);
+  }
   select.value=state.snapshot?.id||'';
 }
 function setSource(source) {
@@ -167,22 +172,31 @@ function setSource(source) {
   chooseLogger();
 }
 async function refreshSnapshots() {
-  state.snapshots=(await api('snapshots')).snapshots;
+  const previousHead=state.series.find(s=>s.id===state.snapshot?.id&&s.logger===state.logger);
+  const [snapshots,series]=await Promise.all([api('snapshots'),api('series')]);
+  state.snapshots=snapshots.snapshots;state.series=series.series;
+  if(previousHead){const successors=state.series.filter(s=>s.logger===previousHead.logger&&s.member_ids.includes(previousHead.id));if(successors.length===1)state.snapshot=successors[0];}
   const list=$('#snapshot-list');list.replaceChildren();
-  if(!state.snapshots.length)list.append(element('p','Noch keine vollständige Loggerhistorie gespeichert.','muted'));
-  for(const item of state.snapshots){
+  if(!state.snapshots.length)list.append(element('p','Noch keine Loggerhistorie gespeichert.','muted'));
+  function appendItem(item,target,archived=false){
     const row=element('div',null,'run-item'),details=element('div');
     details.append(element('strong',`BT06 ${item.logger.replace('bt06-','')} · ${item.count.toLocaleString('de-DE')} Werte`),element('p',`${item.first_device_calendar.replace('T',' ')} – ${item.last_device_calendar.replace('T',' ')} · Gerätezeit ungeprüft`));
-    const button=element('button','Historie ansehen','secondary');button.addEventListener('click',guard(async()=>{state.logger=item.logger;state.snapshot=item;setSource('device');go('history');await loadHistory();}));
+    if(item.member_count>1)details.append(element('p',`${item.member_count} übereinstimmende Historienstände · vorhandene Werte einmal im Verlauf`));
+    if(item.separate_series>1)details.append(element('p','Mehrere getrennte Reihen: keine eindeutige gemeinsame Fortsetzung.'));
+    if(item.transfer_scope==='range')details.append(element('p',`Fortgesetzt aus geprüfter Basis und Nachladebereich · ${item.new_count} neue Werte`));
+    const button=element('button',archived?'Einzelstand ansehen':'Verlauf ansehen','secondary');button.addEventListener('click',guard(async()=>{state.logger=item.logger;state.snapshot=item;setSource('device');go('history');await loadHistory();}));
     const exportButton=element('button','Original-CSV','secondary');exportButton.addEventListener('click',()=>{const link=document.createElement('a');link.href=`api/export?${new URLSearchParams({source:'device',logger:item.logger,snapshot:item.id})}`;link.click();});
-    const actions=element('div',null,'button-row');actions.append(button,exportButton);row.append(details,actions);list.append(row);
+    const actions=element('div',null,'button-row');actions.append(button,exportButton);row.append(details,actions);target.append(row);
   }
+  for(const item of state.series)appendItem(item,list);
+  const archived=state.snapshots.filter(s=>!state.series.some(h=>h.logger===s.logger&&h.id===s.id));
+  if(archived.length){const details=element('details'),summary=element('summary',`${archived.length} frühere Einzelstände`);details.append(summary);for(const item of archived)appendItem(item,details,true);list.append(details);}
   if(state.source==='device')chooseLogger();
 }
 async function renderDeviceCards() {
   const cards=$('#cards');cards.replaceChildren();
   if(!state.snapshots.length){cards.append(element('p','Noch keine vollständig gelesene Loggerhistorie. Unter Logger / Bluetooth auslesen.','empty'));return;}
-  const item=state.snapshot||state.snapshots[0],card=element('article',null,'card');
+  const item=state.snapshot||state.series[0]||state.snapshots[0],card=element('article',null,'card');
   card.append(element('div','HISTORIE · GERÄTEZEIT UNGEPRÜFT','source'),element('h3','BT06 '+item.logger.replace('bt06-','')),element('p',`${item.count.toLocaleString('de-DE')} Originalwerte · ${item.interval_seconds} s Intervall`),element('p',`${item.first_device_calendar.replace('T',' ')} – ${item.last_device_calendar.replace('T',' ')}`,'hint'));
   const button=element('button','Verlauf ansehen','secondary');button.addEventListener('click',guard(async()=>{go('history');await loadHistory();}));card.append(button);cards.append(card);
 }
@@ -190,11 +204,11 @@ let syncPolling=null;
 async function refreshSync() {
   const previous=state.sync?.state;state.sync=await api('sync');
   const busy=state.sync.state==='running';
-  const labels={pausing_host:'Hostempfang wird pausiert',connecting:'Verbindung wartet auf kurzen Tastendruck',reading_metadata:'Metadaten lesen',receiving:'Historie empfangen',saving:'CSV dauerhaft speichern',finished:'Abgeschlossen'};
-  $('#sync-start').disabled=busy||!state.live?.config.device;
+  const labels={pausing_host:'Hostempfang wird pausiert',connecting:'Verbindung wartet auf kurzen Tastendruck',reading_metadata:'Metadaten lesen',selecting_range:'Nachladebereich wählen',full_fallback:'Vollauslesung erforderlich',receiving:'Historie empfangen',saving:'CSV dauerhaft speichern',finished:'Abgeschlossen'};
+  $('#sync-start').disabled=busy||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;
   $('#sync-button-signal').hidden=!(busy&&state.sync.phase==='connecting');
   const result=state.sync.result;
-  $('#sync-status').textContent=[labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} Werte`:'',result?`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`:'',state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
+  $('#sync-status').textContent=[labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} Werte`:'',result?(result.last_transfer_scope==='range'?`${result.new_count} neue Werte · ${result.received_count} Werte einschließlich Überlappung geprüft · ${result.count} Werte im Gesamtbestand · ${result.duplicate?'keine Änderung':'dauerhaft gespeichert'}`:`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`):'',state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
   if(busy&&!syncPolling)syncPolling=setInterval(guard(refreshSync),1000);
   if(!busy&&syncPolling){clearInterval(syncPolling);syncPolling=null;}
   if(previous==='running'&&!busy){await refreshLive();await refreshSnapshots();await refreshBluetooth();await renderCards();}
@@ -202,7 +216,7 @@ async function refreshSync() {
 async function refreshLive() {
   const [live,loggers]=await Promise.all([api('live'),api('loggers')]);state.live=live;state.liveLoggers=loggers.loggers;
   const syncing=state.sync?.state==='running';const active=['starting','receiving','retrying'].includes(live.state);
-  $('#capture-stop').disabled=!active||syncing;$('#capture-resume').hidden=!live.config.device||active;$('#capture-resume').disabled=syncing;$('#sync-start').disabled=syncing||!live.config.device;
+  $('#capture-stop').disabled=!active||syncing;$('#capture-resume').hidden=!live.config.device||active;$('#capture-resume').disabled=syncing;$('#sync-start').disabled=syncing||!live.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;
   const latest=live.latest;
   $('#capture-status').textContent=[`Empfang: ${live.state}`,live.config.device?`BT06 ${live.config.device.id} · Firmware ${live.config.device.firmware}`:'Noch kein Gerät ausgewählt.',latest?`Letzter Empfang: ${date(latest.received_at)} (${live.fresh?'aktuell':'veraltet'})`:'Noch kein Livepaket in dieser Sitzung.',`CSV-Abstand ${live.config.save_interval_seconds} s`,live.last_stored_at?`Zuletzt gespeichert: ${date(live.last_stored_at)}`:'Noch nichts gespeichert.',live.error||''].filter(Boolean).join(' · ');
   $('#ble-scan').disabled=active||$('#ble-scan').disabled;
@@ -235,7 +249,7 @@ async function refreshBluetooth() {
   const data=await api('ble');
   $('#ble-status').textContent=!data.available?'Optionale Bluetooth-Unterstützung fehlt. Mit ./install.sh --ble lokal installieren und das Programm neu starten.':data.state==='running'?'Bluetooth-Auftrag läuft …':data.error||`Bereit. Sichtbare Adapter: ${data.adapters.join(', ')||'keine erkannt'}.`;
   const busy=data.state==='running'||state.sync?.state==='running'||['starting','receiving','retrying'].includes(state.live?.state);
-  $('#sync-start').disabled=data.state==='running'||state.sync?.state==='running'||!state.live?.config.device;
+  $('#sync-start').disabled=data.state==='running'||state.sync?.state==='running'||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;
   $('#ble-scan').disabled=!data.available||busy;
   for(const button of document.querySelectorAll('[data-ble-action]'))button.disabled=busy;
   if(data.state==='running') { if(!blePolling)blePolling=setInterval(guard(refreshBluetooth),1000);return; }
@@ -274,6 +288,7 @@ async function main() {
   $('#chart-reset').addEventListener('click',()=>{if(state.chartData)renderChart(state.chartData,true);});
   $('#chart-fullscreen').addEventListener('click',guard(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else await $('#chart').requestFullscreen();}));
   $('#chart-export').addEventListener('click',guard(exportCSV));
+  $('#sync-incremental').addEventListener('click',guard(async()=>{await post('sync',{mode:'incremental'});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#sync-start').addEventListener('click',guard(async()=>{await post('sync',{});await refreshSync();await refreshLive();await refreshBluetooth();}));
   $('#ble-scan').addEventListener('click',guard(()=>startBluetooth('scan')));
   $('#capture-resume').addEventListener('click',guard(()=>startReceive()));

@@ -34,7 +34,7 @@ async def known_device(config):
         bus.disconnect()
 
 
-async def retrieve(config, progress):
+async def retrieve(config, progress, base=None):
     from bleak import BleakClient
     target = await known_device(config)
     client = BleakClient(target, pair=False, timeout=45)
@@ -62,8 +62,8 @@ async def retrieve(config, progress):
             raise ProtocolError('Historien-Empfangslimit überschritten.')
         return raw
 
-    async def command(operation):
-        raw = read_request(operation)
+    async def command(operation, selection=None):
+        raw = read_request(operation, selection=selection)
         note('TX', raw)
         await asyncio.wait_for(client.write_gatt_char(tx, raw, response=True), 8)
         return read_reply(operation, await response())
@@ -87,6 +87,23 @@ async def retrieve(config, progress):
         count = int.from_bytes(metadata[:2], 'little')
         if not count:
             raise ProtocolError('Logger meldet keine gespeicherte Historie.')
+        if base:
+            first = int.from_bytes(metadata[2:6], 'little')
+            last = int.from_bytes(metadata[6:10], 'little')
+            unit = 'F' if settings[6] else 'C'
+            if (count >= base['count'] and first == base['first'] and last >= base['last']
+                    and last < 0xFFFFFFFF and unit == base['unit']
+                    and int.from_bytes(settings[:2], 'little') == base['interval_seconds']):
+                progress('selecting_range')
+                selected = await command(ReadCommand.SELECT_ALL_HISTORY, (base['begin'], last + 1))
+                if (len(selected) != 10 or int.from_bytes(selected[:2], 'little') != count - base['count'] + base['overlap']
+                        or int.from_bytes(selected[2:6], 'little') < base['begin']
+                        or int.from_bytes(selected[6:10], 'little') != last):
+                    raise ProtocolError('Nachladebereich passt nicht zu den Gesamtmetadaten. Vollständig lesen.')
+                metadata = selected
+                count = int.from_bytes(metadata[:2], 'little')
+            else:
+                progress('full_fallback')
         decoder = HistoryDecoder(count, unit='F' if settings[6] else 'C')
         progress('receiving', expected=count, received=0)
         await command(ReadCommand.RECEIVE_HISTORY)
@@ -97,6 +114,9 @@ async def retrieve(config, progress):
         if overflow or not queue.empty():
             raise ProtocolError('Unerwartete Daten nach Historienende.')
         await asyncio.wait_for(client.stop_notify(rx), 8)
-        return decode_capture(capture)
+        transfer = decode_capture(capture)
+        if 'selection' in transfer:
+            transfer['base_snapshot'] = base['snapshot']
+        return transfer
     finally:
         await asyncio.wait_for(client.disconnect(), 10)

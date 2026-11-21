@@ -1,4 +1,4 @@
-# Architektur · V0.3.0-dev
+# Architektur · V0.3.1-dev
 
 ## Laufzeit
 
@@ -55,3 +55,10 @@ Der UI-Bestand wird beim Prozessstart in den Arbeitsspeicher gelesen, damit lauf
 `linux/history_reader.py` nutzt den bereits von BlueZ bestätigten Geräteeintrag am ausgewählten Adapter. So wartet die Verbindung schon vor dem kurzen Tastenfenster auf den Logger. Keine geratenen DBus-Pfade, UUIDs oder Gerätebefehle. `linux/history_jobs.py` steuert genau einen manuellen Auftrag. Alle BLE-Steuerungs-POSTs sind serialisiert; andere Aufträge bleiben während Sync gesperrt. Der Empfangswunsch bleibt für Neustart erhalten, auch wenn der Hostempfang gerade pausiert ist. Ein Abbruch bestätigt keinen unvollständigen Import.
 
 Das Frontend behandelt Hostempfang, Gerätekalender und Simulation als getrennte Quellen. Die Gerätezeit ist ausdrücklich ungeprüft; Kalenderkoordinaten des Charts erhalten keine automatische UTC-Korrektur. Die integrierte manuelle Strecke ist im installierten Dienst am realen BT06 erfolgreich geprüft. Zusammengeführte Langzeithistorie und automatischer Sync bleiben offen. Dienst und UI werden erst durch geordneten Neustart gemeinsam aktualisiert.
+
+
+## V0.3.1: Nachladen und Verlaufsindex
+
+`HistoryStore.series()` rekonstruiert Präfixbeziehungen aus den geordneten Rohzeiten/Rohwerten und deren Inhaltskennung. Genau enthaltene frühere Stände werden im Hauptverlauf zusammengefasst, Originalarchive bleiben unverändert. Cache ist ausschließlich im Arbeitsspeicher und wird bei geänderten Manifest-/Dateistatistiken verworfen; gewählte CSV werden weiterhin anhand ihrer Prüfsummen gelesen. Mehrdeutige Reihen verhindern automatische Basiswahl.
+
+Der manuelle Nachladeauftrag verwendet dieselbe Adaptersperre und Wiederaufnahme wie die Vollauslesung. Erst passende Gesamtmetadaten erlauben die Bereichsabfrage; vor Veröffentlichung werden Basis, 16 überlappende Messungen, Grenzen und Anzahl nochmals geprüft. Abbruch/Widerspruch ändert bestehende Daten nicht. Teilbereichsherkunft wird ausdrücklich dokumentiert und gilt nicht als neuer Vollabruf. Noch kein automatischer Zeitplan oder separater Hintergrunddienst. Die Gesamt-CSV-Stände bleiben vollständig; Archivspeicheroptimierung ist nicht Teil dieses Schritts.

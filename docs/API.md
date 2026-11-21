@@ -1,4 +1,4 @@
-# HTTP-API · V0.3.0-dev
+# HTTP-API · V0.3.1-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB. Fehler: `{ "error": "..." }`.
 
@@ -40,3 +40,12 @@ Noch nicht implementiert: automatische/inkrementelle Historiensynchronisation un
 - `GET /api/export` mit denselben Identitätsparametern: Schema 3, Originalauflösung, `Zeitstempel` leer, `Geraetekalender` ohne Offset, `GeraeteSekunden` unverändert.
 
 Optionale `start/end` verwenden bei `source=device` dieselben Kalenderkoordinaten (offsetfähiges ISO-Format zur bestehenden API-Kompatibilität; kein Nachweis der realen Zeitzone). Bereich inklusive. CSV gibt weiterhin Originalfelder aus. Bei rückwärts laufender Uhr gibt es einen sichtbaren Diagrammfehler; der ungefilterte Originalexport bleibt möglich. Veränderte Stände werden nicht automatisch zusammengeführt. `duplicate=true` bestätigt einen bereits vorhandenen unveränderten Inhalt nach erneuter Integritätsprüfung.
+
+
+## Nachladen und fortgesetzte Reihen · V0.3.1-dev
+
+`GET /api/series` bietet pro Logger die längsten exakt belegten Rohdatenfortsetzungen an. `member_ids`/`member_count` nennen die enthaltenen Einzelstände; `separate_series` kennzeichnet mehrere nicht eindeutig zusammenführbare Reihen. `/api/snapshots` bleibt als vollständige Archivauswahl erhalten. Chart und Export verwenden weiterhin die unveränderte Inhaltskennung des gewünschten Standes. Die Auswahl im UI zeigt zuerst gemeinsame Verläufe und danach frühere Einzelstände.
+
+`POST /api/sync` mit `{"mode":"incremental"}` fordert Nachladen an. `{}` oder `{"mode":"full"}` liest weiter vollständig. Nur der bewusst ausgewählte Live-Logger wird verwendet. Existiert genau eine geeignete Reihe mit mindestens 16 Werten und streng aufsteigender Gerätezeit, werden zuerst aktuelle Gesamtmetadaten gelesen und auf kompatible Grenzen, Zähler, Einheit und Intervall geprüft. Bei einer vorab ungeeigneten/veränderten Basis wird vollständig gelesen. Bei einem Widerspruch nach Bereichsübertragung wird abgebrochen und eine Vollauslesung verlangt, nicht still gemischt.
+
+Ergebniszusätze: `last_transfer_scope` (`full/range`) beschreibt den aktuellen Auftrag; `received_count` die tatsächlich übertragenen Messungen einschließlich Vergleichswerten, `new_count` die ergänzten Werte. `count` ist weiterhin die Gesamtzahl im resultierenden Stand. `transfer_scope`, `base_snapshot` und `full_read_verified` dokumentieren die ursprüngliche Herkunft des gespeicherten Standes; sie sind kein Nachweis eines frischen Vollabrufs bei späteren Wiederholungen. Ein Bereichstransfer darf keine destruktive Geräteänderung freigeben. Nachladen ist manuell, kein automatischer Zeitplan.

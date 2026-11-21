@@ -1,8 +1,8 @@
 # BT-06 Weblogger
 
-Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.3.0-dev – manuelles Historienlesen und getrennte Historienansicht für BT06 2.05.** Auf dem DeskPi aktiviert; manuelles Historienlesen im installierten Dienst am realen BT06 erfolgreich geprüft.
+Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.3.1-dev – geprüftes Nachladen und fortgesetzte Historienverläufe für BT06 2.05.** Der installierte DeskPi-Dienst bleibt bis zum nächsten Neustart auf V0.3.0-dev.
 
-Vollständiger Historientransfer am realen BT06 und Import der gesicherten Originaldaten sind geprüft. Die integrierte BLE-/API-Strecke ist zusätzlich im installierten Dienst am realen BT06 geprüft: vollständige Speicherung, Originalexport und anschließender aktueller Liveempfang erfolgreich. Automatischer Sync, zusammengeführte Langzeithistorie und verifizierte Zeitzuordnung sind noch offen. Details: [BLE-Protokoll](docs/BLE-PROTOKOLL.md).
+Manuelle Vollauslesung ist im Dienst am realen BT06 geprüft. Die neue Bereichsabfrage samt Überlappungsprüfung, Speicherung und zusammengeführtem Verlauf ist zusätzlich mit dem neuen Treiber am Gerät geprüft; die neue UI wurde synthetisch und mit Originaldaten nur lesend geprüft. Die neue integrierte Oberfläche/API ist noch nicht im Dienst aktiviert. Automatischer Sync und verifizierte Zeitzuordnung bleiben offen. Details: [BLE-Protokoll](docs/BLE-PROTOKOLL.md).
 
 ## Start
 
@@ -25,8 +25,9 @@ Im Browser `http://127.0.0.1:8766/` öffnen. Der Prozess läuft im Vordergrund. 
 - Jeder Testlauf erhält ein eigenes Verzeichnis. Alle Werte bleiben als Simulation gekennzeichnet. Keine erfundenen Batterie-/RSSI-Werte.
 - Interaktiver ECharts-Verlauf mit Temperatur/Feuchte, Tooltip, Zoom, Navigator, Legende, Vollbild, freien Zeiträumen und Schwellenlinien. Lücken bleiben sichtbar. Legendenwahl wird lokal im Browser gespeichert.
 - CSV-Download des gewählten Abfragezeitraums in Originalauflösung. Grafikzoom verändert den Exportzeitraum nicht; die freie Zeitraumwahl steuert ihn.
-- Historie manuell auslesen: **Logger / Bluetooth → Historie jetzt lesen** verwendet den eingerichteten Live-Logger, pausiert den Hostempfang und stellt ihn danach wieder her. Beim angezeigten Signal START und danach STOP jeweils nur kurz antippen; nicht halten, Handy-App vorher trennen. Keine Kopplung oder Änderung von Loggeruhr/Aufzeichnung.
-- Vollständige Historienstände als monatliche Original-CSV mit überprüfter Anzahl/Endemarkierung; identische Wiederholungen erzeugen keine Kopie. Veränderte oder überlappende Stände bleiben getrennt, weil kein dauerhaft stabiler Geräteindex belegt ist.
+- Historie manuell auslesen: **Logger / Bluetooth → Alles vollständig lesen** verwendet den eingerichteten Live-Logger, pausiert den Hostempfang und stellt ihn danach wieder her. Beim angezeigten Signal START und danach STOP jeweils nur kurz antippen; nicht halten, Handy-App vorher trennen. Keine Kopplung oder Änderung von Loggeruhr/Aufzeichnung.
+- Vollständige Historienstände als monatliche Original-CSV mit überprüfter Anzahl/Endemarkierung; identische Wiederholungen erzeugen keine Kopie. Exakte Fortsetzungen erscheinen als ein Verlauf; frühere Einzelstände bleiben erreichbar. Abweichende Reihen bleiben getrennt, weil kein dauerhaft stabiler Geräteindex belegt ist.
+- **Neue Werte nachladen** liest bei geeigneter Basis nur einen Zeitbereich mit den letzten 16 gespeicherten Vergleichswerten und neuen Messungen. Anzahl, Grenzen und Rohwerte müssen übereinstimmen; bei Widerspruch bleibt der Bestand erhalten und eine Vollauslesung wird verlangt. Ohne geeignete Basis erfolgt eine Vollauslesung. Nachladen startet weiterhin nur auf Klick.
 - Datenquelle **Loggerhistorie · Gerätezeit**: Verlauf, freie Kalenderbereiche und Original-CSV-Export, ausdrücklich ohne bestätigten UTC-Offset. Keine Verschiebung auf Hostzeit und keine Vermischung mit Liveempfängen.
 - Explizite BLE-Gerätesuche, Geräteauswahl und vorübergehende GATT-Verbindungsprüfung. Betriebssystem-Kopplung nur mit eigenem Button/CLI-Option. Keine Logger-Konfigurationsbefehle.
 
@@ -121,3 +122,6 @@ python3 tools/import_history.py /pfad/capture.csv --device-id 12345678 --firmwar
 Die Kennung im Beispiel ist synthetisch. Das Werkzeug greift nicht auf Bluetooth zu. Es prüft Befehlsfolge, Metadaten, Rahmen und Vollständigkeit erneut und schreibt unter `data/history/`. Original-Capture bleibt unverändert. Unsichere, unvollständige oder fremde Formate werden abgewiesen. Wiederholung ist sicher; nach Fehler vor der Veröffentlichung erneut vollständig importieren. Nicht veröffentlichte `.pending-*` bleiben zur Diagnose erhalten und werden nicht angezeigt.
 
 Für spätere DeskPi-Aktualisierungen genügen `sudo systemctl restart bt06-weblogger.service` in der normalen SSH-Sitzung und anschließend Neuladen von `/klima/`. Keine Paketinstallation oder System-/Mountänderung nötig. Der aktivierte Liveempfang wird beim Start wieder aufgenommen; Historienlesen startet ausschließlich auf Klick.
+
+
+Bereichs-Captures benötigen beim Offlineimport zusätzlich `--base-snapshot <Inhaltskennung>`. Eine Bereichsabfrage ist kein frischer Nachweis einer vollständigen Geräteauslesung: ältere Teile stammen aus dem bereits gespeicherten Basisstand. Die Oberfläche zeigt empfangene Vergleichswerte und neue Messungen getrennt vom Gesamtbestand. Es erfolgt keine automatische Zusammenführung mit Host-Empfängen und keine automatische UTC-Korrektur.

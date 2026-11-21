@@ -32,3 +32,15 @@ def capture(seconds=None, values=None):
         add('RX', packet(1, b''.join(u32(s) + value for s, value in zip(seconds[offset:offset+128], values[offset:offset+128]))))
     add('RX', packet(255, u32(count) + u32(1 + (count + 127) // 128)))
     return rows
+
+
+def range_capture(seconds, begin, end, values=None):
+    from backend.common.bt06_gatt import ReadCommand, read_request
+    full = capture(seconds, values)
+    indices = [i for i, second in enumerate(seconds) if begin <= second <= end]
+    partial = capture([seconds[i] for i in indices], [values[i] for i in indices] if values else None)
+    request = {**partial[2], 'DatenHex': read_request(ReadCommand.SELECT_ALL_HISTORY, selection=(begin, end)).hex()}
+    result = full[:6] + [request, partial[3]] + partial[6:]
+    for index, row in enumerate(result):
+        row['Hostzeit'] = (datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(milliseconds=index)).isoformat()
+    return result

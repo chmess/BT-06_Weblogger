@@ -1,4 +1,4 @@
-# CSV-Vertrag · V0.3.0-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
+# CSV-Vertrag · V0.3.1-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
 
 Originalformat: UTF-8, Semikolon, Dezimalkomma, LF, Header. Browserexport zusätzlich mit UTF-8-BOM für Excel. Zeitstempel in V0.1 explizit UTC (`+00:00`); Anzeige in konfigurierter Zeitzone. Monatsdateien folgen UTC, daher stabile Dateigrenzen auch bei Sommerzeitwechsel. Leere Batterie/RSSI-Felder bedeuten unbekannt.
 
@@ -40,3 +40,12 @@ Erste zehn Felder wie zuvor, danach `GeraeteSekunden;Geraetekalender;Sequenz;Roh
 `capture.csv` bewahrt Original-GATT-Übertragung als `Hostzeit;Richtung;DatenHex`, Hostzeit mit echtem Offset. `manifest.json` enthält ausschließlich abgeleitete Anzahl, Zeitgrenzen, Einheit, Intervall, Firmware, Transportprüfung und Datei-Prüfsummen. Keine Originalmesswerte in JSON. Der Gerätezeit-Chart verwendet intern separate Kalenderkoordinaten; diese werden niemals als verifizierter Zeitstempel exportiert.
 
 CSV-Dateien und Manifest werden vor Veröffentlichung fsync-gesichert; ein exklusiver flock serialisiert Importe auch gegenüber dem Offlinewerkzeug. Atomare Verzeichnisumbenennung veröffentlicht alle Monatsdateien gemeinsam. Nach Abbruch/Schreibfehler bleiben bestehende Stände erhalten. Erneuter Vollimport rekonstruiert einen neuen vollständigen Stand; unveröffentlichte Staging-Dateien werden nicht als erfolgreich angeboten. Beschädigte bestehende Dateien blockieren Lesen und die Bestätigung eines doppelten Imports; keine automatische Reparatur/Überschreibung. Inhaltskennung folgt Firmware, Einheit und geordneter Folge von Rohzeiten/Rohwerten, nicht allein Zeitstempeln.
+
+
+## V0.3.1: Fortsetzungen und Bereichsübertragung
+
+Schema 3 der Messwerte bleibt unverändert. Die längste exakt passende Folge enthält vorhandene Messungen nur einmal im ausgewählten Verlauf. Frühere Einzelstände und ihre CSV bleiben erhalten; der gemeinsame Verlauf ist eine Auswahl des längsten passenden Standes, keine ungeprüfte Vereinigung nach Zeitstempeln. Raw-Gerätesekunden und Rohwertebytes einschließlich Reihenfolge müssen für ein Präfix identisch sein. Abweichende oder verschobene Reihen bleiben getrennt.
+
+Beim Nachladen enthält `capture.csv` den aktuellen Metadaten-/Bereichstransfer. Die früheren Originalmessungen stammen aus `base_snapshot`; die CSV des resultierenden Standes enthält weiterhin den gesamten unveränderten Bestand plus neue Messungen. Das Manifest ergänzt `transfer_scope=range`, `base_snapshot`, `received_count`, `new_count` und `full_read_verified=false`. Der gesamte aktuell vorhandene Gerätespeicher wurde bei dieser Übertragung **nicht** erneut gelesen. Die Metadaten und 16 Vergleichswerte reduzieren Verwechslungsrisiken, beweisen jedoch keine Unverändertheit aller nicht übertragenen Gerätebereiche.
+
+Auch ein Bereich wird vollständig über Endemarkierung und Anzahl geprüft, bevor er veröffentlicht wird. Die 16 Vergleichswerte müssen bytegenau stimmen und werden nicht doppelt eingefügt. Wiederholte Zeitstempel, Rücksprünge oder uneindeutige Basis verhindern diesen Nachladepfad. Originaldateien werden nicht gelöscht. Aktuell werden vollständige resultierende Monats-CSV-Stände gespeichert; Nachladen spart Funkübertragung, ist noch keine Optimierung des Archivspeicherverbrauchs. Kein automatischer Sync in dieser Entwicklungsfassung.

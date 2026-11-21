@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.3.1-dev · 2026-11-21
+
+- Zeitbereichsabfrage am realen BT06 mit bekannten Rohwerten verifiziert und als begrenzter, reiner Lesepfad implementiert. „Neue Werte nachladen“ prüft 16 gespeicherte Vergleichswerte sowie Zähler und Grenzen, bevor neue Messungen übernommen werden. Keine Loggeränderungen.
+- Exakte Rohdatenfortsetzungen werden als gemeinsamer Verlauf angeboten; abweichende Reihen bleiben getrennt, frühere Einzelstände bleiben erreichbar. Regenerierbarer Index im Arbeitsspeicher, keine Datenbank und kein zusätzlicher Dienst.
+- Herkunft unterscheidet Vollauslesung und aus Basis plus Bereich fortgesetzten Stand. Ein Nachladebereich gilt ausdrücklich nicht als frischer Vollständigkeitsnachweis des gesamten Gerätespeichers. Gerätezeit bleibt ungeprüft.
+- Neuer Nachladepfad mit realem BT06 erfolgreich geprüft: Vergleichswerte stimmen, neue Messungen übernommen, frühere Werte unverändert und Liveempfang wieder gestartet. 56 automatisierte Tests und synthetische Browserprüfung bestanden; fortgesetzter Originalverlauf nur lesend geprüft.
+- Aktivierung der neuen UI/API erfordert noch Dienstneustart. Automatischer Sync, tatsächlicher UTC-Offset und uneindeutige/verschobene Historien bleiben offen.
+
 ## 0.3.0-dev · 2026-11-21
 
 - Auf DeskPi aktiviert und manuelle integrierte BLE-/API-Strecke am realen BT06 erfolgreich geprüft: erwartete und empfangene Anzahl gleich, CSV-Prüfsummen und Originalexport stimmen; bisherige Werte unverändert enthalten, zusätzliche Messungen im konfigurierten Intervall. Liveempfang anschließend wieder aktuell, kein Sync-/Wiederaufnahmefehler.

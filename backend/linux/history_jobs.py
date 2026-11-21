@@ -26,8 +26,8 @@ class HistoryJobs:
         return self.status()['state'] == 'running'
 
     def start(self, options):
-        if options != {}:
-            raise ValueError('Historienlesen verwendet ausschließlich den bewusst eingerichteten Live-Logger; leeres JSON erforderlich.')
+        if not isinstance(options, dict) or set(options) - {'mode'} or options.get('mode', 'full') not in ('full', 'incremental'):
+            raise ValueError('Historienlesen erwartet mode=full oder incremental; Standard ist vollständig.')
         config = self.receiver.status()['config']
         self.receiver.validate(config)
         if config['device'] is None:
@@ -37,8 +37,9 @@ class HistoryJobs:
                 raise BusyError('Historienauftrag läuft bereits oder Anwendung wird beendet.')
             self.value = {'state': 'running', 'phase': 'pausing_host', 'received': 0, 'expected': None,
                           'result': None, 'error': None, 'resume_error': None,
+                          'mode': options.get('mode', 'full'),
                           'started_at': datetime.now(timezone.utc).isoformat()}
-            self.worker = threading.Thread(target=self._run, args=(deepcopy(config),), name='bt06-history')
+            self.worker = threading.Thread(target=self._run, args=(deepcopy(config), options.get('mode', 'full')), name='bt06-history')
             try:
                 self.worker.start()
             except BaseException:
@@ -50,22 +51,25 @@ class HistoryJobs:
         with self.lock:
             self.value.update(phase=phase, **values)
 
-    async def _read(self, config):
+    async def _read(self, config, base):
         with self.lock:
             self.loop = asyncio.get_running_loop()
             self.task = asyncio.current_task()
             if self.closing:
                 raise asyncio.CancelledError()
-        return await asyncio.wait_for(retrieve(config, self._progress), 180)
+        return await asyncio.wait_for(retrieve(config, self._progress, base=base), 180)
 
-    def _run(self, config):
+    def _run(self, config, mode):
         acquired = False
+        paused = False
         try:
+            base = self.store.incremental_base('bt06-' + config['device']['id']) if mode == 'incremental' else None
             self.receiver.stop(persist=False)
+            paused = True
             acquired = self.receiver.radio_lock.acquire(blocking=False)
             if not acquired:
                 raise BusyError('Bluetooth ist noch belegt. Historienlesen später erneut starten.')
-            transfer = asyncio.run(self._read(config))
+            transfer = asyncio.run(self._read(config, base))
             self._progress('saving')
             result = self.store.publish(config['device']['id'], **transfer)
             with self.lock:
@@ -91,7 +95,7 @@ class HistoryJobs:
             with self.lock:
                 self.loop = self.task = None
                 closing = self.closing
-            if config['enabled'] and not closing:
+            if paused and config['enabled'] and not closing:
                 try:
                     self.receiver.start()
                 except Exception:

@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.3.0-dev
+# BLE-Protokollstand · V0.3.1-dev
 
 ## Belege
 
@@ -67,3 +67,12 @@ Die erfasste vollständige Historie wurde unabhängig dekodiert: angekündigte u
 Der installierte Dienst läuft jetzt mit V0.3.0-dev. In V0.3.0-dev sind geprüfter Monats-CSV-Import, identische Wiederholungen ohne Kopie, getrennte Historienstände, Gerätezeit-UI und manuelles Sync implementiert. Der Web-GATT-Diagnosepfad bleibt ein Inventartest. Die integrierte BLE-/API-Strecke wurde automatisiert mit simuliertem BLE und anschließend im installierten Dienst am realen BT06 erfolgreich geprüft. Erwartete/empfangene Anzahl, gespeicherte CSV-Prüfsummen und Originalexport stimmen. Der frühere Stand bleibt erhalten und ist unverändert im neueren Transfer enthalten; neue Messwerte folgen dem konfigurierten Intervall. Der aktivierte Hostempfang läuft danach wieder mit aktuellen Werten, ohne Sync-/Wiederaufnahmefehler. Automatischer Sync, zusammengeführte Langzeithistorie, UTC-Zuordnung und unbeaufsichtigte Wiederverbindung bleiben offen. Die März-Historie ist laut Nutzer mit der ersten Inbetriebnahme plausibel; diese Aussage bestätigt keinen UTC-Offset.
 
 BlueZ-Suche und Liveempfang setzen ausdrücklich `DuplicateData=True`, weil Bleak sonst identische Meldungen unterdrückt. Das erhält Empfangszeit und Frischeprüfung auch bei gleichbleibenden Messwerten; es erzwingt keine Funkpakete und löst das kurze Verbindungsfenster nicht. Referenzen: [BlueZ Adapter API](https://bluez.readthedocs.io/en/latest/adapter-api/), [Bleak Linux backend](https://bleak.readthedocs.io/en/latest/backends/linux.html).
+
+
+## V0.3.1: reale Bereichsabfrage
+
+Die unabhängig aus der Herstellerreferenz abgeleitete Bereichsauswahl wurde am realen BT06 2.05 mit einem kleinen bekannten Datenbereich geprüft: angekündigte/empfangene Anzahl und sämtliche Rohwerte stimmen mit dem gespeicherten Ausschnitt überein. `6C00` verwendet weiterhin elf Nutzdatenbytes; im Bereichsmodus `02 00 00`, gefolgt von Beginn/Ende als uint32 LE. Das sind rohe Geräte-Sekunden, keine automatisch umgerechnete Hostzeit. Die Grenzinklusion genau auf einem Messzeitpunkt wird nicht vorausgesetzt: der geprüfte Pfad verwendet eine Sekunde Abstand um die gewünschten Vergleichs-/Endewerte. Bereichsmetadaten liefern Anzahl, ersten und letzten tatsächlichen Wert wie bei Vollauswahl.
+
+Der neue Treiber liest vor einer Bereichsauswahl die Gesamtmetadaten und Einstellungen. Eine geeignete eindeutige Basis benötigt mindestens 16 streng zeitlich aufsteigende Werte. Gesamter Anfang, Endgrenze, Anzahl, Einheit und Intervall müssen passen. Der Bereich beginnt eine Sekunde vor dem ersten der letzten 16 Basiswerte und endet eine Sekunde nach der aktuellen Endgrenze. Anzahl entspricht neuen Werten plus 16; Endemarkierung und vollständiger Vergleich der Überlappung sind Pflicht. Widersprüche blockieren die Übernahme. Keine pauschale Freigabe für andere Firmware oder Speicherumlauf.
+
+Anschließend wurde der neue Nachladepfad selbst am Gerät geprüft: ausgewählter kleiner Bereich vollständig übertragen, Vergleichswerte unverändert, neue Messungen ergänzt, ursprünglicher Bestand unverändert und zu einer Reihe zugeordnet. Der Hostempfang wurde wieder gestartet. Die neue UI/API ist erst nach Dienstneustart aktiv; automatische Synchronisation, bestätigte UTC-Zuordnung und Zusammenführung verschobener Reihen sind weiter offen.
