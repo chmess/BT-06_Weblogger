@@ -2,11 +2,13 @@
 
 ## 0.3.0-dev · 2026-11-21
 
+- Auf DeskPi aktiviert und manuelle integrierte BLE-/API-Strecke am realen BT06 erfolgreich geprüft: erwartete und empfangene Anzahl gleich, CSV-Prüfsummen und Originalexport stimmen; bisherige Werte unverändert enthalten, zusätzliche Messungen im konfigurierten Intervall. Liveempfang anschließend wieder aktuell, kein Sync-/Wiederaufnahmefehler.
+
 - Vollständige Historien als unveränderliche Monats-CSV-Stände; Veröffentlichung erst nach CSV-/Manifest-fsync und atomarer Umbenennung. Inhaltskennung verhindert identische Kopien auch nach Neustart. Veränderte/überlappende Stände bleiben ausdrücklich getrennt; keine geratenen stabilen Geräteindizes.
 - Manuelles lesendes GATT-Sync mit Fortschritt, begrenztem Empfang, gemeinsamer Adaptersperre, Abbruch beim Beenden und Wiederaufnahme des vorher aktivierten Hostempfangs. Keine automatische Kopplung oder Loggeränderung.
 - Datenquelle Loggerhistorie mit Gerätezeitachse, freier Kalenderauswahl, Historienstandwahl und Original-CSV. UTC-Zeitstempel bleiben bei ungeprüfter Zeitbasis leer; Original-Gerätesekunden bleiben erhalten. Rückwärts laufende Gerätezeit blockiert eine irreführende Kurve, Originalexport bleibt möglich.
 - Offline-Capture-Import und reproduzierbarer Historien-Performancecheck. Original-Capture erfolgreich importiert und wiederholt ohne Kopie geprüft; echte Historienansicht nur lesend geprüft.
-- 49 automatisierte Tests bestanden; synthetische Browserprüfung einschließlich Historie, Export und mobiler Ansicht erfolgreich. Neue integrierte BLE-Strecke noch nicht im Dienst mit Hardware abgenommen; bestehender Dienst bleibt bis Neustart V0.2. Automatischer Sync, inkrementelles Nachladen und UTC-Zuordnung noch offen.
+- 49 automatisierte Tests bestanden; synthetische Browserprüfung einschließlich Historie, Export und mobiler Ansicht erfolgreich. Die anschließende Geräteprüfung im installierten Dienst war erfolgreich (siehe oben). Automatischer Sync, inkrementelles Nachladen und UTC-Zuordnung noch offen.
 
 ### Vorangegangene Protokollprüfung
 

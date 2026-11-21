@@ -1,8 +1,8 @@
 # BT-06 Weblogger
 
-Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.3.0-dev – manuelles Historienlesen und getrennte Historienansicht für BT06 2.05.** Auf dem DeskPi läuft bis zum nächsten Dienstneustart weiterhin V0.2.
+Lokaler Klimamonitor für Linux und Raspberry Pi. **Entwicklungsstand: V0.3.0-dev – manuelles Historienlesen und getrennte Historienansicht für BT06 2.05.** Auf dem DeskPi aktiviert; manuelles Historienlesen im installierten Dienst am realen BT06 erfolgreich geprüft.
 
-Vollständiger Historientransfer am realen BT06 und Import der gesicherten Originaldaten sind geprüft. Die neue integrierte BLE-/API-Strecke wurde automatisiert mit simuliertem BLE geprüft; ihre Geräteabnahme im Dienst steht noch aus. Automatischer Sync, zusammengeführte Langzeithistorie und verifizierte Zeitzuordnung sind noch offen. Details: [BLE-Protokoll](docs/BLE-PROTOKOLL.md).
+Vollständiger Historientransfer am realen BT06 und Import der gesicherten Originaldaten sind geprüft. Die integrierte BLE-/API-Strecke ist zusätzlich im installierten Dienst am realen BT06 geprüft: vollständige Speicherung, Originalexport und anschließender aktueller Liveempfang erfolgreich. Automatischer Sync, zusammengeführte Langzeithistorie und verifizierte Zeitzuordnung sind noch offen. Details: [BLE-Protokoll](docs/BLE-PROTOKOLL.md).
 
 ## Start
 
@@ -52,7 +52,7 @@ Alternativ:
 ./tools/ble-diagnose.sh gatt --device <BEWUSST-GEWAEHLTE-ADRESSE> --adapter hci0 --pair
 ```
 
-Beim ersten Start gibt es keinen automatischen Scan oder Verbindungsversuch. Ein auf der Loggerseite bewusst aktivierter Advertising-Empfang wird nach einem Programmneustart wieder aufgenommen. „Empfang pausieren“ deaktiviert diese Wiederaufnahme; die Aufzeichnung im Logger bleibt unverändert. Der lokale BT06 wurde per Advertising erkannt und anhand seiner Aufkleberkennung zugeordnet. Nach frühen Timeouts gelangen GATT und vollständige Historienübertragung im kurzen Standard-BLE-Fenster ohne Pairing. Advertising-Empfang benötigt diese Verbindung nicht. Die neue integrierte manuelle Sync-Strecke muss nach Aktivierung im Dienst noch mit Hardware abgenommen werden; automatische Wiederverbindung und Geräteparametrierung bleiben offen. Siehe [Protokollstand](docs/BLE-PROTOKOLL.md).
+Beim ersten Start gibt es keinen automatischen Scan oder Verbindungsversuch. Ein auf der Loggerseite bewusst aktivierter Advertising-Empfang wird nach einem Programmneustart wieder aufgenommen. „Empfang pausieren“ deaktiviert diese Wiederaufnahme; die Aufzeichnung im Logger bleibt unverändert. Der lokale BT06 wurde per Advertising erkannt und anhand seiner Aufkleberkennung zugeordnet. Nach frühen Timeouts gelangen GATT und vollständige Historienübertragung im kurzen Standard-BLE-Fenster ohne Pairing. Advertising-Empfang benötigt diese Verbindung nicht. Die integrierte manuelle Sync-Strecke ist im installierten Dienst mit Hardware geprüft; automatische Wiederverbindung und Geräteparametrierung bleiben offen. Siehe [Protokollstand](docs/BLE-PROTOKOLL.md).
 
 ## Echte BT06-Empfänge
 
@@ -120,4 +120,4 @@ python3 tools/import_history.py /pfad/capture.csv --device-id 12345678 --firmwar
 
 Die Kennung im Beispiel ist synthetisch. Das Werkzeug greift nicht auf Bluetooth zu. Es prüft Befehlsfolge, Metadaten, Rahmen und Vollständigkeit erneut und schreibt unter `data/history/`. Original-Capture bleibt unverändert. Unsichere, unvollständige oder fremde Formate werden abgewiesen. Wiederholung ist sicher; nach Fehler vor der Veröffentlichung erneut vollständig importieren. Nicht veröffentlichte `.pending-*` bleiben zur Diagnose erhalten und werden nicht angezeigt.
 
-Für die vorbereitete DeskPi-Aktualisierung genügen `sudo systemctl restart bt06-weblogger.service` in der normalen SSH-Sitzung und anschließend Neuladen von `/klima/`. Keine Paketinstallation oder System-/Mountänderung nötig. Der aktivierte Liveempfang wird beim Start wieder aufgenommen; Historienlesen startet ausschließlich auf Klick.
+Für spätere DeskPi-Aktualisierungen genügen `sudo systemctl restart bt06-weblogger.service` in der normalen SSH-Sitzung und anschließend Neuladen von `/klima/`. Keine Paketinstallation oder System-/Mountänderung nötig. Der aktivierte Liveempfang wird beim Start wieder aufgenommen; Historienlesen startet ausschließlich auf Klick.

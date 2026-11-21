@@ -71,3 +71,10 @@ Synthetische Chromium-Prüfung: Quellenwechsel, Gerätezeitwarnung/-achse, Auswa
 Die private Original-Capture wurde mit dem neuen Importer vollständig übernommen; wiederholter Import liefert denselben Stand ohne Kopie. Neue Ansicht und Originalexport der realen Historie wurden über einen nur lesenden Vorschauprozess geprüft; kein Start des zweiten BLE-Empfängers oder Änderung am laufenden Dienst. Die neue integrierte BLE-/API-Strecke ist damit noch nicht auf Hardware abgenommen. Keine zusätzliche Geräteaktion für diese Prüfung erforderlich.
 
 Synthetischer `python3 tools/benchmark_history.py`-Einzellauf auf DeskPi: 32.000 Werte, Erzeugen/Dekodieren/Speichern 1,937 s; erneuter Import 1,891 s; Prüfsummen/Lesen/Diagramm 1,312 s; 401 Grafikpunkte; 7.542.480 CSV-Bytes; maximales RSS des gesamten Testprozesses 67.156 KiB (ca. 65,6 MiB). Keine garantierte Latenz, keine isolierte Server-Grundlast und keine SMApi-Messung.
+
+
+## Installierte manuelle Historienstrecke: Geräteprüfung erfolgreich
+
+Nach Dienstneustart startete der Nutzer das manuelle Historienlesen in der Oberfläche. Der Dienst bestätigte vollständige Übertragung und dauerhafte Speicherung. Anschließend unabhängig lesend geprüft: empfangene und erwartete Anzahl gleich, alle Datei-Prüfsummen gültig, Original-CSV-Export exakt gleich dem gespeicherten Stand. Der frühere Historienstand ist unverändert erhalten; seine komplette Folge aus Geräte-Sekunden und Rohwerten entspricht dem Anfang des neuen Standes. Zusätzliche Messungen folgen unverändert dem Zehn-Minuten-Intervall. Aktivierter Hostempfang nach dem Auftrag wieder `receiving` mit frischen Werten; keine Sync-, Wiederaufnahme- oder Livefehler. Privater Prüfbericht: `private/installed-v03-hardware-report.json`.
+
+Damit ist die integrierte manuelle BLE-/API-/CSV-Strecke auf dem realen BT06 geprüft. Dies ersetzt keine Prüfung von automatischem Sync, inkrementeller Zusammenführung, längerem Dauerbetrieb oder tatsächlicher UTC-Zuordnung.
