@@ -7,6 +7,7 @@ Verbindliche Spezifikation: [PROJEKTBESCHREIBUNG.md](PROJEKTBESCHREIBUNG.md). Pr
 ## Bestätigte Anpassungen vom 21.11.2026
 - Windows-Umsetzung und Machbarkeitsprüfung vollständig zurückstellen.
 - Kein gesondertes Backup-/Restore-System. Programmeinstellungen per Save Settings / Load Settings als JSON sichern und laden.
+- Nutzer erlaubt einen Geräte-Reset unter der Bedingung, dass zuvor sämtliche Gerätedaten und Einstellungen gesichert sind. Diese Vollständigkeit einschließlich bislang unbekannter Einstellungsfelder muss nachgewiesen sein; aktuell kein Reset implementiert.
 - Potenziell destruktive Geräteänderungen weiterhin nicht automatisch ausführen. Vorher Historie regulär auslesen und Vollständigkeit prüfen; kein zusätzlicher Backupdienst oder doppeltes Archiv nötig.
 - Testdaten reproduzierbar generieren. Private Zigbee-Geräte können lokale Vorlagen liefern; Kennungen und Parameter bleiben unter `private/`, generierte Daten unter `simulation/`. Keine dieser Dateien veröffentlichen.
 - SMApi-Verträglichkeit berücksichtigen: sparsame Laufzeit, getrennte Umgebung, gemeinsamer Bluetooth-Adapter als zu prüfende Ressource. Keine ungefragte Installation auf SMApi.

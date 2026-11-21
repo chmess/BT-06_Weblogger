@@ -26,6 +26,7 @@ from backend.linux.auto_sync import AutoSync
 from backend.common.history_timezones import HistoryTimezones, ASSIGNED_FIELDS
 from backend.common.device_settings import DeviceSettingsStore
 from backend.common.settings_preview import settings_preview
+from backend.linux.configuration import ConfigurationWorkflow
 
 
 class Application:
@@ -55,6 +56,7 @@ class Application:
         self.history_store = HistoryStore(self.root / "data/history")
         self.device_settings = DeviceSettingsStore(self.root / "data/device-settings")
         self.sync = HistoryJobs(self.receiver, self.history_store, self.device_settings)
+        self.configuration = ConfigurationWorkflow(self.receiver, self.sync, self.device_settings, self.history_store)
         self.timezones = HistoryTimezones(self.root / "config/history-timezones.json", self.history_store)
         self.auto_sync = AutoSync(self.root / "config/autosync.json", self.receiver, self.sync, self.bluetooth, self.control_lock)
 
@@ -82,8 +84,8 @@ class Application:
         sync = self.sync.status()
         syncing = sync["state"] == "running"
         return {"version": VERSION, "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
-                "ble": {"connected": syncing and sync["phase"] in ("reading_metadata", "reading_settings", "selecting_range", "full_fallback", "receiving"),
-                        "status": "Historienlesen · " + sync["phase"] if syncing else "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
+                "ble": {"connected": syncing and sync["phase"] in ("reading_metadata", "reading_settings", "selecting_range", "full_fallback", "receiving", "stopping_logger", "writing_settings", "committing_settings", "verifying_settings"),
+                        "status": ("Gerätekonfiguration · " if sync.get('mode', '').startswith('configuration_') else "Historienlesen · ") + sync["phase"] if syncing else "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
                 "free_bytes": shutil.disk_usage(self.root).free,
                 "local_profiles": (self.root / "private/profiles.json").exists(),
                 "limits": {"max_days": 90, "max_points_per_logger": 80000},
@@ -168,6 +170,8 @@ def handler_for(app):
                     device = app.receiver.status()["config"]["device"]
                     self.send(200, {"settings": app.device_settings.latest(device["id"]) if device else None,
                                     "read_only": True, "selected": device is not None})
+                elif path == "/api/device-settings/configuration":
+                    self.send(200, app.configuration.status())
                 elif path == "/api/time-assignment":
                     if set(query) != {"logger", "snapshot"} or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Zeitzuordnung benötigt genau logger und snapshot.")
@@ -256,7 +260,7 @@ def handler_for(app):
                     self.send(413, {"error": "JSON muss zwischen 1 und 16.384 Bytes groß sein."})
                     return
                 value = json.loads(self.rfile.read(length))
-                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync", "/api/device-settings/read", "/api/device-settings/preview"}
+                controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync", "/api/device-settings/read", "/api/device-settings/preview", "/api/device-settings/prepare", "/api/device-settings/apply", "/api/device-settings/cancel"}
                 with app.control_lock if controlled else nullcontext():
                     if controlled and path != "/api/autosync" and app.sync.busy():
                         raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
@@ -271,6 +275,16 @@ def handler_for(app):
                         device = config['device']
                         saved = app.device_settings.latest(device['id']) if device else None
                         self.send(200, settings_preview(config, saved, value))
+                    elif path == "/api/device-settings/prepare":
+                        if app.bluetooth.status()['state'] == 'running':
+                            raise BusyError('Bluetooth-Diagnose läuft bereits.')
+                        self.send(202, app.configuration.prepare(value))
+                    elif path == "/api/device-settings/apply":
+                        if app.bluetooth.status()['state'] == 'running':
+                            raise BusyError('Bluetooth-Diagnose läuft bereits.')
+                        self.send(202, app.configuration.apply(value))
+                    elif path == "/api/device-settings/cancel":
+                        self.send(200, app.configuration.cancel(value))
                     elif path == "/api/device-settings/read":
                         if value != {}:
                             raise ValueError("Geräteeinstellungen lesen benötigt ein leeres JSON-Objekt.")

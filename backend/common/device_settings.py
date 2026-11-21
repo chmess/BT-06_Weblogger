@@ -87,7 +87,7 @@ def decode_settings(payloads):
         if len(raw)!=30 or raw[:3]!=b'\x16\x00\x02':
             raise ProtocolError('Statusformat unbekannt.')
         code=raw[3]
-        return {'recording_code':code,'recording':{1:'gestoppt',2:'USB-Stopp',4:'Speicher-voll-Stopp',16:'zeichnet auf'}.get(code,'nicht verifiziert')}
+        return {'recording_code':code,'recording':{1:'gestoppt',2:'USB-Stopp',4:'Speicher-voll-Stopp',5:'App-Stopp',16:'zeichnet auf',17:'Startverzögerung'}.get(code,'nicht verifiziert')}
     def clock(raw):
         return {'clock_calendar_2000':device_clock(raw,year_base=2000).isoformat(),
                 'clock_calendar_1980':device_clock(raw,year_base=1980).isoformat(),'clock_verified':False}

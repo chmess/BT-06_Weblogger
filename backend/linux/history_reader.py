@@ -51,16 +51,16 @@ async def known_device(config):
     return target
 
 
-async def retrieve(config, progress, base=None, automatic=False):
+async def retrieve(config, progress, base=None, automatic=False, *, client=None):
     if automatic and base is None:
         raise ProtocolError('Automatisches Nachladen benötigt eine eindeutige geprüfte Basis. Zuerst vollständig lesen.')
-    from bleak import BleakClient
-    target = await known_device(config)
-    # Verified BT06 broadcast intervals reach 30 seconds. Eight seconds can miss
-    # every connectable event even in standard mode. A newly found advertiser
-    # gets a shorter window; an existing BlueZ entry gets one full interval.
-    connect_seconds = (8 if getattr(target, 'details', {}).get('bt06_fresh_discovery') else 35) if automatic else 45
-    client = BleakClient(target, pair=False, timeout=connect_seconds)
+    owned = client is None
+    if owned:
+        from bleak import BleakClient
+        target = await known_device(config)
+        # Include a complete 30-second advertising interval for cached targets.
+        connect_seconds = (8 if getattr(target, 'details', {}).get('bt06_fresh_discovery') else 35) if automatic else 45
+        client = BleakClient(target, pair=False, timeout=connect_seconds)
     queue = asyncio.Queue(maxsize=1024)
     capture = []
     received_bytes = 0
@@ -92,8 +92,9 @@ async def retrieve(config, progress, base=None, automatic=False):
         return read_reply(operation, await response())
 
     try:
-        progress('connecting')
-        await asyncio.wait_for(client.connect(), connect_seconds + (1 if automatic else 5))
+        if owned:
+            progress('connecting')
+            await asyncio.wait_for(client.connect(), connect_seconds + (1 if automatic else 5))
         service = client.services.get_service(SERVICE_UUID)
         tx = service.get_characteristic(TX_UUID) if service else None
         rx = service.get_characteristic(RX_UUID) if service else None
@@ -144,4 +145,5 @@ async def retrieve(config, progress, base=None, automatic=False):
             transfer['base_snapshot'] = base['snapshot']
         return transfer
     finally:
-        await asyncio.wait_for(client.disconnect(), 10)
+        if owned:
+            await asyncio.wait_for(client.disconnect(), 10)

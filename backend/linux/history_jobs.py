@@ -17,6 +17,7 @@ class HistoryJobs:
         self.lock = threading.RLock()
         self.worker = None
         self.loop = self.task = None
+        self.operation = None
         self.closing = False
         self.value = {'state': 'idle', 'phase': None, 'received': 0, 'expected': None, 'result': None, 'error': None, 'resume_error': None}
 
@@ -38,19 +39,34 @@ class HistoryJobs:
             raise ValueError('Zuerst einen verifizierten BT06 für den Liveempfang auswählen.')
         if automatic and options.get('mode') != 'incremental':
             raise ValueError('Automatische Aufträge dürfen nur neue Werte nachladen.')
+        return self._launch(config, options.get('mode', 'full'), automatic, on_complete)
+
+    def start_task(self, mode, operation):
+        """Internal configuration workflow only, never dispatched from /api/sync."""
+        if mode not in ('configuration_prepare', 'configuration_write') or not callable(operation):
+            raise ValueError('Unbekannter Konfigurationsauftrag.')
+        config = self.receiver.status()['config']
+        self.receiver.validate(config)
+        if config['device'] is None:
+            raise ValueError('Zuerst einen verifizierten BT06 auswählen.')
+        return self._launch(config, mode, False, None, operation)
+
+    def _launch(self, config, mode, automatic, on_complete, operation=None):
         with self.lock:
             if self.closing or self.busy():
                 raise BusyError('Historienauftrag läuft bereits oder Anwendung wird beendet.')
             self.value = {'state': 'running', 'phase': 'pausing_host', 'received': 0, 'expected': None,
                           'result': None, 'error': None, 'resume_error': None,
-                          'mode': options.get('mode', 'full'),
+                          'mode': mode,
                           'trigger': 'automatic' if automatic else 'manual',
                           'started_at': datetime.now(timezone.utc).isoformat()}
-            self.worker = threading.Thread(target=self._run, args=(deepcopy(config), options.get('mode', 'full'), automatic, on_complete), name='bt06-history')
+            self.operation = operation
+            self.worker = threading.Thread(target=self._run, args=(deepcopy(config), mode, automatic, on_complete), name='bt06-history')
             try:
                 self.worker.start()
             except BaseException:
                 self.value.update(state='error', error='Historienauftrag konnte nicht starten.')
+                self.operation = None
                 raise
         return self.status()
 
@@ -64,6 +80,8 @@ class HistoryJobs:
             self.task = asyncio.current_task()
             if self.closing:
                 raise asyncio.CancelledError()
+        if self.operation:
+            return await asyncio.wait_for(self.operation(config, self._progress), 300)
         operation = (retrieve_settings(config, self._progress) if mode == 'settings'
                      else retrieve(config, self._progress, base=base, automatic=automatic))
         return await asyncio.wait_for(operation, 70 if automatic else 180)
@@ -81,9 +99,12 @@ class HistoryJobs:
             if not acquired:
                 raise BusyError('Bluetooth ist noch belegt. Historienlesen später erneut starten.')
             transfer = asyncio.run(self._read(config, base, automatic, mode))
-            self._progress('saving')
-            result = (self.settings_store.save(config['device']['id'], transfer) if mode == 'settings'
-                      else self.store.publish(config['device']['id'], **transfer))
+            if self.operation:
+                result = transfer
+            else:
+                self._progress('saving')
+                result = (self.settings_store.save(config['device']['id'], transfer) if mode == 'settings'
+                          else self.store.publish(config['device']['id'], **transfer))
             with self.lock:
                 self.value.update(result=result)
         except (Exception, asyncio.CancelledError) as exc:
@@ -100,6 +121,8 @@ class HistoryJobs:
                 message = 'Historienlesen beim Beenden abgebrochen; bisherige Daten erhalten.'
             else:
                 message = 'Historienlesen fehlgeschlagen. Bleak/BlueZ prüfen; bisherige Daten erhalten.'
+            if mode == 'configuration_write':
+                message = 'Geräteänderung nicht vollständig bestätigt. Gerätezustand neu lesen; nicht automatisch wiederholen. ' + message
             with self.lock:
                 self.value.update(error=message)
         finally:
@@ -107,6 +130,7 @@ class HistoryJobs:
                 self.receiver.radio_lock.release()
             with self.lock:
                 self.loop = self.task = None
+                self.operation = None
                 closing = self.closing
             if paused and config['enabled'] and not closing:
                 try:

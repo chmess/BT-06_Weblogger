@@ -177,7 +177,8 @@ from backend.common.settings_preview import settings_preview
 from test_history_jobs import config
 saved=DeviceSettingsStore(Path(sys.argv[1])/'data/device-settings').save('12345678',observation())
 preview=settings_preview(config(),saved,{'base_capture':saved['capture'],'changes':{'broadcast_interval_seconds':1}})
-print(json.dumps({'settings':saved,'preview':preview}))
+record_preview=settings_preview(config(),saved,{'base_capture':saved['capture'],'changes':{'record_interval_seconds':1500}})
+print(json.dumps({'settings':saved,'preview':preview,'record_preview':record_preview}))
 `,join(scratch,'data')],{cwd:project,encoding:'utf8'});
   assert.equal(settingsFixture.status,0,settingsFixture.stderr);
   const settingsFixtureData=JSON.parse(settingsFixture.stdout),observed=settingsFixtureData.settings;
@@ -229,10 +230,46 @@ print(json.dumps({'settings':saved,'preview':preview}))
   assert.equal(draftFlow.reset.value,'12.5');assert.equal(draftFlow.reset.blocked,false);
   assert.equal(draftFlow.lateResponseIgnored,true);
   assert.equal(draftFlow.noDeviceBlocked,true);
+  const configurationFlow=await evaluate(`(async()=>{const originalApi=api;try{
+    const saved=${JSON.stringify(observed)},plan=${JSON.stringify(settingsFixtureData.record_preview)};
+    updateDeviceDraft(saved,true);
+    const input=document.querySelector('#device-draft-record');input.value='25';input.dispatchEvent(new Event('input',{bubbles:true}));
+    const prepared={kind:'configuration-prepared',token:'synthetic-once',preview:plan,values_before:saved.values,history:{count:3,scope:'full'},expires_in_seconds:600,will_stop:true,will_restart:false,notice:'Speichern kann Historie löschen. Aufzeichnung bleibt gestoppt.'};
+    const calls=[];let action='preview';
+    api=async(path,options)=>{
+      if(path==='device-settings/preview')return plan;
+      if(path==='device-settings/prepare'){calls.push({path,body:JSON.parse(options.body)});action='prepare';return {state:'running'};}
+      if(path==='device-settings/apply'){calls.push({path,body:JSON.parse(options.body)});action='apply';return {state:'running'};}
+      if(path==='sync')return {state:action==='apply'?'error':'done',phase:'finished',mode:action==='apply'?'configuration_write':'configuration_prepare',trigger:'manual',received:3,expected:3,result:action==='apply'?null:prepared,error:action==='apply'?'Gerätezustand unklar; nicht automatisch wiederholen.':null};
+      if(path==='device-settings/configuration')return {prepared:action==='apply'?null:prepared,last_change:action==='apply'?{status:'uncertain',notice:'Zustand neu lesen.'}:null};
+      throw new Error('Unexpected configuration UI request '+path);
+    };
+    await previewDeviceDraft(new Event('submit'));
+    const prepareEnabled=!document.querySelector('#device-config-prepare').disabled;
+    document.querySelector('#device-config-prepare').click();await new Promise(r=>setTimeout(r,0));
+    const visible=!document.querySelector('#device-config-confirmation').hidden,summary=document.querySelector('#device-config-changes').textContent;
+    const applyButton=document.querySelector('#device-config-apply'),loss=document.querySelector('#device-config-loss'),stop=document.querySelector('#device-config-stop');
+    const initiallyBlocked=applyButton.disabled;
+    loss.checked=true;loss.dispatchEvent(new Event('change'));const oneBlocked=applyButton.disabled;
+    stop.checked=true;stop.dispatchEvent(new Event('change'));const bothEnabled=!applyButton.disabled;
+    input.value='26';input.dispatchEvent(new Event('input',{bubbles:true}));const editedBlocked=applyButton.disabled&&!loss.checked&&!stop.checked;
+    input.value='25';input.dispatchEvent(new Event('input',{bubbles:true}));
+    loss.checked=true;stop.checked=true;stop.dispatchEvent(new Event('change'));
+    applyButton.click();await new Promise(r=>setTimeout(r,0));
+    return {prepareEnabled,visible,summary,initiallyBlocked,oneBlocked,bothEnabled,editedBlocked,calls,status:document.querySelector('#device-config-status').textContent,job:document.querySelector('#device-settings-job').textContent};
+  }finally{api=originalApi;state.sync=null;await refreshSync();await refreshConfiguration();updateDeviceDraft(${JSON.stringify(observed)},true);}})()`);
+  assert.ok(configurationFlow.prepareEnabled&&configurationFlow.visible);
+  assert.ok(configurationFlow.summary.includes('25,0 min'));
+  assert.ok(configurationFlow.initiallyBlocked&&configurationFlow.oneBlocked&&configurationFlow.bothEnabled&&configurationFlow.editedBlocked);
+  assert.equal(configurationFlow.calls.length,2);
+  assert.equal(configurationFlow.calls[0].body.changes.record_interval_seconds,1500);
+  assert.deepEqual(configurationFlow.calls[1].body,{token:'synthetic-once',confirm_history_loss:true,confirm_stop:true});
+  assert.ok(configurationFlow.status.includes('nicht abschließend bestätigt'));
+  assert.ok(configurationFlow.job.includes('nicht automatisch wiederholen'));
   await screenshot('device-settings-mobile.png');
   assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
   assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(external.length,0,JSON.stringify(external));
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','no JS exceptions','no external requests'],screenshots:8};
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','25 minute recording draft, full preparation summary, two explicit confirmations, edit invalidation and uncertain write display','no JS exceptions','no external requests'],screenshots:8};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}

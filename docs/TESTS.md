@@ -1,4 +1,4 @@
-# Prüfung · V0.4.0-dev · 21.11.2026
+# Prüfung · V0.4.1-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -113,3 +113,11 @@ Reale Getter-Sequenz erfolgreich (Name, Zeit, Status, Aufzeichnung, Funk, Alarmg
 ### Änderungsvorschau
 
 88 Python-Tests bestanden: Alt-/Neuwerte, unveränderte Gegenwerte im gemeinsamen Funkblock, keine Dateiänderung durch Vorschau, unveränderte Werte ohne Änderungsschritte, UTF-8-Bytelimit ohne Kürzung, Steuerzeichen, falsche Typen/NaN/Inf und unbekannte Felder, exakte Intervallschritte, ersetzter Beleg und andere Geräte/Firmware, fehlende/ungültige Gegenwerte, API-Auswahl/CSRF/Sperre und weiterhin keine Write-/Apply-/Save-Route. Vorschau startet keinen BLE-Auftrag und pausiert keinen Empfänger. Browserprüfung umfasst zusätzlich erhaltenen Entwurf bei neuem Stand, Sperre bis expliziter Übernahme, ungültig gewordenes Prüfergebnis nach Eingabeänderung, Datenverlusthinweis, Verwerfen verspäteter Antworten nach neuer Eingabe und mobile Darstellung. Aktueller realer Einstellungsbeleg zusätzlich ohne Geräteaktion als unveränderte Vorschau geprüft (`private/v04-settings-preview-local.json`). Vorschau noch nicht im installierten Dienst aktiviert; keine Hardware-Schreibprüfung behauptet.
+
+## V0.4.1-dev: kontrollierter Schreibpfad
+
+99 Python-Tests: echter Parser/CSV-Speicher und gemeinsamer Jobpfad mit simuliertem GATT-Gerät, eine Verbindung pro Vorbereitung/Ausführung, keine Setter in Vorbereitung; erster Vollstand vor Stop und zweiter Vollstand vor Set dauerhaft verifiziert, 25-Minuten-Ziel und erhaltene Einheit/andere Felder, identische Stände ohne Kopie, expliziter Stopp ohne Start, Zwischen-/Endprüfung, feste Save-/Abschlussreihenfolge. Diskfehler vor Stop verhindern jeden verändernden Befehl; Diskfehler nach Stop verhindern Set/Save; Ausfall bei Stop/Set/Save/Abschluss sowie abweichendes Rücklesen führen zu unklarem Zustand ohne erneuten Befehl und mit dauerhaftem Auftragsbeleg. Hostempfang nach jedem Ausgang wiederhergestellt.
+
+Weitere Schutzfälle: aktuelle Advertising-Identität erforderlich, veränderte Einstellungen/Identität/Adapter, Ablauf/Abbruch/ersetzter Beleg, falsche boolesche Bestätigung, verbrauchter Token und Prozessneustart, unbekannte Nichtnullfelder im Aufzeichnungsblock, Wertebereiche/Antwortopcode/Status/Länge, CSRF/Steuersperre und kein Umgehen über `/api/sync`. API bleibt ohne generische Byte-, Reset- oder Start-Schnittstelle.
+
+Browserprüfung mit synthetischer Vorbereitung: Aufzeichnungsintervall in Minuten wird korrekt als Sekunden übertragen; Alt-/Neuwert, geprüfter Vollstand und Folgen sichtbar; Schreiben erst mit beiden Bestätigungen möglich; neue Entwurfseingabe löscht Bestätigungen und sperrt abweichenden Auftrag. Unklarer Schreibzustand wird nicht als Erfolg ausgegeben. Bestehende UI-/Export-/Favicon-/Mobilprüfungen weiterhin bestanden. **Keine reale Geräteänderung ausgeführt.** Aktivierung und erster realer, bewusst bestätigter Hardwaretest stehen aus. Ein erfolgreicher simulierter Save ist kein Nachweis von Firmware-Nebenwirkungen oder Reset-/Restore-Fähigkeit.

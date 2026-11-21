@@ -1,4 +1,4 @@
-# Architektur · V0.4.0-dev
+# Architektur · V0.4.1-dev
 
 ## Laufzeit
 
@@ -80,3 +80,13 @@ Historienfortsetzungen speichern nur neue CSV-Zeilen; ein vollständiger Zwische
 Die Hauptansicht bleibt bei einem beschädigten optionalen Einstellungsbeleg nutzbar; der Fehler wird im Einstellungsbereich angezeigt. UI-Felder kommen aus dekodierten Antworten, nicht aus Defaultwerten der Herstellerbibliothek. Noch keine Schreibfunktion, kein implizites Unlock, Start/Stop oder Konfigurations-Commit. Ein bestätigtes Get ist kein Beleg für die Nebenwirkungsfreiheit eines späteren Set/Save.
 
 `common/settings_preview.py` vergleicht einen Entwurf rein lokal mit einem erneut geprüften Originalbeleg. Die Steuersperre serialisiert Auswahl und Vorschau mit manuellen/automatischen Aufträgen. Eine Capture-Kennung bindet die Vorschau an genau die aktuelle Auslesung; kein Vorschautoken berechtigt zum Schreiben. Erlaubt sind zunächst Name und die vollständig bekannten gemeinsamen Funkparameter. Unbearbeitete Gegenwerte werden nicht durch Defaults ersetzt. Keine BLE-Imports oder Persistenz im Vorschau-Modul; bestehende Einstellungs-/Historienbelege bleiben unverändert. Die UI erhält einen bearbeiteten Entwurf bei neuer Auslesung, verwirft aber sein Prüfergebnis und verlangt Übernahme des neuen Stands. Geänderte Eingaben verwerfen ebenfalls das vorherige Ergebnis; verspätete Antworten werden nicht als aktuelle Vorschau angezeigt.
+
+## V0.4.1: gezielte Konfiguration
+
+`linux/configuration.py` nutzt interne HistoryJobs-Aufträge; HTTP-`/sync` erlaubt diese Modi nicht. Vorbereitung und Ausführung sind getrennt, beide belegen dieselbe BLE-/Steuersperre wie Historie und Automatik. `retrieve` und `retrieve_settings` können eine bereits verifizierte Verbindung nutzen; sie öffnen oder schließen diese dann nicht selbst. Konfigurationsverbindungen prüfen zusätzlich die aktuellen Manufacturer-Daten auf ausgewählte Kennung/Firmware, bevor irgendein GATT-Auftrag gesendet wird.
+
+Vorbereitung liest alle unterstützten Getter und die gesamte Historie in einer Verbindung, prüft gegen den bisherigen Einstellungsbeleg und speichert Originale. Eine Vorbereitung lebt maximal zehn Minuten im Arbeitsspeicher und ist an Adresse, Kennung, Adapter, Firmware und Einstellungsbeleg gebunden. Sie enthält konkrete Änderungen und Folgen. Weder Neustart noch eine alte identische CSV verleihen Schreibrechte. Die UI verlangt zwei explizite Bestätigungen und verwirft diese bei Entwurfsänderung. Der Token gilt einmalig, auch bei gescheitertem Start.
+
+Ausführung liest aktuelle Einstellungen und Historie erneut vollständig. Erst dauerhaft gespeicherte, geprüfte Originale erlauben einen bestätigten Stopp. Danach nochmals Vollauslesung, um letzte Werte vor dem Stopp zu erhalten; keine Range-Herkunft als Ersatz. Unbekannte Nichtnullfelder im Aufzeichnungsblock werden blockiert. Gestoppten Zustand erneut prüfen, feste Setter aus `settings_commands.py`, alle Werte vor Save prüfen/speichern, belegtes Save plus Abschluss, danach alle Werte erneut lesen und mit den erwarteten Rohblöcken vergleichen. Kein Reset, Uhrsetzen, Zugangsschlüssel, geratenes Funkmodus-Mapping oder Aufzeichnungsstart.
+
+`data/device-settings/changes/` enthält Auftrags-JSON und Original-Schreibverkehr als CSV, keine Kopie der Messdaten: Historien-/Einstellungsbelege werden referenziert. Vor jedem möglicherweise wirksamen Befehl werden Absicht und Rohframe fsync-gesichert. Unvollständiger ACK/Timeout/Abbruch nach möglichem Schreibbeginn gilt als unklar; kein Retry, Rollback oder automatischer Aufzeichnungsstart. `latest.json` macht den letzten Zustand nach einem Prozessabbruch sichtbar. Temporäre Vorbereitungen verfallen; laufende Änderungen werden nicht automatisch fortgesetzt. Die getrennte Historien-/Livezeitbasis bleibt unverändert.

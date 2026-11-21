@@ -109,7 +109,7 @@
       <p id="device-settings-button-signal" class="hint" hidden>Jetzt am BT06 kurz START, danach kurz STOP drücken (jeweils unter einer Sekunde, nicht halten). Eine verbundene Handy-App vorher trennen.</p>
       <p id="device-settings-status" class="hint" role="status">Noch keine Geräteeinstellungen gelesen.</p>
       <dl id="device-settings-values"></dl>
-      <p class="hint">Nur belegte Werte werden angezeigt. Unbekannte Parameter bleiben unbekannt; der Funkmoduscode ist noch keinem bestätigten Long-Range-Zustand zugeordnet. Diese Ansicht sendet keine Einstellungs-, Speicher-, Start-/Stopp- oder Uhränderung.</p>
+      <p class="hint">Nur belegte Werte werden angezeigt. Unbekannte Parameter bleiben unbekannt; der Funkmoduscode ist noch keinem bestätigten Long-Range-Zustand zugeordnet. Das Auslesen sendet keine Einstellungs-, Speicher-, Start-/Stopp- oder Uhränderung.</p>
       <details><summary>Änderungen vorbereiten</summary>
         <p>Gewünschte Werte mit dem gelesenen Stand vergleichen. Diese Vorschau sendet keine Gerätebefehle. Das spätere Speichern am BT06 kann seine Historie löschen und benötigt eine vollständige Auslesung sowie eine ausdrückliche Bestätigung.</p>
         <form id="device-settings-draft">
@@ -117,13 +117,24 @@
             <label>Gerätename (maximal 15 UTF-8-Bytes)<input id="device-draft-name" type="text" disabled required></label>
             <label>Sendeintervall in Sekunden<input id="device-draft-interval" type="number" min="0.5" max="30" step="0.1" disabled required></label>
             <label>Sendeleistung in dBm<select id="device-draft-power" disabled><option value="">Nicht ausgelesen</option><option>-20</option><option>-16</option><option>-12</option><option>-8</option><option>-4</option><option>0</option><option>4</option><option>6</option><option>8</option></select></label>
+            <label>Aufzeichnungsintervall in Minuten<input id="device-draft-record" type="number" min="0.16666666666666666" max="1080" step="any" disabled required></label>
           </div>
           <div class="button-row"><button id="device-draft-preview" type="submit" disabled>Änderungen prüfen</button><button id="device-draft-reset" class="secondary" type="button" disabled>Aktuellen Stand übernehmen</button></div>
         </form>
         <p id="device-draft-status" class="hint" role="status" aria-live="polite">Zuerst Geräteeinstellungen auslesen.</p>
         <div id="device-draft-result"></div>
-        <p class="hint">Long Range, Aufzeichnungsparameter und weitere Felder sind noch nicht zur Änderung freigegeben. Der Geräteschreibablauf ist noch in Entwicklung.</p>
+        <button id="device-config-prepare" disabled>Vorbereiten: Historie vollständig lesen</button>
+        <p class="hint">Long Range und weitere unbekannte Felder bleiben gesperrt. Kein Zurücksetzen und kein automatischer Start der Aufzeichnung. Schreiben ist bisher nur mit simuliertem Gerät geprüft.</p>
       </details>
+      <p id="device-config-status" class="hint" role="status" aria-live="polite"></p>
+      <div id="device-config-confirmation" hidden>
+        <h3>Geräteänderung bestätigen</h3>
+        <dl id="device-config-changes"></dl>
+        <p id="device-config-consequences"></p>
+        <label class="inline-check"><input id="device-config-loss" type="checkbox"> Mögliche Löschung der Gerätehistorie beim Speichern erlauben. Vorher müssen alle aktuellen Messwerte vollständig geprüft als CSV gespeichert sein.</label>
+        <label class="inline-check"><input id="device-config-stop" type="checkbox"> Aufzeichnung stoppen und danach gestoppt lassen.</label>
+        <div class="button-row"><button id="device-config-apply" disabled>Bestätigte Änderungen am BT06 speichern</button><button id="device-config-cancel" type="button" class="secondary">Vorbereitung verwerfen</button></div>
+      </div>
     </article>
     <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. „Verbinden &amp; prüfen“ liest nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>
       <div class="toolbar"><label>Bluetooth-Adapter<input id="ble-adapter" value="hci0" pattern="hci[0-9]{1,3}" required></label><label>CSV-Speicherabstand in Sekunden<input id="capture-interval" type="number" min="10" max="3600" step="1" value="60"></label><button id="ble-scan">Geräte suchen (30 s)</button></div>

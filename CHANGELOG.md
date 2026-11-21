@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.4.1-dev · 2026-11-21
+
+- Kontrollierter, expliziter Schreibablauf für Name, gemeinsame Funkparameter und Aufzeichnungsintervall vorbereitet. Getrennte Geräte-/Historienvorbereitung und Bestätigung; einmalige, zehn Minuten gültige Vorbereitung an Identität/Firmware/Adapter und aktuellen Einstellungsbeleg gebunden. Keine generische Byte-, Reset-, Unlock-, Uhr- oder Start-Route.
+- Vor jedem Schreibauftrag aktuelle Einstellungen vergleichen und gesamte Historie dauerhaft prüfen/speichern. Bei laufender Aufzeichnung erst danach explizit bestätigter Stopp; anschließend nochmals gesamte Historie sichern. Unbekannte Nichtnullfelder im Aufzeichnungsblock sperren Änderungen; keine SDK-Null-Defaults. Zwischenprüfung vor Commit, danach Rücklesen aller Einstellungen und Prüfung unveränderter Gegenwerte. Aufzeichnung bleibt gestoppt.
+- Herstellerreferenz auf verketteten Abschluss nach Save geprüft; Stop-, Set-, Save- und Abschlusssequenzen unabhängig implementiert. Dauerhafter CSV-/JSON-Auftragsbeleg vor jedem möglicherweise wirksamen Befehl; unklare Ergebnisse ohne automatische Wiederholung oder Rollback. Vorbereitungen werden nach Neustart nicht wiederaufgenommen. Gemeinsame BLE-Sperre, bisheriger Hostempfang nach jedem Ausgang wiederhergestellt.
+- 99 Python-Tests und Browserprüfung bestanden: simulierter vollständiger Ablauf, Fehler vor/nach Stopp, negative/unklare Antworten, Schreib-/Rücklesefehler, einmalige Bestätigung, Ablauf/Ersetzung/Neustart, CSRF/Sperre, zwei Bestätigungen und Entwurfsänderung. **Noch kein realer Geräteschreibtest**, Dienstaktivierung erforderlich. Vollständige V0.4-Konfiguration und unbeaufsichtigter Zugriff weiterhin offen.
+
 ## 0.4.0-dev · 2026-11-21
 
 - Änderungsvorschau für Gerätename, Sendeintervall und Sendeleistung mit strengem Wertevergleich und Bezug auf den aktuellen Originalbeleg. Erhält ungespeicherte Eingaben bei neuer Auslesung; veraltete Entwürfe und unbekannte Funk-Gegenwerte blockiert. Keine Gerätebefehle, keine Schreibfreigabe; Warnung vor möglichem Historienverlust und notwendige Vollauslesung/Bestätigung/Rücklesen sichtbar. 88 Python-Tests bestanden.

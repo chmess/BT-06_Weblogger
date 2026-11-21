@@ -9,6 +9,7 @@ FIELDS = {
     'name': ('Gerätename', ''),
     'broadcast_interval_seconds': ('Sendeintervall', 's'),
     'transmit_power_dbm': ('Sendeleistung', 'dBm'),
+    'record_interval_seconds': ('Aufzeichnungsintervall', 's'),
 }
 
 
@@ -26,6 +27,9 @@ def validate_value(field, value):
         if (type(value) not in (int, float) or not 0.5 <= value <= 30
                 or Decimal(str(value)) * 10 != (Decimal(str(value)) * 10).to_integral_value()):
             raise ValueError('Sendeintervall: 0,5–30 Sekunden in exakten 0,1-Sekunden-Schritten erforderlich.')
+    elif field == 'record_interval_seconds':
+        if type(value) is not int or not 10 <= value <= 64800:
+            raise ValueError('Aufzeichnungsintervall: ganze Sekunden zwischen 10 und 64.800 erforderlich.')
     else:
         raise ValueError('Dieses Gerätefeld ist noch nicht zur Änderungsvorschau freigegeben.')
     return value
@@ -42,7 +46,7 @@ def settings_preview(config, saved, request):
         raise ValueError('Einstellungsstand fehlt oder wurde ersetzt. Aktuellen Stand übernehmen und erneut prüfen.')
     desired = request['changes']
     if not isinstance(desired, dict) or not desired or set(desired) - set(FIELDS):
-        raise ValueError('Nur Gerätename, Sendeintervall und Sendeleistung sind als Vorschau verfügbar.')
+        raise ValueError('Nur Gerätename, Sendeintervall, Sendeleistung und Aufzeichnungsintervall sind als Vorschau verfügbar.')
     current = saved['values']
     changes = []
     for field in FIELDS:

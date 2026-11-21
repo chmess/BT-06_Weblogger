@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.4.0-dev
+# BLE-Protokollstand · V0.4.1-dev
 
 ## Belege
 
@@ -96,3 +96,11 @@ Die neuen Getter wurden am Gerät geprüft und ihre Rohbelege separat gespeicher
 Die Verbindung gelang auch bei einem gesonderten Test mit nur kurzem STOP, ohne vorherigen START. Das belegt noch keine dauerhafte Funkmoduszuordnung. Ein ungekoppelter BlueZ-Eintrag war bei einem anderen Versuch nach Pausieren des Scans verschwunden; das ist nun ein expliziter Wiedererkennungsfall mit passender Identitätsprüfung. Das zuvor kurze automatische Zeitlimit war gegenüber dem beobachteten 30-Sekunden-Advertising unzureichend bemessen. Auch der korrigierte Versuch mit 35 Sekunden Wartezeit blieb jedoch ohne Tastenaktion erfolglos. Weder allein das Sendeintervall noch Long Range werden als abschließend belegte Ursache behauptet.
 
 Die Änderungsvorschau verwendet keine Set-Befehle. Die privat ausgewertete Herstellerreferenz belegt für einen Namen 15 UTF-8-Bytes und für gemeinsame Funkparameter Leistungscode plus Intervall in 100-ms-Schritten. Für die Vorschau wird der im Handbuch genannte Bereich 0,5–30 s verwendet, ohne Rundung oder Abschneiden. Diese statischen Belege sind keine am Gerät verifizierte Schreib-/Save-Sequenz. Der separate Funkmoduscode und unbekannte Aufzeichnungsfelder werden nicht übernommen. Eine spätere Ausführung erfordert einen eigenen kontrollierten Ablauf einschließlich aktueller vollständiger Historie, Folgenbestätigung und Rücklesen; insbesondere kein probeweises Save.
+
+## V0.4.1: statisch belegter Schreibpfad, Hardwareprüfung ausstehend
+
+Erneut geprüfte Fakten aus derselben privaten Herstellerreferenz: App-Stopp `52A1`, Name `4333` mit 15 UTF-8-Bytes und FF-Padding, gemeinsame Funkparameter `4335` mit Leistungscode und uint16-Intervall in 100 ms, Aufzeichnungsblock `4302` mit 15 Bytes. Dort sind nur Sekundenintervall in Byte 0–1 (uint16 LE) und Einheit in Byte 6 (0/1) hinreichend belegt; die SDK-Implementierung belegt weitere Argumente ihrer Signatur nicht. Der eigene Pfad ändert das Intervall und erhält die Einheit, blockiert jedoch Nichtnullwerte in anderen Positionen, statt diese blind zu überschreiben. Der konservative implementierte Intervallbereich 10–64.800 s ersetzt keinen Firmware-Grenztest.
+
+Wichtige Verkettung: `SetSaveChanged` sendet `52A3` ohne Payload und nach erfolgreicher Antwort zusätzlich `43FF` ohne Payload. Sein boolescher SDK-Parameter wird nicht zur Schonung der Historie genutzt. Der eigene Treiber bildet diese feste belegte Sequenz ab; Rolle und Nebenwirkungen des Abschlusses werden nicht als am Gerät abgenommen behauptet. Jede Antwort muss im ersten Hardwaretest exakt zum erwarteten Opcode passen, Status 1 haben und einen leeren Payload enthalten; abweichende Antworten blockieren alle weiteren Schreibschritte und werden als unklar protokolliert.
+
+Statusbelegung laut SDK: 5 = App-Stopp, 17 = Startverzögerung; bisher nur Aufzeichnungscode 16 am realen Gerät bestätigt. Der Schreibablauf akzeptiert nur belegte gestoppte Zustände 1/2/4/5 oder zuvor explizit zu stoppenden Zustand 16; Verzögerung/Initialisierung/Unbekannt blockieren. Er startet die Aufzeichnung nicht selbst. Start `52A0` ist in der Referenz identifiziert, bleibt aber außerhalb der implementierten Befehlsliste. Keine Reset- oder Unlock-Sequenz wird geraten oder gesendet. Ein Reset ist vom Nutzer nur nach vollständiger Sicherung sämtlicher Daten und Einstellungen erlaubt; diese Vollständigkeit ist für bislang unbekannte Felder nicht nachgewiesen.

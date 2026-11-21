@@ -1,6 +1,8 @@
-# CSV-Vertrag · V0.4.0-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
+# CSV-Vertrag · V0.4.1-dev · Schema 1 (Simulation) und 2 (BLE-Empfang)
 
 Originalformat: UTF-8, Semikolon, Dezimalkomma, LF, Header. Browserexport zusätzlich mit UTF-8-BOM für Excel. Zeitstempel in V0.1 explizit UTC (`+00:00`); Anzeige in konfigurierter Zeitzone. Monatsdateien folgen UTC, daher stabile Dateigrenzen auch bei Sommerzeitwechsel. Leere Batterie/RSSI-Felder bedeuten unbekannt.
+
+V0.4.1-Konfigurationsaufträge: `data/device-settings/changes/<Auftragskennung>.csv` enthält `Hostzeit;Phase;Richtung;DatenHex` für die möglicherweise verändernden Befehle und deren Antworten. UTF-8, Semikolon, UTC mit Offset. TX wird vor dem Senden fsync-gesichert; RX vor der weiteren Verarbeitung. Zugehöriges JSON referenziert reguläre Historien-/Einstellungsstände und den Zustand (`checking`, `writing`, `blocked`, `uncertain`, `verified`). Kein zusätzliches Messdatenarchiv, keine Reset-/Restore-Datei und keine automatische Befehlswiederholung.
 
 | Feld | Bedeutung |
 |---|---|

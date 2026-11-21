@@ -8,11 +8,13 @@ from backend.common.device_settings import SETTINGS_QUERIES
 QUERIES=SETTINGS_QUERIES
 
 
-async def retrieve_settings(config,progress):
-    from bleak import BleakClient
-    progress('finding_device')
-    target=await known_device(config)
-    client=BleakClient(target,pair=False,timeout=45)
+async def retrieve_settings(config,progress,*,client=None):
+    owned=client is None
+    if owned:
+        from bleak import BleakClient
+        progress('finding_device')
+        target=await known_device(config)
+        client=BleakClient(target,pair=False,timeout=45)
     queue=asyncio.Queue(maxsize=32);capture=[];overflow=False
     def note(direction,data):
         capture.append({'Hostzeit':datetime.now(timezone.utc).isoformat(),'Richtung':direction,'DatenHex':data.hex()})
@@ -23,7 +25,8 @@ async def retrieve_settings(config,progress):
             overflow=True;return
         note('RX',raw);queue.put_nowait(raw)
     try:
-        progress('connecting');await asyncio.wait_for(client.connect(),50)
+        if owned:
+            progress('connecting');await asyncio.wait_for(client.connect(),50)
         service=client.services.get_service(SERVICE_UUID)
         tx=service.get_characteristic(TX_UUID) if service else None
         rx=service.get_characteristic(RX_UUID) if service else None
@@ -47,4 +50,4 @@ async def retrieve_settings(config,progress):
         await asyncio.wait_for(client.stop_notify(rx),8)
         return {'payloads':payloads,'capture':capture,'read_errors':errors}
     finally:
-        await asyncio.wait_for(client.disconnect(),10)
+        if owned:await asyncio.wait_for(client.disconnect(),10)
