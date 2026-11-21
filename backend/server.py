@@ -1,0 +1,194 @@
+"""Loopback-only offline web application. BLE operations are deliberately CLI-only."""
+from __future__ import annotations
+
+import json
+import mimetypes
+import secrets
+import shutil
+import threading
+import time
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
+
+from backend import VERSION
+from backend.common.settings import Settings
+from backend.common.simulation import generate, list_runs, load_profiles
+from backend.common.storage import chart_data, csv_text, identifier, rows_in_range
+from backend.linux.ble_jobs import BluetoothJobs, BusyError
+
+
+class Application:
+    def __init__(self, root, base_path="", public_origin=None):
+        self.root = Path(root)
+        self.web = Path(__file__).resolve().parents[1] / "web"
+        self.base_path = base_path.rstrip("/")
+        if self.base_path and (not self.base_path.startswith("/") or any(c not in "/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in self.base_path)):
+            raise ValueError("Ungültiger Basispfad.")
+        self.settings = Settings(self.root / "config/settings.json")
+        self.simulation = self.root / "simulation"
+        self.csrf = secrets.token_urlsafe(32)
+        self.started = time.monotonic()
+        self.public_origin = public_origin
+        if public_origin:
+            parsed = urlsplit(public_origin)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username:
+                raise ValueError("Public Origin muss eine HTTP(S)-Origin ohne Pfad sein.")
+        self.generation_lock = threading.Lock()
+        self.bluetooth = BluetoothJobs()
+
+    def status(self):
+        return {"version": VERSION, "mode": "offline-simulation", "uptime_seconds": round(time.monotonic() - self.started),
+                "ble": {"connected": False, "status": "Nicht verbunden · Suche und Verbindungsprüfung auf der Loggerseite"},
+                "free_bytes": shutil.disk_usage(self.root).free,
+                "local_profiles": (self.root / "private/profiles.json").exists(),
+                "limits": {"max_days": 90, "max_points_per_logger": 80000},
+                "data_notice": "Testdaten sind synthetisch. Keine BT06-Messung und keine Schimmelbewertung."}
+
+
+def handler_for(app):
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "BT06/" + VERSION
+
+        def log_message(self, format, *args):
+            # Never put query strings, payloads or credentials in access logs.
+            pass
+
+        def valid_host(self):
+            host = self.headers.get("Host", "")
+            allowed = {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
+            if app.public_origin:
+                allowed.add(urlsplit(app.public_origin).netloc)
+            return host in allowed
+
+        def send(self, status, payload, content_type="application/json; charset=utf-8", filename=None):
+            if not isinstance(payload, bytes):
+                payload = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "same-origin")
+            self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'")
+            if filename:
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def route(self):
+            if not self.valid_host():
+                self.send(403, {"error": "Host nicht freigegeben."})
+                return None, None
+            parsed = urlsplit(self.path)
+            if app.base_path and parsed.path == app.base_path:
+                self.send_response(308)
+                self.send_header("Location", app.base_path + "/")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return None, None
+            if not parsed.path.startswith(app.base_path + "/"):
+                self.send(404, {"error": "Pfad nicht gefunden."})
+                return None, None
+            return parsed.path[len(app.base_path):], parse_qs(parsed.query, keep_blank_values=True)
+
+        def do_GET(self):
+            try:
+                path, query = self.route()
+                if path is None:
+                    return
+                if path == "/api/status":
+                    self.send(200, app.status())
+                elif path == "/api/session":
+                    self.send(200, {"csrf_token": app.csrf})
+                elif path == "/api/settings":
+                    self.send(200, app.settings.get())
+                elif path == "/api/settings/download":
+                    self.send(200, app.settings.get(), filename="bt06-settings.json")
+                elif path == "/api/runs":
+                    self.send(200, {"runs": list_runs(app.simulation)})
+                elif path == "/api/ble":
+                    self.send(200, app.bluetooth.status())
+                elif path in ("/api/history", "/api/export"):
+                    allowed = {"run", "logger", "start", "end"}
+                    if set(query) - allowed or any(len(v) != 1 for v in query.values()):
+                        raise ValueError("Ungültige Abfrageparameter.")
+                    run, logger = identifier(query.get("run", [""])[0]), identifier(query.get("logger", [""])[0])
+                    start, end = query.get("start", [None])[0], query.get("end", [None])[0]
+                    runs = list_runs(app.simulation)
+                    manifest = next((item for item in runs if item["id"] == run), None)
+                    if not manifest or logger not in {item["id"] for item in manifest["loggers"]}:
+                        raise ValueError("Unbekannter Testlauf oder Messstelle.")
+                    rows = rows_in_range(app.simulation, run, logger, start, end)
+                    if path == "/api/export":
+                        self.send(200, csv_text(rows).encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}.csv")
+                    else:
+                        self.send(200, {"source": "Simulation", **chart_data(rows, manifest["options"]["interval_minutes"])})
+                else:
+                    assets = {"/": "index.html", "/css/app.css": "css/app.css", "/js/app.js": "js/app.js",
+                              "/assets/favicon.svg": "assets/favicon.svg", "/favicon.ico": "assets/favicon.ico",
+                              "/assets/echarts.min.js": "assets/echarts.min.js"}
+                    target = assets.get(path)
+                    if not target or not (app.web / target).is_file():
+                        self.send(404, {"error": "Nicht gefunden."})
+                    else:
+                        mime = {".svg": "image/svg+xml", ".ico": "image/x-icon", ".js": "text/javascript; charset=utf-8",
+                                ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8"}.get(Path(target).suffix)
+                        self.send(200, (app.web / target).read_bytes(), mime or mimetypes.guess_type(target)[0] or "application/octet-stream")
+            except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+                self.send(400, {"error": str(exc)})
+            except OSError:
+                self.send(503, {"error": "Dateizugriff fehlgeschlagen. Speicherplatz und Dateirechte prüfen."})
+
+        def do_POST(self):
+            try:
+                path, _ = self.route()
+                if path is None:
+                    return
+                origins = {f"http://127.0.0.1:{self.server.server_port}", f"http://localhost:{self.server.server_port}"}
+                if app.public_origin:
+                    origins.add(app.public_origin)
+                if self.headers.get("Origin") not in origins or not secrets.compare_digest(self.headers.get("X-CSRF-Token", ""), app.csrf):
+                    self.send(403, {"error": "Schreibzugriff benötigt gleiche Origin und Sitzungstoken."})
+                    return
+                if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
+                    self.send(415, {"error": "JSON erforderlich."})
+                    return
+                if self.headers.get("Transfer-Encoding"):
+                    raise ValueError("Transfer-Encoding nicht unterstützt.")
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 16384:
+                    self.send(413, {"error": "JSON muss zwischen 1 und 16.384 Bytes groß sein."})
+                    return
+                value = json.loads(self.rfile.read(length))
+                if path == "/api/settings":
+                    self.send(200, app.settings.save(value))
+                elif path == "/api/ble":
+                    self.send(202, app.bluetooth.start(value))
+                elif path == "/api/simulation":
+                    if not app.generation_lock.acquire(blocking=False):
+                        self.send(409, {"error": "Ein Generatorlauf ist bereits aktiv."})
+                        return
+                    try:
+                        profiles = load_profiles(app.root / "private/profiles.json")
+                        manifest = generate(app.simulation, value, profiles)
+                    finally:
+                        app.generation_lock.release()
+                    self.send(201, manifest)
+                else:
+                    self.send(404, {"error": "Nicht gefunden."})
+            except BusyError as exc:
+                self.send(409, {"error": str(exc)})
+            except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+                self.send(400, {"error": str(exc)})
+            except OSError:
+                self.send(503, {"error": "Speichern fehlgeschlagen. Speicherplatz und Dateirechte prüfen."})
+
+    return Handler
+
+
+def make_server(app, port):
+    server = ThreadingHTTPServer(("127.0.0.1", port), handler_for(app))
+    server.daemon_threads = False
+    return server

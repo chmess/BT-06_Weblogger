@@ -2,11 +2,18 @@
 
 P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere Erweiterung. Diese Priorisierung hat Vorrang bei terminlichen oder funktionalen Konflikten mit der Projektbeschreibung. Technisch nicht unterstützte Hardwarefunktionen dokumentieren.
 
+## Bestätigte Änderungen / aktueller Stand
+- Windows einschließlich früher Machbarkeitsprüfung zurückgestellt, bis Linux funktioniert.
+- Keine gesonderte Backup-/Restore-Funktion. Save Settings / Load Settings für Programmeinstellungen genügen. Vor destruktiven Geräteaktionen reguläre Historie vollständig auslesen und Nutzerbestätigung verlangen.
+- V0.1.0 umgesetzt: Offline-Weboberfläche, Save/Load Settings, getrennte synthetische CSV-Testläufe, lokaler ECharts-Verlauf, Roh-CSV-Export, Diagnosewerkzeuge und explizite BLE-Suche/GATT-Verbindungsprüfung mit optionaler Betriebssystem-Kopplung.
+- Private Zigbee-Vorlagen lokal möglich, keine persönlichen Gerätekennungen im Repository.
+- V0.1-Hardwareabnahme offen: konkretes BT06-Modell/Firmware, GATT, Kopplung, Messdaten und Historie noch nicht verifiziert.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.
-- Alle nachweislich unterstützten BT06-Einstellungen lesbar und schreibbar, insbesondere Name/Beschreibung, Temperatur-Einheit, Aufzeichnungs- und Sendeintervall, Sendeleistung, Long Range, Temperatur-/Feuchtealarme, Zugangsschlüssel, Gerätezeit, Startverzögerung, Speicherverhalten, Start/Stop. Verifiziertes Backup vor potenziell destruktiver Änderung, Zustimmung, Rücklesen.
-- CSV nativ: UTF-8, Semikolon, Dezimalkomma, ISO-8601 mit Offset, pro Logger/Monat, unbegrenzte Speicherung, Dedupe, chronologische Historie, Datenlücken, Zeitumstellung, robuste Schreibvorgänge, beschädigte Zeilen erkennen, gleiche Struktur Linux/Windows. JSON-Konfiguration, historische Messstellenzuordnung, manuelle/automatische Sicherung und Restore.
+- Alle nachweislich unterstützten BT06-Einstellungen lesbar und schreibbar, insbesondere Name/Beschreibung, Temperatur-Einheit, Aufzeichnungs- und Sendeintervall, Sendeleistung, Long Range, Temperatur-/Feuchtealarme, Zugangsschlüssel, Gerätezeit, Startverzögerung, Speicherverhalten, Start/Stop. Vor potenziell destruktiver Änderung vollständiges Historienauslesen verifizieren, Zustimmung, Rücklesen.
+- CSV nativ: UTF-8, Semikolon, Dezimalkomma, ISO-8601 mit Offset, pro Logger/Monat, unbegrenzte Speicherung, Dedupe, chronologische Historie, Datenlücken, Zeitumstellung, robuste Schreibvorgänge, beschädigte Zeilen erkennen. JSON-Konfiguration mit Save Settings / Load Settings, historische Messstellenzuordnung.
 - Deutsche kompakte responsive UI, Maus/Touch, hell/dunkel, einklappbare Expertenoptionen, dynamische Verfügbarkeit, lokal gebündelte Assets. Seiten Übersicht, Verlauf, Schimmelrisiko, Statistik, Ereignisse, Logger, Messstellen, Export, Einstellungen, Diagnose.
 - Übersicht: Temperatur, rF, Taupunkt, absolute Feuchte, Klimastatus, Dauer kritischer Bedingungen, Batterie, RSSI, Verbindung, Speicher, Aufnahme, letzte Messung/Sync, Diagramm, Warnungen, Export; alte Werte kennzeichnen.
 - Interaktive Charts: Mouseover, Fadenkreuz, Datum/Uhrzeit, aktive Werte, Mausrad/Touchzoom, Verschieben, Kurven einzeln an/aus, Navigator, freie Zeitraumwahl, Presets (1/6/12/24/48 h, 7/14/30 d, 3/6 Monate, Jahr, alles), vorher/nachher, Vollbild, automatische/manuelle Achsen, Reset, Live, Grenzen/Warnflächen, Datenlücken, persistente Einstellungen und Export. Liveupdates erhalten manuellen Zoom und Auswahl. Flüssige Langzeitdarstellung, Min/Max erhaltende Verdichtung.
@@ -28,7 +35,7 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 - Komfort: individuelle Startseite, Darstellungsoptionen, Fotos, Tagesnotizen, eigene Ereigniskategorien, lokale OS-Benachrichtigungen, Diagnoseexport.
 
 ## P2 – Später
-- Verbindliches langfristiges Ziel: Windows-PowerShell-Portierung nach Linux-Freigabe. start.ps1, Windows BLE/optional .NET-Helfer, identische UI/API/CSV/JSON, keine zwingende Python-Installation, möglichst kein Admin, plattformübergreifende Tests. Machbarkeit früh prüfen.
+- Windows-Portierung erst nach funktionierender Linux-Version konkret planen. Gemeinsame UI/API/CSV/JSON anstreben; derzeit keine Windows-Arbeiten oder frühe Machbarkeitsprüfung.
 - Weitere BLE-Sensortypen, ESP32, DS18B20-Wandtemperatur, Außenklima, gemeinsame Auswertung.
 - Innen-/Außenvergleich, fundiertere Lüftungsempfehlungen, Wärmebrückenanalyse, Feuchteprognosen und nachvollziehbare Schimmelmodelle.
 - MQTT, Home Assistant, E-Mail und weitere Alarmschnittstellen.
@@ -43,7 +50,7 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 | V0.5 | UI, interaktive Diagramme | P0 |
 | V0.6 | Klimaberechnung, Schimmelrisiko | P0 |
 | V0.7 | Grundstatistik, Ereignisse, CSV-Export | P0 |
-| V0.8 | Messstellen, Sicherungen, Diagnose | P0 |
+| V0.8 | Messstellen, Einstellungen speichern/laden, Diagnose | P0 |
 | V0.9 | Dauerbetrieb, Stabilität, portable Skripte | P0 |
 | V1.0 | Linux-Grundversion abnehmen | P0 |
 | V1.1 | Erweiterte Statistik, Klimakalender | P1 |

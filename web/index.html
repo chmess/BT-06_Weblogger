@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BT-06 · Klimamonitor</title>
+  <meta name="description" content="Lokaler Klimamonitor für BT06 – Offline-Diagnose und synthetische Testdaten.">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="favicon.ico">
+  <link rel="stylesheet" href="css/app.css">
+  <script defer src="assets/echarts.min.js"></script><script defer src="js/app.js"></script>
+</head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="#overview"><img src="assets/favicon.svg" alt="" width="38" height="38"><span>BT-06<small>KLIMAMONITOR</small></span></a>
+  <nav aria-label="Hauptnavigation">
+    <button data-page="overview" aria-current="page">Übersicht</button>
+    <button data-page="history">Klimaverlauf</button>
+    <button data-page="simulation">Testdaten</button>
+    <button data-page="logger">Logger / Bluetooth</button>
+    <button data-page="settings">Einstellungen</button>
+    <button data-page="diagnostics">Diagnose</button>
+  </nav>
+  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.1.0</span><br>Deine Daten bleiben hier.</p></div>
+</aside>
+<main>
+  <header><div><p class="eyebrow">BT-06 WEBLOGGER</p><h1 id="page-title">Übersicht</h1></div><span class="tag warning">Entwicklung · Testbetrieb</span></header>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <div class="simulation-notice"><strong>Synthetische Testdaten</strong><span>Kein BT06 verbunden. Alle dargestellten Werte sind simuliert.</span></div>
+
+  <section id="page-overview" class="page">
+    <div class="section-heading"><h2>Messstellen</h2><button class="secondary" id="overview-export" disabled>CSV exportieren</button></div>
+    <p class="muted">Letzter Testlauf · keine Livewerte und keine Schimmelbewertung.</p>
+    <div id="cards" class="cards"><div class="empty"><h3>Noch keine Messdaten</h3><p>Erzeuge einen Testlauf, um die Oberfläche ohne Logger auszuprobieren.</p><button data-go="simulation">Testdaten erzeugen</button></div></div>
+    <article class="panel"><h2>Entwicklungsstand</h2><p>V0.1 bietet lokale Einstellungen, Testdaten, CSV-Export und BLE-Diagnose über die Kommandozeile. Gerätehistorie, Konfiguration und Klimabewertung folgen nach der Protokollprüfung.</p></article>
+  </section>
+
+  <section id="page-history" class="page" hidden>
+    <article class="panel">
+      <div class="toolbar"><label>Testlauf<select id="run-select"></select></label><label>Messstelle<select id="logger-select"></select></label><label>Zeitraum<select id="period"><option value="24">24 Stunden</option><option value="168">7 Tage</option><option value="720">30 Tage</option><option value="0">Alles</option><option value="custom">Frei wählen</option></select></label></div>
+      <div class="toolbar" id="custom-period" hidden><label>Von<input id="range-start" type="datetime-local"></label><label>Bis<input id="range-end" type="datetime-local"></label><button id="apply-range">Zeitraum laden</button></div>
+      <div class="section-heading"><p class="muted" id="chart-caption">Keine Daten ausgewählt.</p><div class="button-row"><button class="secondary" id="chart-reset">Zoom zurücksetzen</button><button class="secondary" id="chart-fullscreen">Vollbild</button><button id="chart-export" disabled>CSV exportieren</button></div></div>
+      <div id="chart" aria-label="Interaktiver Temperatur- und Feuchteverlauf"></div>
+      <p class="hint">Temperatur in °C · relative Luftfeuchte in % · Lücken bleiben sichtbar. CSV enthält die Originalauflösung des gewählten Zeitraums, unabhängig vom Grafikzoom.</p>
+    </article>
+  </section>
+
+  <section id="page-simulation" class="page" hidden>
+    <article class="panel"><h2>Testlauf erzeugen</h2><p>Reproduzierbare Verläufe für drei Testmessstellen. Jeder Lauf wird separat gespeichert und verändert keine vorhandenen Messdaten.</p>
+      <form id="simulation-form"><div class="form-grid">
+        <label>Szenario<select name="scenario"><option value="humidity">Feuchtespitzen</option><option value="daily">Tagesgang</option><option value="ventilation">Lüftung</option><option value="gaps">Datenlücken</option></select></label>
+        <label>Dauer in Tagen<input name="days" type="number" min="1" max="90" value="7" required></label>
+        <label>Intervall in Minuten<input name="interval_minutes" type="number" min="1" max="60" value="5" required></label>
+        <label>Zufallsstartwert (Seed)<input name="seed" type="number" min="0" max="2147483647" value="42" required></label>
+      </div><div class="form-actions"><span class="hint" id="template-note">Vorlage wird geprüft …</span><button type="submit">Testdaten erzeugen</button></div></form>
+      <p class="hint">Maximal 80.000 Werte pro Messstelle. Gleicher Seed, gleiche Vorlage und gleiches Enddatum ergeben gleiche Messwerte; das Enddatum wird im Lauf gespeichert.</p>
+    </article>
+    <article class="panel"><h2>Vorhandene Testläufe</h2><div id="run-list" class="run-list"><p class="muted">Noch keine Testläufe.</p></div></article>
+  </section>
+
+  <section id="page-settings" class="page" hidden>
+    <article class="panel"><div class="section-heading"><h2>Programmeinstellungen</h2><span id="dirty" class="tag">Gespeichert</span></div>
+      <p>Save Settings speichert die aktuellen Werte lokal und lädt eine JSON-Datei herunter. Load Settings liest eine gespeicherte Datei zunächst zur Prüfung ein; mit Save Settings übernimmst du sie.</p>
+      <form id="settings-form"><div class="form-grid">
+        <label>Darstellung<select name="theme"><option value="dark">Dunkel</option><option value="light">Hell</option></select></label>
+        <label>Zeitzone<input name="timezone" value="Europe/Berlin" required></label>
+        <label>Aktualisierung in Sekunden<input name="refresh_seconds" type="number" min="5" max="300" required></label>
+        <label>Standardzeitraum in Stunden<input name="default_hours" type="number" min="1" max="2160" required></label>
+        <label>Feuchte-Warnlinie in %<input name="humidity_warning" type="number" min="1" max="99" step="0.1" required></label>
+        <label>Kritische Feuchtelinie in %<input name="humidity_critical" type="number" min="2" max="100" step="0.1" required></label>
+      </div><p class="hint">Die Schwellen zeichnen Hilfslinien im Diagramm. Eine zeitabhängige Risikobewertung ist in V0.1 noch nicht enthalten. Geräteeinstellungen sind hiervon getrennt.</p>
+      <div class="form-actions"><button id="load-settings" type="button" class="secondary">Load Settings</button><input id="settings-file" type="file" accept=".json,application/json" hidden><button type="submit">Save Settings</button></div></form>
+    </article>
+  </section>
+
+  <section id="page-logger" class="page" hidden>
+    <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. Verbinden liest in V0.1 nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>
+      <div class="toolbar"><label>Bluetooth-Adapter<input id="ble-adapter" value="hci0" pattern="hci[0-9]{1,3}" required></label><button id="ble-scan">Geräte suchen (10 s)</button></div>
+      <p class="hint" id="ble-status">Bluetooth-Status wird geladen …</p><div id="ble-devices" class="run-list"></div>
+    </article>
+    <article class="panel"><h2>Verbinden und Koppeln</h2><p>Viele BLE-Geräte benötigen eine Verbindung ohne Betriebssystem-Kopplung. „Koppeln &amp; prüfen“ versucht ausdrücklich eine BlueZ-Kopplung. Falls eine PIN oder Bestätigung erforderlich ist, erfolgt sie über den systemeigenen Bluetooth-Agent.</p><p class="hint">Eine Betriebssystem-Kopplung kann gespeichert bleiben. Sie ersetzt keinen möglichen BT06-Zugangsschlüssel. In V0.1 werden keine Loggerparameter, Uhrzeiten oder Speicherinhalte verändert. Dauerverbindung und Messdaten folgen nach der Protokollprüfung.</p><pre id="ble-result" hidden></pre></article>
+  </section>
+
+  <section id="page-diagnostics" class="page" hidden>
+    <article class="panel"><h2>Programmstatus</h2><dl id="diagnostics"></dl></article>
+    <article class="panel"><h2>BLE-Diagnose</h2><p>Suche und Verbindungsprüfung sind auf der Loggerseite verfügbar. Alternativ lokal:</p><pre>./tools/ble-diagnose.sh scan --seconds 10</pre><p class="hint">Benötigt die optionale Bleak-Umgebung und Zugriff auf BlueZ. Keine Konfigurations- oder Speicherbefehle. Firmware und BT06-Protokoll sind noch nicht an echter Hardware verifiziert.</p></article>
+  </section>
+  <footer>BT-06_Weblogger · vollständig lokal · CSV als Datenformat</footer>
+</main>
+</body></html>

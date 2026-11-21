@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "theme": "dark",
+  "timezone": "Europe/Berlin",
+  "refresh_seconds": 15,
+  "default_hours": 24,
+  "humidity_warning": 70,
+  "humidity_critical": 80
+}

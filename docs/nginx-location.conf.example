@@ -1,0 +1,11 @@
+# In den bereits authentifizierten Dashboard-Serverblock aufnehmen.
+# Nicht als ungeschützten neuen Server verwenden.
+# App starten mit: ./start.sh --base-path /klima --public-origin http://DEIN-DASHBOARD-HOST
+location /klima/ {
+    proxy_pass http://127.0.0.1:8766;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 120s;
+    client_max_body_size 16k;
+}
