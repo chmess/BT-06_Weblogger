@@ -53,3 +53,10 @@ Ein realer Advertising-Empfang mit angekündigter Firmware 2.05 wurde dekodiert 
 Der tatsächliche Dienst empfing mehrere reale Pakete und bestätigte mindestens zwei CSV-Stichproben mit 60 Sekunden Abstand. Der API-Verlauf lieferte dieselben gespeicherten Zeilen unter Quelle BLE-Advertising. Chromium prüfte die echte installierte Oberfläche ausschließlich mit GET-Abfragen: aktuelle Livekachel, reales Diagramm, CSV mit Host-Zeitbasis, Zoom-Pause, 390-Pixel-Ansicht ohne Überlauf, keine JavaScript-Ausnahmen oder externen Abrufe. Die Screenshots bleiben privat.
 
 Korrektur der Mountdiagnose: In der normalen Benutzer-/SSH-Ansicht ist `/` schreibbar; dort sind `/usr` und `/etc` keine eigenen Mounts und sudo funktioniert. Die sichtbaren separaten `ro,nosuid,nodev`-Mounts gehören zum Ausführungskontext der Werkzeuge. Die frühere Aussage, sudo auf dem Host sei beschädigt, war falsch. Ein Mount-Reparaturversuch oder Host-Neustart ist nicht nötig. Der vorbereitete V0.2-Hostinstaller verwendet die normale sudo-Berechtigung und führt keinerlei Mountoperation aus.
+
+
+## V0.3-Entwicklungsprüfung
+
+37 automatisierte Tests bestanden. Neue synthetische Fälle: ausschließlich freigegebene Leseopcodes, negative/falsche Antworten, explizite Kalenderjahresbasis, fragmentierte und zusammengefasste Historienrahmen, jede mögliche Trunkierung eines Teststreams, widersprüchliche Anzahl/Endezähler, fehlender Zeitkontext, Nullintervall, Überlauf, unbekannte Typen, wiederholte Zeitstempel und Fahrenheit. Diagnose- und Receiver-Tests prüfen DuplicateData=True am Scanner-Aufruf.
+
+Reale Hardwareprüfung separat erfolgreich: GATT-Inventar, Notifications und belegte Leseabfragen ohne Pairing; vollständige Historie nach expliziter temporärer Tastenaktion übertragen und privat dekodiert. Anzahl, Enderahmenzähler, Anfang/Ende und Zeitabstände passen. Ein anderer Leseopcode wurde abgewiesen, nicht als Erfolg gewertet. Negative Verbindungsversuche haben Hostempfang jeweils wieder aktiviert. Produktionsintegration, Gerätezeit/UTC-Zuordnung, Dedupe und unbeaufsichtigter Sync sind damit nicht getestet oder freigegeben. Laufender Dienst unverändert V0.2.

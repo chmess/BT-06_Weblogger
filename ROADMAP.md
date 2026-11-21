@@ -8,7 +8,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 - V0.1.0 umgesetzt: Offline-Weboberfläche, Save/Load Settings, getrennte synthetische CSV-Testläufe, lokaler ECharts-Verlauf, Roh-CSV-Export, Diagnosewerkzeuge und explizite BLE-Suche/GATT-Verbindungsprüfung mit optionaler Betriebssystem-Kopplung.
 - V0.2.0 installiert und getestet: lesender Advertising-Empfang des belegten BT06-2.05-Formats, getrennte echte CSV-Datenquelle, Start/Pause, Datenalter und Export. Realer Empfang und wiederholte CSV-Speicherung im installierten Dienst erfolgreich; tatsächliche Browseransicht einschließlich CSV-Export geprüft.
 - Private Zigbee-Vorlagen lokal möglich, keine persönlichen Gerätekennungen im Repository.
-- Hardwarestand: BT06 anhand Foto/Advertising zugeordnet, Firmwareformat 2.05 und Livewerte geprüft. GATT-Verbindung, Kopplungsbedarf und Historienprotokoll bleiben offen.
+- V0.3 in Entwicklung: GATT ohne Pairing und vollständige Historienübertragung am realen BT06 erfolgreich. Unabhängiger Parser prüft Anzahl, Endemarkierung, Rahmenzähler und Zeitgrenzen; reale Historie privat als CSV gesichert. Gerätezeit ist gegenüber der Hostzeit versetzt; Zeitbasis, wiederholbarer Import, Dedupe, Recovery und UI/automatische Synchronisation bleiben offen.
+- Hardwarestand: BT06 anhand Foto/Advertising zugeordnet, Firmwareformat 2.05, Livewerte und GATT-Service geprüft. Kurzes Standard-BLE-Fenster per dokumentierter Tastenaktion erforderlich; unbeaufsichtigte Wiederverbindung noch nicht verifiziert.
 
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.

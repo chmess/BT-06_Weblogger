@@ -1,5 +1,12 @@
 # Änderungen
 
+## V0.3 in Entwicklung · 2026-11-21
+
+- Reale GATT-Verbindung ohne Pairing, reine Geräte-/Uhrzeit-/Statusabfragen und vollständiger Historientransfer geprüft. Private Roh- und dekodierte CSV bleiben außerhalb des Repositorys. Noch kein produktiver Historienimport oder automatischer Sync.
+- Unabhängiger, begrenzter Historienparser für Rahmenfragmentierung, vollständige und kompakte Messwerte, Anzahl-/Ende-/Rahmenzählerprüfung. Fehler sperren die Vollständigkeitsbestätigung; Gerätezeiten erhalten keinen erfundenen UTC-Offset. Jahresbasis der Kalenderantwort muss ausdrücklich festgelegt werden.
+- BlueZ-Scans fordern wiederholte identische Advertising-Meldungen an, damit unveränderte Messwerte nicht durch Bleaks Duplicate-Filter als ausgefallener Empfang erscheinen. CSV-Speicherabstand bleibt bestehen. Laufender V0.2-Dienst noch nicht aktualisiert.
+- 37 automatisierte Tests bestanden, einschließlich abgeschnittener/fehlerhafter Historien, Zeitkontext, Überlauf, wiederholter Zeitstempel und abgewiesener Leseantworten.
+
 ## 0.2.0 · 2026-11-21
 
 - Auf dem headless DeskPi aktiviert: realer BT06-Empfang und wiederholte CSV-Speicherung im Dienst, tatsächliche Browseransicht samt Verlauf/Export geprüft. 28 automatisierte Tests bestanden.

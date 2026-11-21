@@ -34,6 +34,7 @@ class BluetoothTests(unittest.TestCase):
                 calls.clear()
                 args = SimpleNamespace(command="gatt", seconds=1, adapter="hci1", device=device.address, pair=pair)
                 result = asyncio.run(diagnose(args))
+                self.assertEqual(calls[0][1]["bluez"], {"adapter": "hci1", "filters": {"DuplicateData": True}})
                 self.assertEqual(calls[1][0], "connect")
                 self.assertEqual(calls[1][1]["pair"], pair)
                 self.assertEqual(calls[-1][0], "disconnect")
@@ -43,6 +44,7 @@ class BluetoothTests(unittest.TestCase):
             args.command = "scan"
             result = asyncio.run(diagnose(args))
             self.assertEqual([call[0] for call in calls], ["scan"])
+            self.assertTrue(calls[0][1]["bluez"]["filters"]["DuplicateData"])
             self.assertEqual(result["devices"][0]["rssi"], -50)
 
     def test_jobs_require_discovery_and_are_serialized(self):

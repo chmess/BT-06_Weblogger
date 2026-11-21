@@ -11,6 +11,7 @@ from backend.common.bt06 import advertised_reading
 from backend.common.settings import atomic_json
 from backend.common.storage import parse_time
 from .ble_jobs import BusyError
+from .ble_options import scan_options
 
 
 class Receiver:
@@ -146,7 +147,7 @@ class Receiver:
         delay = 1
         while not self.stop_event.is_set():
             try:
-                async with BleakScanner(detection_callback=received, bluez={"adapter": self.config["adapter"]}):
+                async with BleakScanner(detection_callback=received, bluez=scan_options(self.config["adapter"])):
                     with self.lock:
                         self.value["state"] = "receiving"
                     delay = 1

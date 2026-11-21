@@ -2,6 +2,8 @@
 
 Lokaler Klimamonitor für Linux und Raspberry Pi. **Aktueller Stand: V0.2.0 – BT06-Liveempfang per Advertising und CSV-Aufzeichnung.** Unterstützt wird zunächst das belegte Format der Firmware 2.05. Gerätehistorie, Gerätekonfiguration und Klimaberechnungen folgen gemäß Roadmap.
 
+V0.3 ist in Entwicklung: vollständiger Historientransfer am realen BT06 und unabhängige Dekodierung erfolgreich, ohne Pairing oder Änderung von Gerätezeit/Aufzeichnung. Der produktive Webimport folgt nach Klärung der Gerätezeit und Prüfung von Dedupe/Recovery. Details und Grenzen: [BLE-Protokoll](docs/BLE-PROTOKOLL.md).
+
 ## Start
 
 Python **3.10 oder neuer**, Linux und Zeitzonendaten (`Europe/Berlin`) werden benötigt. Weboberfläche und Testdatengenerator verwenden ausschließlich die Python-Standardbibliothek; Apache ECharts ist lokal enthalten. Keine Cloud und kein Internetzugriff im Betrieb.

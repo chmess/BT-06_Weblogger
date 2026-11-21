@@ -4,6 +4,7 @@ import asyncio
 import json
 import sys
 from backend.common.bt06 import advertised_reading
+from .ble_options import scan_options
 
 
 async def diagnose(args):
@@ -12,7 +13,7 @@ async def diagnose(args):
     except ImportError:
         raise RuntimeError("Bleak fehlt. Optional installieren: ./install.sh --ble (nur lokale .venv).") from None
     if args.command == "scan":
-        devices = await BleakScanner.discover(timeout=args.seconds, return_adv=True, bluez={"adapter": args.adapter})
+        devices = await BleakScanner.discover(timeout=args.seconds, return_adv=True, bluez=scan_options(args.adapter))
         return {"mode": "advertising-only", "seconds": args.seconds, "devices": [
             {"address": device.address, "name": advertisement.local_name or device.name,
              "rssi": advertisement.rssi, "service_uuids": advertisement.service_uuids,
@@ -22,7 +23,7 @@ async def diagnose(args):
             for device, advertisement in devices.values()]}
     # Connect as soon as the selected peripheral advertises, instead of waiting
     # for the full scan window. Slow-advertising loggers have short connect windows.
-    target = await BleakScanner.find_device_by_address(args.device, timeout=args.seconds, bluez={"adapter": args.adapter})
+    target = await BleakScanner.find_device_by_address(args.device, timeout=args.seconds, bluez=scan_options(args.adapter))
     if not target:
         raise RuntimeError("Gewähltes Gerät während der Suche nicht gefunden.")
     async with BleakClient(target, timeout=30 if args.pair else 15, pair=args.pair, bluez={"adapter": args.adapter}) as client:

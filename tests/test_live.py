@@ -146,6 +146,7 @@ class ReceiverStoreTests(unittest.TestCase):
             def __init__(self, **kwargs):
                 import inspect
                 test.assertEqual(len(inspect.signature(kwargs["detection_callback"]).parameters), 2)
+                test.assertEqual(kwargs["bluez"], {"adapter": "hci0", "filters": {"DuplicateData": True}})
                 self.callback = kwargs["detection_callback"]
                 calls.append("scanner")
             async def __aenter__(self):
