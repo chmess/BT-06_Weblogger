@@ -4,7 +4,7 @@
 
 - Aufzeichnungsstart mit eigener lesender Vorbereitung, zwei Bestätigungen und einmaligem, gerätegebundenem Zehn-Minuten-Token. Vorhandene Historie vollständig sichern; leeren Speicher ausschließlich durch vollständige zehnbyteige Nullmetadaten belegen, keine erfundenen Messwert-CSV. Statusnullen allein genügen nicht.
 - Vor Start Einstellungen, Identität, Zustand und Umfang erneut prüfen und Belege dauerhaft speichern. Genau ein belegter Startbefehl, keine Parameter-/Uhränderung, kein Save/Reset. Aktive Aufnahme nur durch Status 16 oder frischen Advertising-Übergang nach Start bestätigen; ACK allein bleibt unbestätigt. Bei unklarer Antwort ausschließlich lesend nachprüfen, keine Wiederholung.
-- 119 Tests und Browserprüfung bestanden. Reale Startprüfung und Aktivierung stehen aus.
+- 119 Tests und Browserprüfung bestanden. Dienst aktiviert; erster Leseversuch Timeout, zweiter verbindet erfolgreich, erhält auf Historienumfang Status 3. Kein Leerstandsbeleg, keine Vorbereitung freigegeben, kein Startbefehl. Hostempfang wieder frisch; Interpretation von Status 3 offen.
 
 ## 0.4.3-dev · 2026-11-21
 
