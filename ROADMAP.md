@@ -17,6 +17,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.4.4-dev installiert: kontrollierter Aufzeichnungsstart mit Vollhistorien-/Leerstandsbeleg, Bestätigung und lesender Zustandsprüfung. 119 Tests und Browserprüfung bestanden. Reale Leseverbindung erfolgreich, Historienumfang mit Status 3 abgewiesen; Bedeutung unbekannt, kein Leerstand behauptet, Start gesperrt. Kein Startbefehl gesendet.
 
+- Aktuell: V0.4.5 installiert; originale SDK-Abfragereihenfolge real geprüft, weiterhin Status 3 ohne Zähler. Rohbeleg gespeichert. Nutzer autorisiert ausdrücklich Werksreset; geprüfte Herstellerunterlagen und aktuelle offizielle App liefern dafür keine bestätigte Prozedur (BT06-ClearFlash leer). Kein Reset/Start gesendet. Herstelleranleitung erforderlich.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

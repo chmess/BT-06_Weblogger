@@ -124,3 +124,6 @@ Statisch erneut geprüft: Hersteller-DataManager `SetStart` sendet `52A0` ohne P
 
 
 V0.4.5: Die Referenz `DataManager.SetConfig` liest `4C01` und sendet aus dessen Callback unmittelbar `6C00`. Die eigene Umfangsabfrage folgt nun dieser Reihenfolge; beide Request-/Response-Paare werden belegt. Die Statusantwort muss zum zuvor gelesenen Zustand passen. Das SDK unterscheidet für Antwortcodes außer 1 nur generisch Fehler; eine Bedeutung „leer“ für Status 3 ist nicht belegt. Abweisungen bleiben gesperrt und werden einschließlich Rohantwort unter `data/recording/diagnostics/` gespeichert. Neue Reihenfolge noch ohne Hardwareabnahme.
+
+
+Werksresetprüfung vom 22.11.2026: BT06-Handbuch V1.4 ohne dokumentierten Factory-Reset-Weg; ältere Hersteller-SDK-Referenz und SDK der aktuellen offiziellen Android-App 3.5.0.0528 geprüft. BT06 `ClearFlash` hat in beiden keine Implementierung. Kein bekannter BLE-Werksreset daraus ableitbar; keine Tastenfolge geraten. Nutzer bestätigt Datensicherung und autorisiert Werkseinstellungen ausdrücklich. Keine Geräteänderung ausgeführt. Reale SDK-Abfragereihenfolge liefert weiterhin `26 6C 00 03 23`, ohne Nutzdaten/Zähler; Originalbeleg gesichert. Für den Werksreset fehlt die herstellerbestätigte Prozedur. APK/SDK und private Supportanfrage bleiben unveröffentlicht.
