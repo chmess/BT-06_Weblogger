@@ -211,7 +211,7 @@ async function refreshSync() {
   $('#sync-start').disabled=busy||!state.live?.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;$('#device-settings-read').disabled=$('#sync-start').disabled;
   $('#sync-button-signal').hidden=!(busy&&state.sync.trigger!=='automatic'&&['finding_device','connecting'].includes(state.sync.phase));
   const result=state.sync.result;
-  const resultText=result?.kind==='recording-prepared'?`Start vorbereitet · ${result.protection.count} vorhandene Werte geprüft · noch kein Start`:result?.kind==='recording-started'?'Aufzeichnung am Gerät bestätigt':result?.kind==='recording-start-pending'?'Start bestätigt; Aufzeichnung noch nicht nachgewiesen · nicht erneut starten':result?.kind==='configuration-parameters-verified'?'Geräteparameter zurückgelesen · Status ohne Aufzeichnungsdetails · kein automatischer Start':result?.kind==='configuration-prepared'?`Vorbereitung abgeschlossen · ${result.history.count} Werte vollständig geprüft · noch keine Geräteänderung`:result?.kind==='configuration-verified'?'Geräteänderung zurückgelesen · Aufzeichnung bleibt gestoppt':result?.kind==='device-settings'?`Geräteeinstellungen gelesen · Stand ${date(result.observed_at)} · ${Object.keys(result.read_errors).length+Object.keys(result.decode_errors).length} nicht verfügbare Abfragen`:(result?(result.last_transfer_scope==='range'?`${result.new_count} neue Werte · ${result.received_count} Werte einschließlich Überlappung geprüft · ${result.count} Werte im Gesamtbestand · ${result.duplicate?'keine Änderung':'dauerhaft gespeichert'}`:`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`):'');
+  const resultText=result?.kind==='recording-prepared'?`Start vorbereitet · ${result.protection.count==null?'unbekannter Gerätebestand':result.protection.count+' vorhandene Werte geprüft'} · noch kein Start`:result?.kind==='recording-started'?'Aufzeichnung am Gerät bestätigt':result?.kind==='recording-start-pending'?'Start bestätigt; Aufzeichnung noch nicht nachgewiesen · nicht erneut starten':result?.kind==='configuration-parameters-verified'?'Geräteparameter zurückgelesen · Status ohne Aufzeichnungsdetails · kein automatischer Start':result?.kind==='configuration-prepared'?`Vorbereitung abgeschlossen · ${result.history.count} Werte vollständig geprüft · noch keine Geräteänderung`:result?.kind==='configuration-verified'?'Geräteänderung zurückgelesen · Aufzeichnung bleibt gestoppt':result?.kind==='device-settings'?`Geräteeinstellungen gelesen · Stand ${date(result.observed_at)} · ${Object.keys(result.read_errors).length+Object.keys(result.decode_errors).length} nicht verfügbare Abfragen`:(result?(result.last_transfer_scope==='range'?`${result.new_count} neue Werte · ${result.received_count} Werte einschließlich Überlappung geprüft · ${result.count} Werte im Gesamtbestand · ${result.duplicate?'keine Änderung':'dauerhaft gespeichert'}`:`${result.count} Werte vollständig geprüft · ${result.duplicate?'bereits vorhanden, keine Kopie':'dauerhaft gespeichert'}`):'');
   const jobText=[state.sync.state==='error'?(state.sync.mode==='configuration_write'?'Geräteänderung nicht bestätigt':'Lesen fehlgeschlagen'):labels[state.sync.phase]||'Bereit zum manuellen Auslesen.',busy&&state.sync.expected?`${state.sync.received} / ${state.sync.expected} ${state.sync.phase==='reading_settings'?'Abfragen':'Werte'}`:'',resultText,state.sync.error||'',state.sync.resume_error||''].filter(Boolean).join(' · ');
   $('#sync-status').textContent=jobText;
   $('#device-settings-job').textContent=['settings','configuration_prepare','configuration_write','configuration_verify','recording_prepare','recording_start','recording_verify'].includes(state.sync.mode)?jobText+(state.sync.state==='error'&&state.sync.mode==='settings'?' · Kein neuer Einstellungsstand gespeichert; bisheriger Stand bleibt erhalten.':''):'';
@@ -223,6 +223,7 @@ async function refreshSync() {
 }
 async function refreshDeviceSettings() {
   const target=$('#device-settings-values');target.replaceChildren();let result;try{result=await api('device-settings');}catch(error){updateDeviceDraft(null);$('#device-settings-status').textContent=error.message;return;}const data=result.settings;
+  const memory=result.memory_estimate;$('#device-memory-estimate').textContent=memory?`Rechnerische Speicherdauer: ca. ${number(memory.nominal_days,1)} Tage bei ${memory.capacity_records.toLocaleString('de-DE')} Werten (Herstellerangabe). Tatsächlich freie Restdauer unbekannt.`:'';
   updateDeviceDraft(data);await refreshConfiguration();await refreshRecording();
   if(!data){$('#device-settings-status').textContent=result.selected?'Für dieses Gerät noch keine gespeicherte Einstellungsabfrage.':'Zuerst einen verifizierten BT06 auswählen.';return;}
   const v=data.values;
@@ -321,18 +322,18 @@ async function refreshConfiguration() {
 function recordingControls() {
   const busy=state.sync?.state==='running',prepared=state.recording?.prepared,report=state.recording?.last_start;
   $('#recording-prepare').disabled=busy||!state.live?.config.device;
-  $('#recording-start').disabled=busy||!prepared||!$('#recording-loss').checked||!$('#recording-consent').checked;
+  $('#recording-start').disabled=busy||!prepared||!$('#recording-loss').checked||!$('#recording-consent').checked||(prepared?.allow_unread_history_loss&&!$('#recording-unread-confirm').checked);
   $('#recording-cancel').disabled=busy||!prepared;
   $('#recording-verify').disabled=busy||!report?.may_have_changed;
 }
 async function refreshRecording() {
   try {
     const result=await api('recording');
-    if(result.prepared?.token!==state.recording?.prepared?.token){$('#recording-loss').checked=false;$('#recording-consent').checked=false;}
+    if(result.prepared?.token!==state.recording?.prepared?.token){$('#recording-loss').checked=false;$('#recording-consent').checked=false;$('#recording-unread-confirm').checked=false;}
     state.recording=result;const prepared=result.prepared;
-    $('#recording-confirmation').hidden=!prepared;
+    $('#recording-confirmation').hidden=!prepared;$('#recording-unread-label').hidden=!prepared?.allow_unread_history_loss;
     $('#recording-status').textContent=prepared?'Start vorbereitet; noch kein Startbefehl gesendet.':result.last_start?.notice||'Noch kein Aufzeichnungsstart vorbereitet.';
-    if(prepared)$('#recording-plan').textContent=`Intervall ${number(prepared.interval_seconds/60,1)} min · ${prepared.protection.count} vorhandene Werte ${prepared.protection.count?'vollständig gesichert':'(leerer Speicher nachgewiesen)'} · gültig für ${Math.ceil(prepared.expires_in_seconds/60)} min. ${prepared.notice}`;
+    if(prepared)$('#recording-plan').textContent=`Intervall ${number(prepared.interval_seconds/60,1)} min · ${prepared.protection.count==null?'Gerätebestand unbekannt':prepared.protection.count+' vorhandene Werte '+(prepared.protection.count?'vollständig gesichert':'(leerer Speicher nachgewiesen)')} · gültig für ${Math.ceil(prepared.expires_in_seconds/60)} min. ${prepared.notice}`;
   } catch(error){state.recording=null;$('#recording-status').textContent=error.message;$('#recording-confirmation').hidden=true;}
   recordingControls();
 }
@@ -425,9 +426,9 @@ async function main() {
   $('#device-settings-draft').addEventListener('submit',guard(previewDeviceDraft));
   $('#device-settings-draft').addEventListener('input',()=>{deviceDraftReviewed=null;deviceDraftRevision++;$('#device-config-loss').checked=false;$('#device-config-stop').checked=false;configurationControls();$('#device-draft-result').replaceChildren();$('#device-draft-status').textContent=deviceDraftBase?.capture===deviceDraftLatest?.capture?'Entwurf geändert. Erneut prüfen; noch nichts am Gerät gespeichert.':'Einstellungsstand ersetzt. Zuerst aktuellen Stand übernehmen.';});
   $('#device-draft-reset').addEventListener('click',()=>updateDeviceDraft(deviceDraftLatest,true));
-  $('#recording-prepare').addEventListener('click',guard(async()=>{await post('recording/prepare',{});await refreshSync();await refreshRecording();}));
-  for(const selector of ['#recording-loss','#recording-consent'])$(selector).addEventListener('change',recordingControls);
-  $('#recording-start').addEventListener('click',guard(async()=>{await post('recording/start',{token:state.recording?.prepared?.token,confirm_history_loss:$('#recording-loss').checked,confirm_start:$('#recording-consent').checked});$('#recording-loss').checked=false;$('#recording-consent').checked=false;await refreshSync();await refreshRecording();}));
+  $('#recording-prepare').addEventListener('click',guard(async()=>{await post('recording/prepare',$('#recording-unread-allow').checked?{allow_unread_history_loss:true}:{});await refreshSync();await refreshRecording();}));
+  for(const selector of ['#recording-loss','#recording-consent','#recording-unread-confirm'])$(selector).addEventListener('change',recordingControls);
+  $('#recording-start').addEventListener('click',guard(async()=>{await post('recording/start',{token:state.recording?.prepared?.token,confirm_history_loss:$('#recording-loss').checked,confirm_start:$('#recording-consent').checked,...(state.recording?.prepared?.allow_unread_history_loss?{confirm_unread_history_loss:$('#recording-unread-confirm').checked}:{})});$('#recording-loss').checked=false;$('#recording-consent').checked=false;$('#recording-unread-confirm').checked=false;await refreshSync();await refreshRecording();}));
   $('#recording-cancel').addEventListener('click',guard(async()=>{await post('recording/cancel',{});await refreshRecording();}));
   $('#recording-verify').addEventListener('click',guard(async()=>{await post('recording/verify',{});await refreshSync();await refreshRecording();}));
   $('#device-config-prepare').addEventListener('click',guard(async()=>{if(!deviceDraftReviewed?.changes.length)throw new Error('Änderungen zuerst prüfen.');await post('device-settings/prepare',{base_capture:deviceDraftBase.capture,changes:deviceDraftValues()});await refreshSync();await refreshConfiguration();}));

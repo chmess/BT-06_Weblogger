@@ -24,7 +24,7 @@ from backend.common.history_store import HistoryStore, HISTORY_FIELDS
 from backend.linux.history_jobs import HistoryJobs
 from backend.linux.auto_sync import AutoSync
 from backend.common.history_timezones import HistoryTimezones, ASSIGNED_FIELDS
-from backend.common.device_settings import DeviceSettingsStore
+from backend.common.device_settings import DeviceSettingsStore,memory_estimate
 from backend.common.settings_preview import settings_preview
 from backend.linux.configuration import ConfigurationWorkflow
 from backend.linux.recording import RecordingWorkflow
@@ -170,7 +170,9 @@ def handler_for(app):
                     self.send(200, app.auto_sync.status())
                 elif path == "/api/device-settings":
                     device = app.receiver.status()["config"]["device"]
-                    self.send(200, {"settings": app.device_settings.latest(device["id"]) if device else None,
+                    saved=app.device_settings.latest(device['id']) if device else None
+                    self.send(200, {"settings":saved,
+                                    'memory_estimate':memory_estimate(saved['values'].get('record_interval_seconds')) if saved else None,
                                     "read_only": True, "selected": device is not None})
                 elif path == "/api/device-settings/configuration":
                     self.send(200, app.configuration.status())

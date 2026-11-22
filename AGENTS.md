@@ -8,6 +8,7 @@ Verbindliche Spezifikation: [PROJEKTBESCHREIBUNG.md](PROJEKTBESCHREIBUNG.md). Pr
 - Windows-Umsetzung und Machbarkeitsprüfung vollständig zurückstellen.
 - Kein gesondertes Backup-/Restore-System. Programmeinstellungen per Save Settings / Load Settings als JSON sichern und laden.
 - Am 22.11.2026 bestätigt der Nutzer, dass alle Daten gesichert sind, und autorisiert ausdrücklich das Wiederherstellen der Werkseinstellungen. Kein bloßer Aufzeichnungsneustart als Ersatz. Nur belegte Herstellerprozedur verwenden; aktuell kein verifizierter Werksreset implementiert.
+- Am 22.11.2026 anschließend bestätigt: ohne Werksreset fortfahren. Einmaliger Aufzeichnungsstart mit 25 Minuten trotz unbekanntem aktuellem Gerätebestand und möglichem Verlust verbliebener Gerätedaten ausdrücklich freigegeben; gesicherte Originalhistorie erhalten. Geräteuhr darf bei belegtem Verfahren aktuell gesetzt werden. Keine geratenen Uhrbefehle.
 - Potenziell destruktive Geräteänderungen weiterhin nicht automatisch ausführen. Vorher Historie regulär auslesen und Vollständigkeit prüfen; kein zusätzlicher Backupdienst oder doppeltes Archiv nötig.
 - Testdaten reproduzierbar generieren. Private Zigbee-Geräte können lokale Vorlagen liefern; Kennungen und Parameter bleiben unter `private/`, generierte Daten unter `simulation/`. Keine dieser Dateien veröffentlichen.
 - SMApi-Verträglichkeit berücksichtigen: sparsame Laufzeit, getrennte Umgebung, gemeinsamer Bluetooth-Adapter als zu prüfende Ressource. Keine ungefragte Installation auf SMApi.

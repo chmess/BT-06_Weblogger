@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.4.6-dev · 2026-11-22
+
+- Ausdrückliche Ausnahme für den bestätigten Neustart bei unbekanntem Gerätebestand: nur Initialzustand, exakt belegte negative Umfangsantwort und geprüfte vollständige Alt-CSV. Zusatzbestätigung des möglichen Verlusts noch nicht ausgelesener Werte erforderlich. Bestand bleibt unbekannt; Status 3 wird weiterhin nicht als leer interpretiert. Genau ein Start, keine automatische Wiederholung. Reale Ausführung steht aus.
+- Rechnerische Speicherdauer aus Herstellerkapazität 32.000 Werte und ausgelesenem Intervall anzeigen: bei 25 Minuten etwa 556 Tage. Tatsächlich freie Restdauer bleibt unbekannt.
+- Geräteuhr bleibt vorerst unverändert: Jahreskodierung des Schreibbefehls noch nicht für diese Firmware belegt.
+
 ## 0.4.5-dev · 2026-11-22
 
 - Historienumfang jetzt wie im Hersteller-SDK unmittelbar nach einer Statusabfrage lesen. Geänderter Status blockiert Start. Ob dies die reale Ablehnung behebt, ist noch offen; Status 3 bleibt Fehler und kein Leerstandsbeleg.

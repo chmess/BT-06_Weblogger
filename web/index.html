@@ -109,6 +109,7 @@
       <p id="device-settings-button-signal" class="hint" hidden>Jetzt am BT06 kurz START, danach kurz STOP drücken (jeweils unter einer Sekunde, nicht halten). Eine verbundene Handy-App vorher trennen.</p>
       <p id="device-settings-status" class="hint" role="status">Noch keine Geräteeinstellungen gelesen.</p>
       <dl id="device-settings-values"></dl>
+      <p id="device-memory-estimate" class="hint"></p>
       <p class="hint">Nur belegte Werte werden angezeigt. Unbekannte Parameter bleiben unbekannt; der Funkmoduscode ist noch keinem bestätigten Long-Range-Zustand zugeordnet. Das Auslesen sendet keine Einstellungs-, Speicher-, Start-/Stopp- oder Uhränderung.</p>
       <details><summary>Änderungen vorbereiten</summary>
         <p>Gewünschte Werte mit dem gelesenen Stand vergleichen. Diese Vorschau sendet keine Gerätebefehle. Das spätere Speichern am BT06 kann seine Historie löschen und benötigt eine vollständige Auslesung sowie eine ausdrückliche Bestätigung.</p>
@@ -141,11 +142,13 @@
     <article class="panel"><h2>Aufzeichnung im BT06</h2><p class="hint">Startablauf bisher nur simuliert geprüft.</p>
       <p>Start mit den gelesenen Einstellungen. Ein App-Start kann die Gerätehistorie löschen. Zuvor werden der gesamte Bestand gesichert oder ein leerer Speicher ausdrücklich nachgewiesen. Die Geräteuhr bleibt unverändert und ungeprüft.</p>
       <button id="recording-prepare" disabled>Aufzeichnungsstart vorbereiten (nur lesen)</button>
+      <label class="inline-check"><input id="recording-unread-allow" type="checkbox"> Ausnahme vorbereiten: Bei Initialzustand und Status 3 darf ein Start trotz nicht auslesbarem Gerätebestand vorbereitet werden.</label>
       <p id="recording-status" role="status" aria-live="polite"></p>
       <div id="recording-confirmation" hidden>
         <p id="recording-plan"></p>
         <label class="inline-check"><input id="recording-loss" type="checkbox"> Mögliche Löschung der zuvor gesicherten Gerätehistorie erlauben.</label>
         <label class="inline-check"><input id="recording-consent" type="checkbox"> Aufzeichnung mit unveränderten Einstellungen und ungeprüfter Geräteuhr starten.</label>
+        <label id="recording-unread-label" class="inline-check" hidden><input id="recording-unread-confirm" type="checkbox"> Auch eventuell noch nicht gesicherte Gerätedaten dürfen verloren gehen. Unbekannter Bestand wird ausdrücklich nicht als leer gewertet.</label>
         <div class="button-row"><button id="recording-start" disabled>Bestätigten Aufzeichnungsstart ausführen</button><button id="recording-cancel" class="secondary">Vorbereitung verwerfen</button></div>
       </div>
       <button id="recording-verify" class="secondary" disabled>Aufnahmestart prüfen (nur lesen)</button>

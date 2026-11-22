@@ -141,3 +141,7 @@ Realer V0.4.2-Folgetest: vollständige Historie nochmals gesichert, kein erneute
 
 
 V0.4.5: 9 Aufzeichnungs- und 19 Konfigurationstests bestanden. Zusätzliche Prüfung: unmittelbare Folge Status/Umfang; negativer Status 3 trotz Null-Nutzdaten erzeugt ausschließlich einen Diagnosebeleg und niemals Leerstandsbeweis oder Startfreigabe. Keine erneute Gesamt-/Browserprüfung bei unveränderter Oberfläche.
+
+## V0.4.6
+
+11 Aufzeichnungs- und 9 Einstellungstests bestanden; zusätzlich 15 API-Tests und Chromium-Browserprüfung. Prüft: unbekannter Bestand bleibt unbekannt, explizite Zusatzbestätigung, vorhandene vollständige Alt-CSV erforderlich, andere negative Antwort bleibt gesperrt, genau ein Start, rein lesende Nachprüfung, Speicherzeit bei 25 Minuten und Darstellung der Zusatzbestätigung. Hardwarestart ausstehend.

@@ -14,6 +14,12 @@ import csv
 import io
 
 POWER_CODES = {1:-20, 2:-16, 3:-12, 4:-8, 5:-4, 6:0, 7:4, 8:6, 9:8}
+
+def memory_estimate(interval):
+    if type(interval) is not int or interval<=0:return None
+    return {'capacity_records':32000,'nominal_seconds':32000*interval,'nominal_days':32000*interval/86400,
+            'source':'Herstellerangabe, rechnerisches Speicherfenster','remaining_seconds':None}
+
 UNVERIFIED = ['long_range_mapping', 'start_delay', 'memory_policy', 'stop_button_policy', 'start_mode', 'description', 'access_key']
 SETTINGS_QUERIES=(('device_info',ReadCommand.DEVICE_INFO),('device_clock',ReadCommand.DEVICE_CLOCK),
                  ('log_status',ReadCommand.LOG_STATUS),('log_settings',ReadCommand.LOG_SETTINGS),

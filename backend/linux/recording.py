@@ -9,7 +9,7 @@ import time
 from copy import deepcopy
 from datetime import datetime,timezone
 
-from backend.common.bt06_gatt import ProtocolError
+from backend.common.bt06_gatt import ProtocolError,ReadCommand,read_request
 from backend.common.device_settings import settings_capture
 from backend.common.recording_store import RecordingProofStore
 from backend.common.settings import atomic_json
@@ -68,9 +68,25 @@ class RecordingWorkflow:
         if errors:raise ValueError('Einstellungsbeleg unvollständig.')
         return values
 
-    async def protect(self,config,client,progress,payloads):
-        failure=lambda rows,error:self.proofs.diagnostic(config['device']['id'],rows,error)
-        observation=await inventory(client,progress,on_failure=failure)
+    async def protect(self,config,client,progress,payloads,allow_unread_loss=False):
+        failures=[]
+        def failure(rows,error):failures.append(self.proofs.diagnostic(config['device']['id'],rows,error))
+        try:
+            observation=await inventory(client,progress,on_failure=failure)
+        except ProtocolError:
+            if not allow_unread_loss or not failures or payloads['log_status']!=bytes(8):raise
+            diagnostic=failures[-1]
+            rows=self.proofs.read_diagnostic(diagnostic['id'],config['device']['id'])
+            if (len(rows)!=4 or rows[0]['DatenHex']!=read_request(ReadCommand.LOG_STATUS).hex()
+                    or rows[1]['DatenHex']!=(bytes.fromhex('264c0101')+bytes(8)+b'#').hex()
+                    or rows[2]['DatenHex']!=read_request(ReadCommand.SELECT_ALL_HISTORY).hex()
+                    or rows[3]['DatenHex']!='266c000323'):raise
+            candidates=[item for item in self.history_store.snapshots() if item['logger']=='bt06-'+config['device']['id'] and item.get('full_read_verified')]
+            if not candidates:raise ProtocolError('Gesicherter Altbestand fehlt; kein Ausnahmestart.')
+            saved=max(candidates,key=lambda item:item['count'])
+            if len(self.history_store.rows(saved['logger'],saved['id']))!=saved['count']:raise ProtocolError('Altbestand nicht verifiziert.')
+            return {'inventory_id':None,'diagnostic_id':diagnostic['id'],'count':None,'metadata_hex':None,'snapshot':None,
+                    'unread_history_loss_accepted':True,'archived_reference':{'logger':saved['logger'],'id':saved['id'],'count':saved['count'],'scope':'full'}}
         if observation['status']!=payloads['log_status']:
             raise ProtocolError('Aufzeichnungsstatus während der Prüfung geändert; kein Start.')
         proof=self.proofs.save(config['device']['id'],observation)
@@ -88,7 +104,8 @@ class RecordingWorkflow:
                 'snapshot':({'logger':snapshot['logger'],'id':snapshot['id'],'count':snapshot['count'],'scope':'full'} if snapshot else None)}
 
     def prepare(self,value):
-        if value!={}:raise ValueError('Startvorbereitung erwartet ein leeres Objekt; keine Parameteränderung.')
+        if not isinstance(value,dict) or not (value=={} or set(value)=={'allow_unread_history_loss'} and value['allow_unread_history_loss'] is True):raise ValueError('Ungültige Startvorbereitung.')
+        allow_unread=value.get('allow_unread_history_loss') is True
         selected=binding(self.receiver.status()['config'])
         if not selected or selected[-1]!='2.05':raise ValueError('Verifizierten BT06 mit Firmware 2.05 auswählen.')
         async def operation(config,progress):
@@ -99,27 +116,35 @@ class RecordingWorkflow:
                 observation=await retrieve_settings(config,progress,client=client)
                 saved=self.settings_store.save(config['device']['id'],observation)
                 self.startable(observation,advertised,0)
-                protection=await self.protect(config,client,progress,observation['payloads'])
+                if allow_unread and advertised['recording']!='initialisiert':raise ProtocolError('Ausnahme nur im Initialzustand zulässig.')
+                protection=await self.protect(config,client,progress,observation['payloads'],allow_unread)
                 values=self.startable(observation,advertised,protection['count'])
             public={'kind':'recording-prepared','token':secrets.token_urlsafe(32),'device_id':config['device']['id'],
                     'interval_seconds':values['record_interval_seconds'],'temperature_unit':values['temperature_unit'],
                     'protection':protection,'advertising_before':advertised['recording'],
-                    'notice':'App-Start kann die Gerätehistorie löschen. Vor dem Start wird der aktuelle Gesamtbestand erneut geprüft und gesichert. Intervall und Geräteuhr werden nicht geändert; Gerätezeit bleibt ungeprüft.'}
+                    'allow_unread_history_loss':allow_unread,
+                    'notice':('Gerätebestand nicht auslesbar. Eventuell noch ungesicherte Gerätedaten dürfen beim bestätigten Start verloren gehen. ' if protection.get('unread_history_loss_accepted') else 'Aktueller Gesamtbestand wird vor Start erneut geprüft und gesichert. ')+
+                             'Intervall und Geräteuhr werden nicht geändert; Gerätezeit bleibt ungeprüft.'}
             with self.lock:
                 self.pending={'public':public,'binding':selected,'deadline':time.monotonic()+600,'capture':saved['capture'],
-                              'payloads':observation['payloads'],'state':(values.get('recording_code'),values.get('status_variant'))}
+                              'payloads':observation['payloads'],'state':(values.get('recording_code'),values.get('status_variant')),'allow_unread':allow_unread}
             return deepcopy(public)
         return self.jobs.start_task('recording_prepare',operation)
 
     def apply(self,value):
-        if (not isinstance(value,dict) or set(value)!={'token','confirm_history_loss','confirm_start'}
+        if (not isinstance(value,dict) or set(value)-{'token','confirm_history_loss','confirm_start','confirm_unread_history_loss'} or not {'token','confirm_history_loss','confirm_start'}<=set(value)
                 or value['confirm_history_loss'] is not True or value['confirm_start'] is not True):
             raise ValueError('Konkreten Aufzeichnungsstart und möglichen Historienverlust ausdrücklich bestätigen.')
         with self.lock:
             self.status();context=self.pending
             if not context or not isinstance(value['token'],str) or not secrets.compare_digest(value['token'],context['public']['token']):
                 raise ValueError('Startvorbereitung fehlt, abgelaufen oder verbraucht.')
-            self.proofs.read(context['public']['protection']['inventory_id'],context['public']['device_id'])
+            if context['allow_unread'] and value.get('confirm_unread_history_loss') is not True:
+                raise ValueError('Möglichen Verlust noch nicht ausgelesener Gerätedaten ausdrücklich bestätigen.')
+            if not context['allow_unread'] and 'confirm_unread_history_loss' in value:raise ValueError('Unpassende Zusatzbestätigung.')
+            if context['public']['protection'].get('unread_history_loss_accepted'):
+                self.proofs.read_diagnostic(context['public']['protection']['diagnostic_id'],context['public']['device_id'])
+            else:self.proofs.read(context['public']['protection']['inventory_id'],context['public']['device_id'])
             context=deepcopy(context);self.pending=None
 
         async def operation(config,progress):
@@ -134,13 +159,16 @@ class RecordingWorkflow:
                     saved=self.settings_store.save(config['device']['id'],before)
                     same_configuration(context['payloads'],before['payloads'])
                     self.startable(before,advertised,0)
-                    protection=await self.protect(config,client,progress,before['payloads'])
+                    if context['allow_unread'] and advertised['recording']!='initialisiert':raise ProtocolError('Initialzustand geändert.')
+                    protection=await self.protect(config,client,progress,before['payloads'],context['allow_unread'])
                     values=self.startable(before,advertised,protection['count'])
                     if (values.get('recording_code'),values.get('status_variant'))!=context['state'] or protection['metadata_hex']!=context['public']['protection']['metadata_hex']:
                         raise ProtocolError('Zustand oder Historienumfang geändert; Start erneut vorbereiten.')
                     journal.save(settings_before_capture=saved['capture'],settings_before_sha256=saved['capture_sha256'],
                                  protection=protection,advertising_before=advertised['recording'])
                     if protection['snapshot']:journal.history({**protection['snapshot'],'last_transfer_scope':'full'})
+                    if protection.get('archived_reference'):journal.history({**protection['archived_reference'],'last_transfer_scope':'full'})
+                    journal.save(unread_history_loss_confirmed=context['allow_unread'])
                     progress('starting_logger')
                     await ConfigurationWorkflow.send(client,START,'start',journal)
                     journal.save(start_acknowledged=True,start_ack_at=datetime.now(timezone.utc).isoformat())
@@ -170,7 +198,14 @@ class RecordingWorkflow:
         if (list(binding(config) or ())!=report.get('target_binding') or not config['device']
                 or report.get('device_id')!=config['device']['id'] or not re.fullmatch('[0-9a-f]{32}',report.get('id',''))):
             raise ValueError('Kein passender Startauftrag; nicht wiederholen.')
-        proof=self.proofs.read(report['protection']['inventory_id'],report['device_id'])
+        manual=report['protection'].get('unread_history_loss_accepted')
+        if manual:
+            if report.get('unread_history_loss_confirmed') is not True:raise ValueError('Ausnahmefreigabe fehlt.')
+            self.proofs.read_diagnostic(report['protection']['diagnostic_id'],report['device_id'])
+            proof={'count':None,'metadata_hex':None}
+            archived=report['protection']['archived_reference']
+            if len(self.history_store.rows(archived['logger'],archived['id']))!=archived['count']:raise ValueError('Altbestand beschädigt.')
+        else:proof=self.proofs.read(report['protection']['inventory_id'],report['device_id'])
         if proof['count']!=report['protection']['count'] or proof['metadata_hex']!=report['protection']['metadata_hex']:
             raise ValueError('Historienumfang widersprüchlich.')
         snapshot=report['protection']['snapshot']

@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock,patch
 
-from backend.common.device_settings import DeviceSettingsStore,decode_settings,settings_capture
+from backend.common.device_settings import DeviceSettingsStore,decode_settings,settings_capture,memory_estimate
 from backend.common.bt06_gatt import SERVICE_UUID,TX_UUID,RX_UUID,read_request
 from backend.common.history_store import HistoryStore
 from backend.linux.history_jobs import HistoryJobs
@@ -16,6 +16,13 @@ from test_history_jobs import FakeReceiver,config
 
 
 class SettingsTests(unittest.TestCase):
+    def test_nominal_memory_window_is_not_claimed_as_free_remaining_time(self):
+        estimate=memory_estimate(1500)
+        self.assertEqual(estimate['capacity_records'],32000)
+        self.assertEqual(estimate['nominal_seconds'],48000000)
+        self.assertAlmostEqual(estimate['nominal_days'],555.5555555555555)
+        self.assertIsNone(estimate['remaining_seconds'])
+        self.assertIsNone(memory_estimate(None));self.assertIsNone(memory_estimate(True))
     def test_only_verified_fields_are_decoded_and_mode_stays_unknown(self):
         result=decode_settings(observation()['payloads']);v=result['values']
         self.assertEqual(result['decode_errors'],{})

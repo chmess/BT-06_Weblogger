@@ -10,6 +10,8 @@ from backend.common.bt06_gatt import ReadCommand,read_request
 from backend.common.settings_commands import START,STOP,SAVE,FINISH
 from backend.common.recording_store import RecordingProofStore,decode_inventory
 from backend.linux.recording import RecordingWorkflow
+from backend.common.history_capture import decode_capture
+from history_fixture import capture
 from test_configuration import ConfigurationFixture
 
 
@@ -25,7 +27,12 @@ class RecordingTests(ConfigurationFixture):
         async def guarded(client,frame,phase,journal):
             if frame==START:
                 saved=json.loads((self.recording.root/'changes/latest.json').read_text())
-                proof=self.recording.proofs.read(saved['protection']['inventory_id'],'12345678')
+                if saved['protection'].get('unread_history_loss_accepted'):
+                    self.assertIsNone(saved['protection']['count'])
+                    self.assertTrue(saved['unread_history_loss_confirmed'])
+                    self.recording.proofs.read_diagnostic(saved['protection']['diagnostic_id'],'12345678')
+                    proof={'count':None}
+                else:proof=self.recording.proofs.read(saved['protection']['inventory_id'],'12345678')
                 if proof['count']:
                     snapshot=saved['protection']['snapshot']
                     self.assertEqual(len(self.history.rows(snapshot['logger'],snapshot['id'])),proof['count'])
@@ -82,6 +89,31 @@ class RecordingTests(ConfigurationFixture):
         self.assertEqual(self.jobs.status()['state'],'error');self.assertEqual(self.starts,[])
         for raw in (bytes(8),bytes(9),bytes(11),bytes(2)+(1).to_bytes(4,'little')+bytes(4)):
             with self.subTest(raw=raw),self.assertRaises(ValueError):decode_inventory(raw)
+
+    def test_explicit_exception_retains_unknown_count_and_still_requires_extra_start_confirmation(self):
+        self.history.publish('12345678',**decode_capture(capture()))
+        self.empty_device();self.inventory_reply_status=3;self.inventory_error_payload=b''
+        self.recording.prepare({'allow_unread_history_loss':True});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        prepared=self.recording.status()['prepared']
+        self.assertIsNone(prepared['protection']['count'])
+        self.assertEqual(prepared['protection']['archived_reference']['count'],3)
+        with self.assertRaises(ValueError):self.start(prepared)
+        self.recording.apply({'token':prepared['token'],'confirm_history_loss':True,'confirm_start':True,'confirm_unread_history_loss':True})
+        self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        self.assertEqual(self.starts,[START]);self.assertEqual(len(self.history.snapshots()),1)
+        self.recording.verify({});self.jobs.worker.join(5)
+        self.assertEqual(self.starts,[START])
+
+    def test_exception_without_archive_or_with_other_reply_is_blocked(self):
+        self.empty_device();self.inventory_reply_status=3;self.inventory_error_payload=b''
+        self.recording.prepare({'allow_unread_history_loss':True});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'error');self.assertEqual(self.starts,[])
+        self.history.publish('12345678',**decode_capture(capture()))
+        self.inventory_error_payload=bytes(10)
+        self.recording.prepare({'allow_unread_history_loss':True});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'error');self.assertEqual(self.starts,[])
 
     def test_rejected_inventory_is_preserved_and_never_becomes_an_empty_proof(self):
         self.empty_device();self.inventory_reply_status=3

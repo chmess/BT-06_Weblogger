@@ -44,6 +44,13 @@ def inventory_capture(rows):
 class RecordingProofStore:
     def __init__(self,root):self.root=root
 
+    def read_diagnostic(self,key,device_id):
+        if not isinstance(key,str) or not re.fullmatch('[0-9a-f]{32}',key):raise ValueError('Ungültiger Diagnosebeleg.')
+        folder=self.root/'diagnostics';data=json.loads((folder/(key+'.json')).read_text());raw=(folder/(key+'.csv')).read_bytes()
+        if data.get('device_id')!=device_id or hashlib.sha256(raw).hexdigest()!=data.get('capture_sha256'):
+            raise ValueError('Diagnosebeleg beschädigt.')
+        return list(csv.DictReader(io.StringIO(raw.decode('utf-8')),delimiter=';'))
+
     def diagnostic(self,device_id,rows,error):
         if not re.fullmatch('[0-9]{8}',device_id) or not 1<=len(rows)<=4:raise ValueError('Ungültiger Diagnosebeleg.')
         for row in rows:
