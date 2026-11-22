@@ -136,6 +136,28 @@ class ConfigurationTests(ConfigurationFixture):
         self.assertEqual(self.history.snapshots()[0]['count'], 3)
         with self.assertRaises(ValueError):self.apply(prepared)
 
+    def test_unit_change_archives_old_unit_and_strictly_reads_back_new_unit(self):
+        before=self.payloads['log_settings']
+        self.workflow.prepare({'base_capture':self.saved['capture'],'changes':{'temperature_unit':'F'}})
+        self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        prepared=self.workflow.status()['prepared']
+        self.assertEqual(self.mutations(),[])
+        self.apply(prepared);self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        after=self.payloads['log_settings']
+        self.assertEqual(after[:6]+after[7:],before[:6]+before[7:])
+        self.assertEqual(after[6],1)
+        self.assertEqual(self.settings.latest('12345678')['values']['temperature_unit'],'F')
+        self.assertTrue(all(s['unit']=='C' for s in self.history.snapshots()))
+        self.assertEqual(self.mutations(),[STOP,b'\x2a\x12\x43\x02'+after+b'#',SAVE,FINISH])
+        both=configuration_frames({'log_settings':before},{'temperature_unit':'F','record_interval_seconds':1500})
+        self.assertEqual(len(both),1)
+        self.assertEqual(both[0][4:6],(1500).to_bytes(2,'little'))
+        self.assertEqual(both[0][10],1)
+        raw=bytearray(before);raw[3]=1
+        with self.assertRaises(ValueError):configuration_frames({'log_settings':bytes(raw)},{'temperature_unit':'F'})
+
     def test_missing_confirmation_expiry_replaced_capture_and_restart_never_authorize_writes(self):
         prepared = self.prepare()
         for key in ('confirm_history_loss', 'confirm_stop'):

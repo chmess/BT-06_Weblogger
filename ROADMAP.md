@@ -19,6 +19,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - Aktuell: V0.4.5 installiert; originale SDK-Abfragereihenfolge real geprüft, weiterhin Status 3 ohne Zähler. Rohbeleg gespeichert. Nutzer autorisiert ausdrücklich Werksreset; geprüfte Herstellerunterlagen und aktuelle offizielle App liefern dafür keine bestätigte Prozedur (BT06-ClearFlash leer). Kein Reset/Start gesendet. Herstelleranleitung für Werksreset erforderlich. Nutzer hat anschließend Fortfahren ohne Werksreset und einmaligen Start trotz unbekanntem Bestand freigegeben. V0.4.6 vorbereitet: eng begrenzte Ausnahme mit Zusatzbestätigung und geprüfter Alt-CSV sowie rechnerische Speicherdauer. V0.4.6 läuft: genau ein Start positiv bestätigt und aktive Aufzeichnung anschließend per GATT-Status 16 nachgewiesen; gewähltes Intervall unverändert, Originalhistorie erhalten. Uhrkorrektur weiterhin offen.
 
+- V0.4.7 vorbereitet: belegte Temperatureinheit °C/°F im geschützten Einstellungsablauf. Intervall und übrige Rohfelder bleiben erhalten; Altgeschichte wird vor Einheitenwechsel in bisheriger Einheit gesichert. Keine reale Änderung ausgeführt. Geräteuhr, Funkmoduszuordnung und übrige unbestätigte Felder bleiben offen.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

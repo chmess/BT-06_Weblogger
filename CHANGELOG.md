@@ -1,5 +1,10 @@
 # Änderungen
 
+## 0.4.7-dev · 2026-11-22
+
+- Temperatureinheit °C/°F als Entwurf, Vorschau und geschützte Geräteänderung ergänzt. Einheit und Intervall teilen den belegten 15-Byte-Aufzeichnungsblock; unveränderte Felder bleiben erhalten, unbekannte Zusatzfelder sperren das Schreiben. Gemeinsame Änderungen erzeugen nur einen Setter.
+- Bestehender Schutzablauf bleibt erhalten: vollständige Historie in bisheriger Einheit vor/nach Stopp prüfen und speichern, Bestätigung, Save/Abschluss, striktes Rücklesen. Kein automatischer Neustart. Keine reale Einheitenänderung ausgeführt; laufender Logger unverändert.
+
 ## 0.4.6-dev · 2026-11-22
 
 - Ausdrückliche Ausnahme für den bestätigten Neustart bei unbekanntem Gerätebestand: nur Initialzustand, exakt belegte negative Umfangsantwort und geprüfte vollständige Alt-CSV. Zusatzbestätigung des möglichen Verlusts noch nicht ausgelesener Werte erforderlich. Bestand bleibt unbekannt; Status 3 wird weiterhin nicht als leer interpretiert. Genau ein Start, keine automatische Wiederholung. Real ausgeführt: genau ein Start mit positiver Antwort, unverändertes Intervall anschließend zurückgelesen, Aufzeichnung durch GATT-Status 16 bestätigt. Archivierte Originalhistorie erhalten.

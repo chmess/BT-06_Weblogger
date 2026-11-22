@@ -231,6 +231,9 @@ print(json.dumps({'settings':saved,'preview':preview,'record_preview':record_pre
   assert.equal(draftFlow.reset.value,'12.5');assert.equal(draftFlow.reset.blocked,false);
   assert.equal(draftFlow.lateResponseIgnored,true);
   assert.equal(draftFlow.noDeviceBlocked,true);
+  const unitDraft=await evaluate(`(()=>{const saved=${JSON.stringify(observed)};updateDeviceDraft(saved,true);const input=document.querySelector('#device-draft-unit');const before=input.value;input.value='F';input.dispatchEvent(new Event('input',{bubbles:true}));const values=deviceDraftValues();updateDeviceDraft(saved,true);return {before,values,reset:input.value};})()`);
+  assert.equal(unitDraft.before,'C');assert.equal(unitDraft.values.temperature_unit,'F');assert.equal(unitDraft.reset,'C');
+  assert.equal(unitDraft.values.record_interval_seconds,observed.values.record_interval_seconds);
   const configurationFlow=await evaluate(`(async()=>{const originalApi=api;try{
     const saved=${JSON.stringify(observed)},plan=${JSON.stringify(settingsFixtureData.record_preview)};
     updateDeviceDraft(saved,true);

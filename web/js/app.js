@@ -236,11 +236,11 @@ async function refreshDeviceSettings() {
   const errors=Object.keys({...data.read_errors,...data.decode_errors});
   if(errors.length){const labels={device_info:'Gerätename',device_clock:'Gerätezeit',log_status:'Aufzeichnungsstatus',log_settings:'Aufzeichnungsparameter',broadcast_settings:'Funkparameter',transmit_rate:'Funkmodus',temperature_alarm:'Temperaturalarm',humidity_alarm:'Feuchtealarm'};target.append(element('dt','Nicht verfügbar'),element('dd',errors.map(key=>labels[key]||key).join(', ')));}
 }
-const deviceDraftFields={name:'#device-draft-name',broadcast_interval_seconds:'#device-draft-interval',transmit_power_dbm:'#device-draft-power',record_interval_seconds:'#device-draft-record'};
+const deviceDraftFields={name:'#device-draft-name',broadcast_interval_seconds:'#device-draft-interval',transmit_power_dbm:'#device-draft-power',record_interval_seconds:'#device-draft-record',temperature_unit:'#device-draft-unit'};
 let deviceDraftBase=null,deviceDraftLatest=null,deviceDraftPending=false,deviceDraftRevision=0,deviceDraftReviewed=null,configurationState=null;
 function deviceDraftValues() {
   const values={};
-  for(const [key,selector] of Object.entries(deviceDraftFields))if(deviceDraftBase&&key in deviceDraftBase.values)values[key]=key==='name'?$(selector).value:Number($(selector).value)*(key==='record_interval_seconds'?60:1);
+  for(const [key,selector] of Object.entries(deviceDraftFields))if(deviceDraftBase&&key in deviceDraftBase.values)values[key]=['name','temperature_unit'].includes(key)?$(selector).value:Number($(selector).value)*(key==='record_interval_seconds'?60:1);
   return values;
 }
 function deviceDraftDirty() {

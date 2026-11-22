@@ -19,7 +19,7 @@ FINISH = bytes.fromhex('2a0343ff23')
 def configuration_frames(payloads, changes):
     """No access key, clock, radio-mode code, start, reset or arbitrary opcode."""
     frames = []
-    if not changes or set(changes) - {'name', 'broadcast_interval_seconds', 'transmit_power_dbm', 'record_interval_seconds'}:
+    if not changes or set(changes) - {'name', 'broadcast_interval_seconds', 'transmit_power_dbm', 'record_interval_seconds', 'temperature_unit'}:
         raise ValueError('Keine unterstützten konkreten Geräteänderungen.')
     for key, value in changes.items():
         validate_value(key, value)
@@ -35,12 +35,15 @@ def configuration_frames(payloads, changes):
         validate_value('broadcast_interval_seconds', interval); validate_value('transmit_power_dbm', power)
         code = next(key for key, value in POWER_CODES.items() if value == power)
         frames.append(b'\x2a\x06\x43\x35' + bytes([code]) + int(Decimal(str(interval))*10).to_bytes(2, 'little') + b'\x23')
-    if 'record_interval_seconds' in changes:
+    if {'record_interval_seconds','temperature_unit'} & set(changes):
         raw = payloads.get('log_settings', b'')
         if (len(raw) != 15 or raw[6] not in (0, 1) or not int.from_bytes(raw[:2], 'little')
                 or any(value for index, value in enumerate(raw) if index not in (0, 1, 6))):
             raise ProtocolError('Unbekannte Aufzeichnungsfelder: Schreibauftrag blockiert, keine Null-Defaults.')
-        updated = changes['record_interval_seconds'].to_bytes(2, 'little') + raw[2:]
+        updated = bytearray(raw)
+        if 'record_interval_seconds' in changes:updated[:2]=changes['record_interval_seconds'].to_bytes(2,'little')
+        if 'temperature_unit' in changes:updated[6]=int(changes['temperature_unit']=='F')
+        updated=bytes(updated)
         frames.append(b'\x2a\x12\x43\x02' + updated + b'\x23')
     return frames
 

@@ -127,3 +127,7 @@ V0.4.5: Die Referenz `DataManager.SetConfig` liest `4C01` und sendet aus dessen 
 
 
 Werksresetprüfung vom 22.11.2026: BT06-Handbuch V1.4 ohne dokumentierten Factory-Reset-Weg; ältere Hersteller-SDK-Referenz und SDK der aktuellen offiziellen Android-App 3.5.0.0528 geprüft. BT06 `ClearFlash` hat in beiden keine Implementierung. Kein bekannter BLE-Werksreset daraus ableitbar; keine Tastenfolge geraten. Nutzer bestätigt Datensicherung und autorisiert Werkseinstellungen ausdrücklich. Keine Geräteänderung ausgeführt. Reale SDK-Abfragereihenfolge liefert weiterhin `26 6C 00 03 23`, ohne Nutzdaten/Zähler; Originalbeleg gesichert. Für den Werksreset fehlt die herstellerbestätigte Prozedur. APK/SDK und private Supportanfrage bleiben unveröffentlicht.
+
+### Temperatureinheit (V0.4.7)
+
+Der bereits belegte Setter `4302` verwendet 15 Nutzbytes: Intervall als UInt16-LE an Offset 0, Temperatureinheit an Offset 6 (`0=C`, `1=F`). Hersteller-SDK `SetLogSetting` bestätigt diese Feldposition. Der neue Pfad ändert ausschließlich angeforderte Felder im originalen Block; unbekannte zusätzliche Werte verhindern Schreiben. Einheit und Intervall werden gemeinsam gesetzt, anschließend vollständig zurückgelesen. Reale Einheitenänderung noch nicht geprüft.

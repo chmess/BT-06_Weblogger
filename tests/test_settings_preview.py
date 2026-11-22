@@ -36,6 +36,15 @@ class SettingsPreviewTests(unittest.TestCase):
         reverse = self.preview({'transmit_power_dbm': -20})
         self.assertEqual(reverse['broadcast_after']['broadcast_interval_seconds'], 12.5)
 
+    def test_temperature_unit_requires_verified_interval_and_preserves_it(self):
+        result=self.preview({'temperature_unit':'F'})
+        self.assertEqual(result['logging_after'],{'temperature_unit':'F','record_interval_seconds':1230})
+        self.assertEqual(result['changes'][0]['before'],'C')
+        for value in ('K','f',1,True,None):
+            with self.subTest(value=value),self.assertRaises(ValueError):self.preview({'temperature_unit':value})
+        self.saved['values'].pop('record_interval_seconds')
+        with self.assertRaises(ValueError):self.preview({'temperature_unit':'F'})
+
     def test_no_change_has_no_destructive_steps_or_write_permission(self):
         result = self.preview({'name': 'Demo BT06', 'broadcast_interval_seconds': 12.5, 'transmit_power_dbm': 0})
         self.assertEqual(result['changes'], [])

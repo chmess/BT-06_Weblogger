@@ -116,3 +116,7 @@ Für fehlende ungekoppelte BlueZ-Einträge gibt es eine frische Suche am ausgew�
 `POST /api/recording/prepare` kann alternativ exakt `{"allow_unread_history_loss":true}` erhalten. Nur im Initialzustand und bei unverändertem Nullstatus, exakt belegter Umfangsablehnung `266c000323` und bereits geprüfter vollständiger Alt-CSV wird ein unbekannter Bestand akzeptiert. `protection.count` bleibt `null`, `archived_reference` benennt den gesicherten Altbestand. Start benötigt zusätzlich `confirm_unread_history_loss:true`. Normale Vorbereitung bleibt strikt; Zeitüberschreitung, andere Fehler oder fehlendes Archiv sperren weiterhin. Einmaliger Start, keine automatische Wiederholung.
 
 `GET /api/device-settings` ergänzt `memory_estimate`: nominelle Kapazität 32.000 Werte, rechnerische Sekunden/Tage aus ausgelesenem Intervall, `remaining_seconds:null`. Keine Aussage über aktuellen Füllstand oder Batteriehaltbarkeit.
+
+## V0.4.7: Temperatureinheit
+
+Die Änderungsvorschau und Konfigurationsvorbereitung akzeptieren zusätzlich `temperature_unit` mit exakt `"C"` oder `"F"`. Vorschau ergänzt `logging_after` mit Einheit und Intervall; bei Änderungen müssen beide Ausgangswerte verifiziert sein. Gemeinsamer Setter für Einheit/Intervall, alle anderen Rohfelder bleiben erhalten. Unbekannte Zusatzfelder blockieren weiterhin. Bestehende Historienprüfung, Bestätigungen, Stopp, Save/Abschluss und striktes Rücklesen gelten unverändert. Kein automatischer Aufzeichnungsstart. Archivierte Daten behalten ihre ursprüngliche Einheit und normalisierte Celsiuswerte.
