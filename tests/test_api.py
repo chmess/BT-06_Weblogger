@@ -226,6 +226,18 @@ class ApiTests(unittest.TestCase):
         for mode in ('configuration_prepare', 'configuration_write', 'configuration_verify'):
             self.assertEqual(self.request('/klima/api/sync', {'mode':mode}, self.auth())[0], 400)
 
+    def test_recording_routes_are_protected_and_cannot_be_started_through_sync(self):
+        status,_,body=self.request('/klima/api/recording')
+        self.assertEqual(status,200);self.assertIsNone(json.loads(body)['prepared'])
+        for action in ('prepare','start','verify','cancel'):
+            path='/klima/api/recording/'+action
+            self.assertEqual(self.request(path,{})[0],403)
+            with patch.object(self.app.sync,'busy',return_value=True):
+                self.assertEqual(self.request(path,{},self.auth())[0],409)
+            self.assertEqual(self.request(path,{},self.auth())[0],200 if action=='cancel' else 400)
+        for mode in ('recording_prepare','recording_start','recording_verify'):
+            self.assertEqual(self.request('/klima/api/sync',{'mode':mode},self.auth())[0],400)
+
     def test_device_history_chart_export_and_snapshot_access(self):
         from backend.common.history_capture import decode_capture
         from history_fixture import capture

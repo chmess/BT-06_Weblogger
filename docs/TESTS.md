@@ -1,4 +1,4 @@
-# Prüfung · V0.4.3-dev · 21.11.2026
+# Prüfung · V0.4.4-dev · 21.11.2026
 
 ## Automatisiert
 
@@ -133,3 +133,8 @@ Reale integrierte Vorbereitung und bestätigter Schreibversuch in V0.4.1: vollst
 Realer V0.4.2-Folgetest: vollständige Historie nochmals gesichert, kein erneuter Stop beim bereits gestoppten Gerät; Setter, Save und Abschluss positiv beantwortet. Zwischenbeleg zeigt den alten Wert bis Save. Neue lesende Verbindung nach Abschluss bestätigt den gewünschten Parameter und unveränderte übrige Konfiguration. Statuspayload exakt acht Nullbytes, daher alte Dekodierung noch fehlerhaft; frisches Advertising meldet Initialzustand. Kein automatischer Start, kein Reset. Die gesamten Originalmessdaten bleiben auf dem DeskPi erhalten. Private Belege: `private/v042-write-journal.json`, `private/v042-postsave-comparison.json`, `private/v042-postsave-live.json`.
 
 110 Python-Tests einschließlich Nullstatus ohne erfundenen Aufnahmezustand/Historienspeicher, Ablehnung anderer Varianten, Legacy-Zusammenfassung ohne Dateiänderung, beschädigter Zusammenfassung, konsequenter Trennung von Parametern und Status, rein lesender Nachprüfung vollständiger ACK-/Historienbelege, fehlender ACKs ohne Verbindungsaufbau, beschädigtem Original und weiterhin falschem Zielwert. Nachprüfung eines belegten post-Commit-Originals sendet keine zusätzliche Bluetooth-Anfrage. Browserprüfung zeigt Parametererfolg ohne falsche Stoppaussage und behält ausdrücklich lesende Nachprüfung bei. V0.4.3 anschließend im installierten Dienst geprüft: Auftrag `parameters_verified`, Zielwert stimmt, keine neue Bluetooth-Anfrage, ursprüngliche Schreib-CSV unverändert, keine Lese-/Wiederaufnahmefehler und wieder frischer Advertising-Empfang. Geladene UI-Dateien entsprechen dem aktivierten Quellstand, SVG-/ICO-MIME korrekt. Private Berichte: `private/v043-installed-reconciliation.json`, `private/v043-final-hardware-report.json`.
+
+
+## V0.4.4: Aufzeichnungsstart
+
+119 Tests und Browserprüfung bestanden. Neue Fälle: nichtleere Historie vollständig vor Start gesichert; Leerstand nur durch eigene zehnbyteige Nullmetadaten, keine leere Messwertserie; laufender Logger, falsche Bestätigungen, Ablauf/Neustart/Abbruch, geänderte Einstellungen/Umfang, beschädigte Belege und Speicherfehler ohne Start. Genau ein Start ohne Stop/Save/Reset; verlorener ACK ohne Wiederholung, anschließend lesende Statusbestätigung. ACK mit Status ohne Details bleibt pending; erst frischer Advertising-Übergang oder Aufnahmestatus 16 bestätigt. API-CSRF/Sperre, kein Umgehen über Sync; Oberfläche verlangt beide Bestätigungen. Hardwarestart noch nicht geprüft.

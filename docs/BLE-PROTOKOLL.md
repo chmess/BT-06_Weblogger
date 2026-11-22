@@ -1,4 +1,4 @@
-# BLE-Protokollstand · V0.4.3-dev
+# BLE-Protokollstand · V0.4.4-dev
 
 ## Belege
 
@@ -116,3 +116,8 @@ V0.4.2 lässt vor Save nur den vollständigen alten oder den angeforderten Zielb
 Im realen, weiterhin bestätigten Versuch mit V0.4.2: vor Save zeigte der Getter exakt den Ausgangsblock (`previous_visible`); Setter `4302`, Save `52A3` und Abschluss `43FF` jeweils mit passendem Echo, Status 1 und leerem Payload bestätigt. Das nachfolgende `4C01` lieferte exakt acht Nullbytes; damit scheiterte noch die alte Statusdekodierung, obwohl der Zielparameter gespeichert war. Eine neue, ausschließlich lesende Verbindung bestätigte anschließend den Zielblock und sämtliche unveränderten Name-/Einheits-/Funk-/Alarmparameter. Die getrennte Geräteuhr bleibt ungeprüft. Keine pauschale Abnahme anderer Setter.
 
 Exakt acht Nullbytes sind nun ein belegtes Format ohne Aufzeichnungsdetails, kein Nachweis für einen bestimmten Aufnahmezustand oder einen leeren Messspeicher. Frisches Advertising meldete in diesem konkreten Versuch Initialzustand. Das Programm startet nicht automatisch. Die ACKs und das strikte Rücklesen belegen die Parameteränderung; der Aufnahmezustand wird separat ausgedrückt. Nachprüfung verwendet entweder den belegten Original-Lesestand nach Abschluss oder eine neue Getterverbindung, niemals erneut einen Setter/Save.
+
+
+## V0.4.4: kontrollierter Start
+
+Statisch erneut geprüft: Hersteller-DataManager `SetStart` sendet `52A0` ohne Payload, also `2A 03 52 A0 23`, ohne Save/Abschlussverkettung. Der eigene Startpfad ist separat von Konfigurations-Settern. GATT-Inventar, Einstellungen und vollständige Historie oder exakte leere Zehnbyte-Metadaten müssen vorher geprüft gespeichert sein. Nullstatus allein erlaubt keinen Start. ACK alleine beweist keine laufende Aufnahme; Rückprüfung benötigt Status 16 oder frischen Advertising-Übergang nach Start. Unklare Befehle werden nicht wiederholt. Reale Startprüfung steht noch aus.

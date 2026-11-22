@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.4.4-dev · 2026-11-22
+
+- Aufzeichnungsstart mit eigener lesender Vorbereitung, zwei Bestätigungen und einmaligem, gerätegebundenem Zehn-Minuten-Token. Vorhandene Historie vollständig sichern; leeren Speicher ausschließlich durch vollständige zehnbyteige Nullmetadaten belegen, keine erfundenen Messwert-CSV. Statusnullen allein genügen nicht.
+- Vor Start Einstellungen, Identität, Zustand und Umfang erneut prüfen und Belege dauerhaft speichern. Genau ein belegter Startbefehl, keine Parameter-/Uhränderung, kein Save/Reset. Aktive Aufnahme nur durch Status 16 oder frischen Advertising-Übergang nach Start bestätigen; ACK allein bleibt unbestätigt. Bei unklarer Antwort ausschließlich lesend nachprüfen, keine Wiederholung.
+- 119 Tests und Browserprüfung bestanden. Reale Startprüfung und Aktivierung stehen aus.
+
 ## 0.4.3-dev · 2026-11-21
 
 - Reale Parameteränderung nach erneuter vollständiger Historienprüfung: Setter, Save und Abschluss jeweils mit Status 1 bestätigt; anschließende neue Leseverbindung zeigt gewünschten Aufzeichnungswert bei unveränderten übrigen Parametern. Kein Reset oder Aufzeichnungsstart. Advertising meldet initialisiert; bisherige Original-CSV bleiben erhalten.

@@ -271,6 +271,9 @@ print(json.dumps({'settings':saved,'preview':preview,'record_preview':record_pre
   assert.ok(parameterOnly.job.includes('ohne Aufzeichnungsdetails'));
   assert.ok(!parameterOnly.job.includes('bleibt gestoppt'));
   assert.equal(parameterOnly.verifyEnabled,true);
+  const recordingUi=await evaluate(`(async()=>{const originalApi=api;try{api=async(path)=>path==='recording'?{prepared:{token:'synthetic-start',interval_seconds:1500,protection:{count:0},expires_in_seconds:600,notice:'Geräteuhr ungeprüft.'},last_start:null}:originalApi(path);await refreshRecording();const button=document.querySelector('#recording-start');const initial=button.disabled;document.querySelector('#recording-loss').checked=true;recordingControls();const one=button.disabled;document.querySelector('#recording-consent').checked=true;recordingControls();return {initial,one,both:!button.disabled,text:document.querySelector('#recording-plan').textContent};}finally{api=originalApi;await refreshRecording();}})()`);
+  assert.ok(recordingUi.initial&&recordingUi.one&&recordingUi.both);
+  assert.ok(recordingUi.text.includes('25,0 min')&&recordingUi.text.includes('leerer Speicher nachgewiesen'));
   await screenshot('device-settings-mobile.png');
   assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
   assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(external.length,0,JSON.stringify(external));

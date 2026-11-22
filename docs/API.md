@@ -1,4 +1,4 @@
-# HTTP-API · V0.4.3-dev
+# HTTP-API · V0.4.4-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB. Fehler: `{ "error": "..." }`.
 
@@ -101,3 +101,12 @@ Zusammenfassungen vor Dekoderversion 2 mit diesem bisher unbekannten Nullstatus 
 Die Zusammenfassung zeigt nur belegte Felder. Abgewiesene Antworten stehen in `read_errors`, unbekannte Formate in `decode_errors`. `unverified` kennzeichnet noch nicht belegte Parameter. `transmit_rate_code` ist ein Rohcode, `long_range=null`; keine geratene Bool-Zuordnung. Gerätezeitfelder sind ungeprüft, keine automatische Jahres-/UTC-Korrektur. Name, Intervalle und Hardware-Alarme sind keine Programmeinstellungen oder Software-Klimagrenzen.
 
 Für fehlende ungekoppelte BlueZ-Einträge gibt es eine frische Suche am ausgewählten Adapter, beschränkt auf Adresse, Gerätekennung und verifiziertes Firmwareformat. Automatische Verbindungen zu vorhandenen Einträgen warten bis 35 Sekunden; nach frischer Entdeckung acht Sekunden. Gesamtlimit bleibt begrenzt; dies ist kein Nachweis eines zuverlässig connectablen Gerätemodus.
+
+
+## V0.4.4: Aufzeichnungsstart
+
+`GET /api/recording`: wartende Vorbereitung und letzter Startauftrag. `POST /api/recording/prepare` mit `{}` liest Einstellungen und den gesamten Historienumfang. Nichtleere Historie wird vollständig geprüft gespeichert; Leerstand erfordert exakt zehn Nullbytes aus der vollständigen Historienauswahl, separat mit Rohbeleg gespeichert. Acht Statusnullbytes sind kein Leerstandsnachweis. Bereits aktive Aufnahme/Startverzögerung, unbekannte Zustände oder widersprüchliche Daten blockieren.
+
+`POST /api/recording/start` verlangt exakt `{"token":"<Vorbereitung>","confirm_history_loss":true,"confirm_start":true}`. Gerät/Adapter/Firmware, letzter Einstellungsbeleg, Zustand und Umfang müssen passen; Token maximal zehn Minuten und einmalig. Vor dem einzigen `52A0` werden aktuelle Originale nochmals dauerhaft gesichert. Keine Parameter-/Uhränderung, Stop-, Save- oder Resetfolge. Aktiver Zustand 16 ergibt `recording-started`; ACK ohne Aufnahmenachweis bleibt `recording-start-pending`. Fehler nach Sendeversuch bleiben unklar, niemals automatisch wiederholen.
+
+`POST /api/recording/verify` mit `{}` prüft ausschließlich lesend. Vollständiger Sicherungs-/Leerstandsbeleg und gesendeter Startframe müssen vorliegen. Ein frischer Advertising-Übergang von initialisiert/gestoppt zu Aufnahme nach dem Sende-/Antwortzeitpunkt kann mit unveränderten nachgelesenen Parametern bestätigen; andernfalls neue Getterverbindung. Auch ein verlorener ACK berechtigt nie zu einem erneuten Start. `POST /api/recording/cancel` mit `{}` verwirft nur wartende Vorbereitungen. Alle POSTs: Origin/CSRF und gemeinsame BLE-Sperre. Interne Modi `recording_prepare/start/verify` sind nicht über `/api/sync` zugänglich. Originale unter `data/recording/`; keine zusätzlichen Messdatenbackups.

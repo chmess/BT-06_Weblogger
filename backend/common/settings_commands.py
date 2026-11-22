@@ -11,6 +11,7 @@ from .settings_preview import validate_value
 
 
 STOP = bytes.fromhex('2a0352a123')
+START = bytes.fromhex('2a0352a023')
 SAVE = bytes.fromhex('2a0352a323')
 FINISH = bytes.fromhex('2a0343ff23')
 

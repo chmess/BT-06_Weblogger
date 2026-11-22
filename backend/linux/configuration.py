@@ -391,7 +391,7 @@ class ConfigurationWorkflow:
             await asyncio.wait_for(client.stop_notify(rx), 8)
 
     @staticmethod
-    def session(config, progress):
+    def session(config, progress, *, identity_callback=None):
         from contextlib import asynccontextmanager
         @asynccontextmanager
         async def connected():
@@ -405,6 +405,8 @@ class ConfigurationWorkflow:
             if (not identity or identity['device_id'] != config['device']['id']
                     or identity['firmware'] != config['device']['firmware']):
                 raise ProtocolError('Aktuelles Advertising bestätigt Gerätekennung und Firmware nicht; kein Schreiben.')
+            if identity_callback:
+                identity_callback(identity)
             client = BleakClient(target, pair=False, timeout=45)
             try:
                 progress('connecting')

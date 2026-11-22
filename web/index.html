@@ -124,7 +124,7 @@
         <p id="device-draft-status" class="hint" role="status" aria-live="polite">Zuerst Geräteeinstellungen auslesen.</p>
         <div id="device-draft-result"></div>
         <button id="device-config-prepare" disabled>Vorbereiten: Historie vollständig lesen</button>
-        <p class="hint">Long Range und weitere unbekannte Felder bleiben gesperrt. Kein Zurücksetzen und kein automatischer Start der Aufzeichnung. Schreiben ist bisher nur mit simuliertem Gerät geprüft.</p>
+        <p class="hint">Long Range und weitere unbekannte Felder bleiben gesperrt. Kein Zurücksetzen und kein automatischer Start der Aufzeichnung. Aufzeichnungsintervall am Gerät geprüft; weitere Schreibfelder noch nicht am Gerät abgenommen.</p>
       </details>
       <p id="device-config-status" class="hint" role="status" aria-live="polite"></p>
       <button id="device-config-verify" class="secondary" disabled>Gespeicherte Einstellungen nachprüfen (nur lesen)</button>
@@ -137,6 +137,18 @@
         <label class="inline-check"><input id="device-config-stop" type="checkbox"> Aufzeichnung stoppen und danach gestoppt lassen.</label>
         <div class="button-row"><button id="device-config-apply" disabled>Bestätigte Änderungen am BT06 speichern</button><button id="device-config-cancel" type="button" class="secondary">Vorbereitung verwerfen</button></div>
       </div>
+    </article>
+    <article class="panel"><h2>Aufzeichnung im BT06</h2><p class="hint">Startablauf bisher nur simuliert geprüft.</p>
+      <p>Start mit den gelesenen Einstellungen. Ein App-Start kann die Gerätehistorie löschen. Zuvor werden der gesamte Bestand gesichert oder ein leerer Speicher ausdrücklich nachgewiesen. Die Geräteuhr bleibt unverändert und ungeprüft.</p>
+      <button id="recording-prepare" disabled>Aufzeichnungsstart vorbereiten (nur lesen)</button>
+      <p id="recording-status" role="status" aria-live="polite"></p>
+      <div id="recording-confirmation" hidden>
+        <p id="recording-plan"></p>
+        <label class="inline-check"><input id="recording-loss" type="checkbox"> Mögliche Löschung der zuvor gesicherten Gerätehistorie erlauben.</label>
+        <label class="inline-check"><input id="recording-consent" type="checkbox"> Aufzeichnung mit unveränderten Einstellungen und ungeprüfter Geräteuhr starten.</label>
+        <div class="button-row"><button id="recording-start" disabled>Bestätigten Aufzeichnungsstart ausführen</button><button id="recording-cancel" class="secondary">Vorbereitung verwerfen</button></div>
+      </div>
+      <button id="recording-verify" class="secondary" disabled>Aufnahmestart prüfen (nur lesen)</button>
     </article>
     <article class="panel"><h2>Bluetooth-Gerät auswählen</h2><p>Suche nach BLE-Geräten in Reichweite. Ein Gerätename allein bestätigt noch keinen BT06. „Verbinden &amp; prüfen“ liest nur das GATT-Inventar und beendet danach die Diagnoseverbindung.</p>
       <div class="toolbar"><label>Bluetooth-Adapter<input id="ble-adapter" value="hci0" pattern="hci[0-9]{1,3}" required></label><label>CSV-Speicherabstand in Sekunden<input id="capture-interval" type="number" min="10" max="3600" step="1" value="60"></label><button id="ble-scan">Geräte suchen (30 s)</button></div>

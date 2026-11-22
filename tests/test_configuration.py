@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 from backend.common.bt06_gatt import SERVICE_UUID, TX_UUID, RX_UUID, ReadCommand, read_request
 from backend.common.device_settings import DeviceSettingsStore, SETTINGS_QUERIES
 from backend.common.history_store import HistoryStore
-from backend.common.settings_commands import STOP, SAVE, FINISH, configuration_frames, configuration_reply
+from backend.common.settings_commands import STOP, START, SAVE, FINISH, configuration_frames, configuration_reply
 from backend.linux.configuration import ConfigurationWorkflow
 from backend.linux.history_jobs import HistoryJobs
 from history_fixture import capture
@@ -19,7 +19,7 @@ from settings_fixture import observation
 from test_history_jobs import FakeReceiver
 
 
-class ConfigurationTests(unittest.TestCase):
+class ConfigurationFixture(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -39,6 +39,7 @@ class ConfigurationTests(unittest.TestCase):
         self.fail_history = False
         self.deferred_setter = False; self.pending_log = None; self.third_value = False; self.ignore_save = False
         self.final_status = None
+        self.metadata_override=None;self.start_status=None;self.lost_start_ack=False
         test = self
         rows = capture()
         metadata = bytes.fromhex(rows[3]['DatenHex'])[4:-1]
@@ -64,6 +65,11 @@ class ConfigurationTests(unittest.TestCase):
                 if wire[2:4] == test.fail_opcode:raise TimeoutError()
                 if wire == STOP:
                     raw = bytearray(test.payloads['log_status']); raw[3] = 5; test.payloads['log_status'] = bytes(raw)
+                elif wire == START:
+                    if test.start_status is not None:test.payloads['log_status']=test.start_status
+                    else:
+                        raw=bytearray(30);raw[:4]=bytes.fromhex('16000210');test.payloads['log_status']=bytes(raw)
+                    if test.lost_start_ack:raise TimeoutError()
                 elif wire[2:4] == b'\x43\x02':
                     if test.deferred_setter:
                         test.pending_log = wire[4:-1]
@@ -79,7 +85,7 @@ class ConfigurationTests(unittest.TestCase):
                 if wire in commands:
                     self.notify(None, b'\x26' + wire[2:4] + b'\x01' + test.payloads[commands[wire]] + b'#')
                 elif wire == read_request(ReadCommand.SELECT_ALL_HISTORY):
-                    self.notify(None, b'\x26' + wire[2:4] + b'\x01' + metadata + b'#')
+                    self.notify(None, b'\x26' + wire[2:4] + b'\x01' + (test.metadata_override if test.metadata_override is not None else metadata) + b'#')
                 else:
                     self.notify(None, b'\x26' + wire[2:4] + b'\x01#')
                     if wire == read_request(ReadCommand.RECEIVE_HISTORY):
@@ -87,6 +93,7 @@ class ConfigurationTests(unittest.TestCase):
                         for chunk in chunks:self.notify(None, chunk)
         advertising = bytearray(24); advertising[:3] = bytes.fromhex('090205'); advertising[4:8] = bytes.fromhex('12345678')
         target = SimpleNamespace(details={'props': {'ManufacturerData': {0xff23: bytes(advertising)}}})
+        self.target=target
         patches = [patch('backend.linux.configuration.known_device', AsyncMock(return_value=target)),
                    patch.dict('sys.modules', {'bleak': SimpleNamespace(BleakClient=Client)})]
         for item in patches:item.start(); self.addCleanup(item.stop)
@@ -103,6 +110,8 @@ class ConfigurationTests(unittest.TestCase):
     def mutations(self):
         return [wire for wire in self.sent if wire[2:4] in (b'\x52\xa1', b'\x43\x02', b'\x52\xa3', b'\x43\xff')]
 
+
+class ConfigurationTests(ConfigurationFixture):
     def test_prepare_is_read_only_apply_saves_before_stop_and_after_stop_and_verifies(self):
         prepared = self.prepare()
         self.assertEqual(self.mutations(), [])
