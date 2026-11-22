@@ -121,3 +121,6 @@ Exakt acht Nullbytes sind nun ein belegtes Format ohne Aufzeichnungsdetails, kei
 ## V0.4.4: kontrollierter Start
 
 Statisch erneut geprüft: Hersteller-DataManager `SetStart` sendet `52A0` ohne Payload, also `2A 03 52 A0 23`, ohne Save/Abschlussverkettung. Der eigene Startpfad ist separat von Konfigurations-Settern. GATT-Inventar, Einstellungen und vollständige Historie oder exakte leere Zehnbyte-Metadaten müssen vorher geprüft gespeichert sein. Nullstatus allein erlaubt keinen Start. ACK alleine beweist keine laufende Aufnahme; Rückprüfung benötigt Status 16 oder frischen Advertising-Übergang nach Start. Unklare Befehle werden nicht wiederholt. Reale Startprüfung steht noch aus.
+
+
+V0.4.5: Die Referenz `DataManager.SetConfig` liest `4C01` und sendet aus dessen Callback unmittelbar `6C00`. Die eigene Umfangsabfrage folgt nun dieser Reihenfolge; beide Request-/Response-Paare werden belegt. Die Statusantwort muss zum zuvor gelesenen Zustand passen. Das SDK unterscheidet für Antwortcodes außer 1 nur generisch Fehler; eine Bedeutung „leer“ für Status 3 ist nicht belegt. Abweisungen bleiben gesperrt und werden einschließlich Rohantwort unter `data/recording/diagnostics/` gespeichert. Neue Reihenfolge noch ohne Hardwareabnahme.

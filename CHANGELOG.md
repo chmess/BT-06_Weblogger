@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.4.5-dev · 2026-11-22
+
+- Historienumfang jetzt wie im Hersteller-SDK unmittelbar nach einer Statusabfrage lesen. Geänderter Status blockiert Start. Ob dies die reale Ablehnung behebt, ist noch offen; Status 3 bleibt Fehler und kein Leerstandsbeleg.
+- Abgewiesene/ungültige Umfangsantworten inklusive vorangehendem Status nun dauerhaft als separate Diagnose-CSV/JSON sichern. Kein zusätzlicher Messdatenbestand, keine Startfreigabe durch Diagnosebelege.
+- 28 gezielte Tests bestanden (Aufzeichnungs- und Konfigurationsablauf); keine erneute vollständige Browserprüfung, da Oberfläche unverändert. Hardwareprüfung der neuen Reihenfolge steht aus.
+
 ## 0.4.4-dev · 2026-11-22
 
 - Aufzeichnungsstart mit eigener lesender Vorbereitung, zwei Bestätigungen und einmaligem, gerätegebundenem Zehn-Minuten-Token. Vorhandene Historie vollständig sichern; leeren Speicher ausschließlich durch vollständige zehnbyteige Nullmetadaten belegen, keine erfundenen Messwert-CSV. Statusnullen allein genügen nicht.

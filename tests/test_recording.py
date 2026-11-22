@@ -51,6 +51,9 @@ class RecordingTests(ConfigurationFixture):
         self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
         self.assertEqual(self.jobs.status()['result']['kind'],'recording-started')
         self.assertEqual(self.starts,[START])
+        for index,frame in enumerate(self.sent):
+            if frame==read_request(ReadCommand.SELECT_ALL_HISTORY):
+                self.assertEqual(self.sent[index-1],read_request(ReadCommand.LOG_STATUS))
         allowed={read_request(command) for command in ReadCommand}
         self.assertEqual([frame for frame in self.sent if frame not in allowed],[START])
         self.assertEqual(self.settings.latest('12345678')['values']['record_interval_seconds'],600)
@@ -79,6 +82,17 @@ class RecordingTests(ConfigurationFixture):
         self.assertEqual(self.jobs.status()['state'],'error');self.assertEqual(self.starts,[])
         for raw in (bytes(8),bytes(9),bytes(11),bytes(2)+(1).to_bytes(4,'little')+bytes(4)):
             with self.subTest(raw=raw),self.assertRaises(ValueError):decode_inventory(raw)
+
+    def test_rejected_inventory_is_preserved_and_never_becomes_an_empty_proof(self):
+        self.empty_device();self.inventory_reply_status=3
+        self.recording.prepare({});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'error')
+        self.assertEqual(self.starts,[]);self.assertIsNone(self.recording.status()['prepared'])
+        diagnostic=self.recording.status()['inventory_diagnostic']
+        self.assertFalse(diagnostic['valid_inventory_proof'])
+        raw=(self.recording.root/'diagnostics'/(diagnostic['id']+'.csv')).read_text()
+        self.assertIn('266c0003',raw)
+        self.assertIn(read_request(ReadCommand.LOG_STATUS).hex(),raw)
 
     def test_running_device_or_changed_settings_never_receive_start(self):
         raw=bytearray(self.payloads['log_status']);raw[3]=16;self.payloads['log_status']=bytes(raw)

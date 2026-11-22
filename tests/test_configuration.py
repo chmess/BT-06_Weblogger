@@ -40,6 +40,7 @@ class ConfigurationFixture(unittest.TestCase):
         self.deferred_setter = False; self.pending_log = None; self.third_value = False; self.ignore_save = False
         self.final_status = None
         self.metadata_override=None;self.start_status=None;self.lost_start_ack=False
+        self.inventory_reply_status=1
         test = self
         rows = capture()
         metadata = bytes.fromhex(rows[3]['DatenHex'])[4:-1]
@@ -85,7 +86,7 @@ class ConfigurationFixture(unittest.TestCase):
                 if wire in commands:
                     self.notify(None, b'\x26' + wire[2:4] + b'\x01' + test.payloads[commands[wire]] + b'#')
                 elif wire == read_request(ReadCommand.SELECT_ALL_HISTORY):
-                    self.notify(None, b'\x26' + wire[2:4] + b'\x01' + (test.metadata_override if test.metadata_override is not None else metadata) + b'#')
+                    self.notify(None, b'\x26' + wire[2:4] + bytes([test.inventory_reply_status]) + (test.metadata_override if test.metadata_override is not None else metadata) + b'#')
                 else:
                     self.notify(None, b'\x26' + wire[2:4] + b'\x01#')
                     if wire == read_request(ReadCommand.RECEIVE_HISTORY):

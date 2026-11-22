@@ -40,7 +40,9 @@ class RecordingWorkflow:
             if prepared:prepared['expires_in_seconds']=max(0,int(pending['deadline']-time.monotonic()))
             path=self.root/'changes/latest.json'
             report=json.loads(path.read_text()) if path.exists() else None
-            return {'prepared':prepared,'last_start':report,'automatic_retry':False}
+            diagnostic=self.root/'diagnostics/latest.json'
+            return {'prepared':prepared,'last_start':report,'automatic_retry':False,
+                    'inventory_diagnostic':json.loads(diagnostic.read_text()) if diagnostic.exists() else None}
 
     def cancel(self,value):
         if value!={}:raise ValueError('Startvorbereitung verwerfen benötigt ein leeres Objekt.')
@@ -67,7 +69,10 @@ class RecordingWorkflow:
         return values
 
     async def protect(self,config,client,progress,payloads):
-        observation=await inventory(client,progress)
+        failure=lambda rows,error:self.proofs.diagnostic(config['device']['id'],rows,error)
+        observation=await inventory(client,progress,on_failure=failure)
+        if observation['status']!=payloads['log_status']:
+            raise ProtocolError('Aufzeichnungsstatus während der Prüfung geändert; kein Start.')
         proof=self.proofs.save(config['device']['id'],observation)
         snapshot=None
         if proof['count']:
@@ -76,7 +81,7 @@ class RecordingWorkflow:
             if (len(rows)!=proof['count'] or int(rows[0]['GeraeteSekunden'])!=proof['first_device_seconds']
                     or int(rows[-1]['GeraeteSekunden'])!=proof['last_device_seconds']):
                 raise ProtocolError('Vollauslesung widerspricht Umfangsbeleg; kein Start.')
-            end=await inventory(client,progress)
+            end=await inventory(client,progress,on_failure=failure)
             if end['metadata']!=observation['metadata']:
                 raise ProtocolError('Historie während der Prüfung geändert; kein Start.')
         return {'inventory_id':proof['id'],'count':proof['count'],'metadata_hex':proof['metadata_hex'],

@@ -23,6 +23,14 @@ def decode_inventory(raw):
 
 
 def inventory_capture(rows):
+    if len(rows)==4:
+        tx,rx=rows[:2]
+        if (set(tx)!=set(CAPTURE_FIELDS) or set(rx)!=set(CAPTURE_FIELDS) or tx['Richtung']!='TX' or rx['Richtung']!='RX'
+                or bytes.fromhex(tx['DatenHex'])!=read_request(ReadCommand.LOG_STATUS)):
+            raise ValueError('Ungültige vorangehende Statusabfrage.')
+        parse_time(tx['Hostzeit']);parse_time(rx['Hostzeit'])
+        read_reply(ReadCommand.LOG_STATUS,bytes.fromhex(rx['DatenHex']))
+        rows=rows[2:]
     if len(rows)!=2 or any(set(row)!=set(CAPTURE_FIELDS) for row in rows):
         raise ValueError('Historienumfang benötigt genau eine Anfrage und Antwort.')
     for row in rows:parse_time(row['Hostzeit'])
@@ -35,6 +43,21 @@ def inventory_capture(rows):
 
 class RecordingProofStore:
     def __init__(self,root):self.root=root
+
+    def diagnostic(self,device_id,rows,error):
+        if not re.fullmatch('[0-9]{8}',device_id) or not 1<=len(rows)<=4:raise ValueError('Ungültiger Diagnosebeleg.')
+        for row in rows:
+            if set(row)!=set(CAPTURE_FIELDS):raise ValueError('Ungültige Diagnosezeile.')
+            parse_time(row['Hostzeit'])
+            if len(bytes.fromhex(row['DatenHex']))>64:raise ValueError('Diagnosebeleg zu groß.')
+        folder=self.root/'diagnostics';folder.mkdir(parents=True,exist_ok=True,mode=0o700)
+        key=uuid.uuid4().hex;content=csv_text(rows,CAPTURE_FIELDS).encode('utf-8')
+        data={'id':key,'device_id':device_id,'error':error,'observed_at':rows[-1]['Hostzeit'],
+              'capture_sha256':hashlib.sha256(content).hexdigest(),'valid_inventory_proof':False}
+        durable_file(folder/(key+'.csv'),content)
+        atomic_json(folder/(key+'.json'),data);atomic_json(folder/'latest.json',data)
+        for path in (folder,self.root,self.root.parent):sync_directory(path)
+        return data
 
     def save(self,device_id,observation):
         if not isinstance(device_id,str) or not re.fullmatch('[0-9]{8}',device_id):
