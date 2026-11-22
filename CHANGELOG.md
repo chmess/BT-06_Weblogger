@@ -2,7 +2,7 @@
 
 ## 0.4.6-dev · 2026-11-22
 
-- Ausdrückliche Ausnahme für den bestätigten Neustart bei unbekanntem Gerätebestand: nur Initialzustand, exakt belegte negative Umfangsantwort und geprüfte vollständige Alt-CSV. Zusatzbestätigung des möglichen Verlusts noch nicht ausgelesener Werte erforderlich. Bestand bleibt unbekannt; Status 3 wird weiterhin nicht als leer interpretiert. Genau ein Start, keine automatische Wiederholung. Reale Ausführung steht aus.
+- Ausdrückliche Ausnahme für den bestätigten Neustart bei unbekanntem Gerätebestand: nur Initialzustand, exakt belegte negative Umfangsantwort und geprüfte vollständige Alt-CSV. Zusatzbestätigung des möglichen Verlusts noch nicht ausgelesener Werte erforderlich. Bestand bleibt unbekannt; Status 3 wird weiterhin nicht als leer interpretiert. Genau ein Start, keine automatische Wiederholung. Real ausgeführt: genau ein Start mit positiver Antwort, unverändertes Intervall anschließend zurückgelesen, Aufzeichnung durch GATT-Status 16 bestätigt. Archivierte Originalhistorie erhalten.
 - Rechnerische Speicherdauer aus Herstellerkapazität 32.000 Werte und ausgelesenem Intervall anzeigen: bei 25 Minuten etwa 556 Tage. Tatsächlich freie Restdauer bleibt unbekannt.
 - Geräteuhr bleibt vorerst unverändert: Jahreskodierung des Schreibbefehls noch nicht für diese Firmware belegt.
 

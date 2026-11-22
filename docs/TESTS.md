@@ -144,4 +144,4 @@ V0.4.5: 9 Aufzeichnungs- und 19 Konfigurationstests bestanden. Zusätzliche Prü
 
 ## V0.4.6
 
-11 Aufzeichnungs- und 9 Einstellungstests bestanden; zusätzlich 15 API-Tests und Chromium-Browserprüfung. Prüft: unbekannter Bestand bleibt unbekannt, explizite Zusatzbestätigung, vorhandene vollständige Alt-CSV erforderlich, andere negative Antwort bleibt gesperrt, genau ein Start, rein lesende Nachprüfung, Speicherzeit bei 25 Minuten und Darstellung der Zusatzbestätigung. Hardwarestart ausstehend.
+11 Aufzeichnungs- und 9 Einstellungstests bestanden; zusätzlich 15 API-Tests und Chromium-Browserprüfung. Prüft: unbekannter Bestand bleibt unbekannt, explizite Zusatzbestätigung, vorhandene vollständige Alt-CSV erforderlich, andere negative Antwort bleibt gesperrt, genau ein Start, rein lesende Nachprüfung, Speicherzeit bei 25 Minuten und Darstellung der Zusatzbestätigung. Hardwarestart bestätigt: genau ein START-TX mit positiver Antwort, finales Rücklesen bestätigt Aufzeichnungsstatus 16 und unverändertes Intervall. Die vollständige Alt-CSV wurde vor Start erneut geprüft. Keine Uhr-/Resetbefehle.
