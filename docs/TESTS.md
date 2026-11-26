@@ -149,3 +149,7 @@ V0.4.5: 9 Aufzeichnungs- und 19 Konfigurationstests bestanden. Zusätzliche Prü
 ## V0.4.7
 
 6 Vorschau-, 20 Konfigurations- und 15 API-Tests sowie Chromium-Browserprüfung bestanden. Neue Prüfungen: nur C/F zulässig, fehlender Intervall-Gegenwert blockiert, gemeinsamer Setter ohne Fremdfeldänderung, unbekannte Rohfelder blockiert, vollständiger Schutzablauf archiviert die bisherige Einheit und liest die neue strikt zurück. UI übermittelt die Einheit als Text und erhält das Intervall; Übernehmen setzt den Entwurf korrekt zurück. Keine reale Einheitenänderung ausgeführt.
+
+## V0.4.8
+
+7 Vorschau-, 22 Konfigurations- und 15 API-Tests sowie Chromium-Browserprüfung bestanden. Neue Prüfungen: Temperatur-/Feuchtegrenzen und strikte Bool-Aktivierung, Wertebereich und 0,1-Präzision, vollständiger Gegenblock und Unter-/Obergrenzenrelation; unveränderter °C-Modus für Temperaturalarm. Integrierter Schreibtest prüft beide festen Alarmsetter, Vorab-Historie, unveränderte Typ-/Verzögerungsbytes, unveränderten Aufzeichnungsblock, Save/Abschluss und finales Rücklesen. Fehler am Alarmsetter verhindert Save und Wiederholung; unbekannte Typcodes blockieren. Browser prüft Alarm-Entwurf, Checkbox-Bool, Rücksetzen und Fahrenheit-Sperre. Keine reale Alarmänderung ausgeführt.

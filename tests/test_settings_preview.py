@@ -45,6 +45,22 @@ class SettingsPreviewTests(unittest.TestCase):
         self.saved['values'].pop('record_interval_seconds')
         with self.assertRaises(ValueError):self.preview({'temperature_unit':'F'})
 
+    def test_alarm_limits_activation_and_bounds_are_explicit(self):
+        result=self.preview({'humidity_alarm_low_enabled':True,'humidity_alarm_high_limit':70.5})
+        self.assertEqual(len(result['changes']),2)
+        self.assertTrue(result['potential_history_loss'])
+        for changes in ({'humidity_alarm_high_limit':101},{'humidity_alarm_high_limit':65.01},
+                        {'humidity_alarm_high_limit':True},{'humidity_alarm_high_enabled':1},
+                        {'humidity_alarm_low_limit':80},{'temperature_alarm_low_limit':-21},
+                        {'temperature_alarm_high_limit':61},
+                        {'temperature_alarm_high_limit':20,'temperature_unit':'F'}):
+            with self.subTest(changes=changes),self.assertRaises(ValueError):self.preview(changes)
+        self.saved['values']['temperature_unit']='F'
+        with self.assertRaises(ValueError):self.preview({'temperature_alarm_high_limit':20})
+        self.assertTrue(self.preview({'humidity_alarm_high_limit':70})['changes'])
+        self.saved['values']['humidity_alarm'].pop('low')
+        with self.assertRaises(ValueError):self.preview({'humidity_alarm_high_limit':70})
+
     def test_no_change_has_no_destructive_steps_or_write_permission(self):
         result = self.preview({'name': 'Demo BT06', 'broadcast_interval_seconds': 12.5, 'transmit_power_dbm': 0})
         self.assertEqual(result['changes'], [])

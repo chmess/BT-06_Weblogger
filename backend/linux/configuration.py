@@ -347,7 +347,7 @@ class ConfigurationWorkflow:
         expected = dict(before)
         changed = set()
         for frame in configuration_frames(before, desired):
-            key = {b'\x43\x33': 'device_info', b'\x43\x35': 'broadcast_settings', b'\x43\x02': 'log_settings'}[frame[2:4]]
+            key = {b'\x43\x33': 'device_info', b'\x43\x35': 'broadcast_settings', b'\x43\x02': 'log_settings', b'\x43\x20':'temperature_alarm', b'\x43\x23':'humidity_alarm'}[frame[2:4]]
             expected[key] = frame[4:-1]
             changed.add(key)
         if before_commit:

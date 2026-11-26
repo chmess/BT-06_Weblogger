@@ -131,3 +131,7 @@ Werksresetprüfung vom 22.11.2026: BT06-Handbuch V1.4 ohne dokumentierten Factor
 ### Temperatureinheit (V0.4.7)
 
 Der bereits belegte Setter `4302` verwendet 15 Nutzbytes: Intervall als UInt16-LE an Offset 0, Temperatureinheit an Offset 6 (`0=C`, `1=F`). Hersteller-SDK `SetLogSetting` bestätigt diese Feldposition. Der neue Pfad ändert ausschließlich angeforderte Felder im originalen Block; unbekannte zusätzliche Werte verhindern Schreiben. Einheit und Intervall werden gemeinsam gesetzt, anschließend vollständig zurückgelesen. Reale Einheitenänderung noch nicht geprüft.
+
+### Alarmgrenzen (V0.4.8)
+
+Hersteller-SDK bestätigt getrennte Setter `4320` (Temperatur) und `4323` (Feuchte), jeweils 12 Nutzbytes. Zwei Sechsbyteblöcke für Unter-/Obergrenze: Aktivierung 0/26, Typcode 0/26, zwei Byte Verzögerung, zwei Byte Grenzwert als Int16-LE in Zehnteln. Der lokale Encoder kopiert den originalen Block und verändert ausschließlich ausdrücklich angeforderte Aktivierung/Grenze; Typcode und Verzögerung bleiben erhalten, unbekannte Formate sperren. Beide Setter mit jeweils eigener positiver Antwort, bestehender Save-/Abschlussablauf und strikter Vergleich sämtlicher Ziel-/Fremdfelder. Keine reale Alarmänderung geprüft.

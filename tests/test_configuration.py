@@ -58,7 +58,7 @@ class ConfigurationFixture(unittest.TestCase):
             async def stop_notify(self, rx):pass
             async def write_gatt_char(self, tx, wire, **options):
                 test.sent.append(wire)
-                if wire in (STOP, SAVE, FINISH) or wire[2:4] == b'\x43\x02':
+                if wire in (STOP, SAVE, FINISH) or wire[2:4] in (b'\x43\x02',b'\x43\x20',b'\x43\x23'):
                     durable = json.loads((test.workflow.root / 'latest.json').read_text())
                     test.assertTrue(durable['may_have_changed'])
                     test.assertGreaterEqual(len(durable['histories']), 1 if wire == STOP or STOP not in test.sent else 2)
@@ -77,6 +77,9 @@ class ConfigurationFixture(unittest.TestCase):
                         test.pending_log = wire[4:-1]
                     else:
                         test.payloads['log_settings'] = ((900).to_bytes(2,'little') + wire[6:-1]) if test.third_value else wire[4:-1]
+                elif wire[2:4] in (b'\x43\x20',b'\x43\x23'):
+                    key='temperature_alarm' if wire[3]==32 else 'humidity_alarm'
+                    test.payloads[key]=wire[4:-1]
                 elif wire == SAVE and test.pending_log is not None and not test.ignore_save:
                     test.payloads['log_settings'] = test.pending_log
                 elif wire == SAVE and test.corrupt_readback:
@@ -111,7 +114,7 @@ class ConfigurationFixture(unittest.TestCase):
         return self.workflow.apply({'token': prepared['token'], 'confirm_history_loss': True, 'confirm_stop': True})
 
     def mutations(self):
-        return [wire for wire in self.sent if wire[2:4] in (b'\x52\xa1', b'\x43\x02', b'\x52\xa3', b'\x43\xff')]
+        return [wire for wire in self.sent if wire[2:4] in (b'\x52\xa1', b'\x43\x02', b'\x43\x20', b'\x43\x23', b'\x52\xa3', b'\x43\xff')]
 
 
 class ConfigurationTests(ConfigurationFixture):
@@ -157,6 +160,35 @@ class ConfigurationTests(ConfigurationFixture):
         self.assertEqual(both[0][10],1)
         raw=bytearray(before);raw[3]=1
         with self.assertRaises(ValueError):configuration_frames({'log_settings':bytes(raw)},{'temperature_unit':'F'})
+
+    def test_alarm_blocks_preserve_type_delay_and_other_parameters(self):
+        before=copy.deepcopy(self.payloads)
+        changes={'temperature_alarm_low_limit':-3.2,'humidity_alarm_high_limit':72.5,'humidity_alarm_low_enabled':True}
+        self.workflow.prepare({'base_capture':self.saved['capture'],'changes':changes});self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        prepared=self.workflow.status()['prepared'];self.assertEqual(self.mutations(),[])
+        self.apply(prepared);self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'done',self.jobs.status())
+        self.assertEqual(self.workflow.status()['last_change']['status'],'verified')
+        self.assertEqual([wire[2:4] for wire in self.mutations()],[STOP[2:4],b'\x43\x20',b'\x43\x23',SAVE[2:4],FINISH[2:4]])
+        temp=self.payloads['temperature_alarm'];rh=self.payloads['humidity_alarm']
+        self.assertEqual(temp[:4]+temp[6:],before['temperature_alarm'][:4]+before['temperature_alarm'][6:])
+        self.assertEqual(int.from_bytes(temp[4:6],'little',signed=True),-32)
+        self.assertEqual(rh[0],26);self.assertEqual(rh[1:10],before['humidity_alarm'][1:10])
+        self.assertEqual(int.from_bytes(rh[10:12],'little',signed=True),725)
+        self.assertEqual(self.payloads['log_settings'],before['log_settings'])
+        for wire in self.mutations()[1:3]:self.assertEqual(wire[1],15)
+
+    def test_alarm_failure_never_saves_or_repeats_and_unknown_block_is_rejected(self):
+        self.workflow.prepare({'base_capture':self.saved['capture'],'changes':{'humidity_alarm_high_limit':70}});self.jobs.worker.join(5)
+        prepared=self.workflow.status()['prepared'];self.fail_opcode=b'\x43\x23'
+        self.apply(prepared);self.jobs.worker.join(5)
+        self.assertEqual(self.jobs.status()['state'],'error')
+        self.assertNotIn(SAVE,self.sent)
+        self.assertEqual(sum(wire[2:4]==b'\x43\x23' for wire in self.sent),1)
+        broken=copy.deepcopy(self.payloads);raw=bytearray(broken['humidity_alarm']);raw[1]=1;broken['humidity_alarm']=bytes(raw)
+        with self.assertRaises(ValueError):configuration_frames(broken,{'humidity_alarm_high_limit':70})
+        with self.assertRaises(ValueError):configuration_frames(self.payloads,{'temperature_unit':'F','temperature_alarm_high_limit':30})
 
     def test_missing_confirmation_expiry_replaced_capture_and_restart_never_authorize_writes(self):
         prepared = self.prepare()

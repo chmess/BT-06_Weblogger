@@ -1,5 +1,10 @@
 # Änderungen
 
+## 0.4.8-dev · 2026-11-27
+
+- Unter-/Obergrenzen und Aktivierung für Temperatur- und Feuchtealarme als Entwurf, Vorschau und geschützte Geräteänderung ergänzt. Originale Alarmtypen und Verzögerungen bleiben bytegenau erhalten; unbekannte Formate blockieren. Grenzen in exakten 0,1-Schritten, untere Grenze kleiner als obere.
+- Temperaturalarm vorerst ausschließlich bei unverändertem °C-Modus: keine ungeprüfte Umrechnung und kein gleichzeitiger Wechsel auf °F. Feuchtealarm unabhängig davon. Vollständige Historienprüfung, Bestätigung, Stopp, Save/Abschluss und striktes Rücklesen weiterhin erforderlich. Kein realer Alarmwert verändert.
+
 ## 0.4.7-dev · 2026-11-22
 
 - Temperatureinheit °C/°F als Entwurf, Vorschau und geschützte Geräteänderung ergänzt. Einheit und Intervall teilen den belegten 15-Byte-Aufzeichnungsblock; unveränderte Felder bleiben erhalten, unbekannte Zusatzfelder sperren das Schreiben. Gemeinsame Änderungen erzeugen nur einen Setter.

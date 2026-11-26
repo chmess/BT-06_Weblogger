@@ -6,8 +6,8 @@ Only the guarded configuration workflow may send these frames.
 from decimal import Decimal
 
 from .bt06_gatt import ProtocolError
-from .device_settings import POWER_CODES
-from .settings_preview import validate_value
+from .device_settings import POWER_CODES,decode_settings
+from .settings_preview import ALARM_FIELDS,editable_values,validate_alarm_draft,validate_value
 
 
 STOP = bytes.fromhex('2a0352a123')
@@ -19,7 +19,7 @@ FINISH = bytes.fromhex('2a0343ff23')
 def configuration_frames(payloads, changes):
     """No access key, clock, radio-mode code, start, reset or arbitrary opcode."""
     frames = []
-    if not changes or set(changes) - {'name', 'broadcast_interval_seconds', 'transmit_power_dbm', 'record_interval_seconds', 'temperature_unit'}:
+    if not changes or set(changes) - {'name', 'broadcast_interval_seconds', 'transmit_power_dbm', 'record_interval_seconds', 'temperature_unit'} - set(ALARM_FIELDS):
         raise ValueError('Keine unterstützten konkreten Geräteänderungen.')
     for key, value in changes.items():
         validate_value(key, value)
@@ -45,6 +45,25 @@ def configuration_frames(payloads, changes):
         if 'temperature_unit' in changes:updated[6]=int(changes['temperature_unit']=='F')
         updated=bytes(updated)
         frames.append(b'\x2a\x12\x43\x02' + updated + b'\x23')
+    alarm_changes={key:value for key,value in changes.items() if key in ALARM_FIELDS}
+    if alarm_changes:
+        decoded=decode_settings(payloads)
+        if any(key in decoded['decode_errors'] for key in ('temperature_alarm','humidity_alarm','log_settings')):
+            raise ProtocolError('Alarmparameter nicht verifiziert.')
+        validate_alarm_draft(editable_values(decoded['values']),{**alarm_changes,**({'temperature_unit':changes['temperature_unit']} if 'temperature_unit' in changes else {})})
+        for alarm,opcode in (('temperature_alarm',b'\x43\x20'),('humidity_alarm',b'\x43\x23')):
+            if not any(ALARM_FIELDS[key][0]==alarm for key in alarm_changes):continue
+            raw=payloads.get(alarm,b'')
+            if len(raw)!=12 or any(raw[i] not in (0,26) for i in (0,1,6,7)):
+                raise ProtocolError('Alarmblock nicht verifiziert.')
+            updated=bytearray(raw)
+            for key,value in alarm_changes.items():
+                block,bound,part=ALARM_FIELDS[key]
+                if block!=alarm:continue
+                offset=0 if bound=='low' else 6
+                if part=='enabled':updated[offset]=26 if value else 0
+                else:updated[offset+4:offset+6]=int(Decimal(str(value))*10).to_bytes(2,'little',signed=True)
+            frames.append(b'\x2a\x0f'+opcode+bytes(updated)+b'#')
     return frames
 
 

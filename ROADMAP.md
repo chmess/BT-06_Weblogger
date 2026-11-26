@@ -21,6 +21,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.4.7 vorbereitet: belegte Temperatureinheit °C/°F im geschützten Einstellungsablauf. Intervall und übrige Rohfelder bleiben erhalten; Altgeschichte wird vor Einheitenwechsel in bisheriger Einheit gesichert. Keine reale Änderung ausgeführt. Geräteuhr, Funkmoduszuordnung und übrige unbestätigte Felder bleiben offen.
 
+- V0.4.7 im Dienst aktiviert. V0.4.8 vorbereitet: Temperatur-/Feuchtealarmgrenzen und Aktivierung im geschützten Einstellungsablauf; Originaltypen und Verzögerungen erhalten. Temperaturbearbeitung nur bei unverändertem °C-Modus. Hardwareänderung nicht ausgeführt; Uhr, Funkmoduszuordnung und weitere unbestätigte Felder weiterhin offen.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

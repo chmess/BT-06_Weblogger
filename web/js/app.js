@@ -237,10 +237,16 @@ async function refreshDeviceSettings() {
   if(errors.length){const labels={device_info:'Gerätename',device_clock:'Gerätezeit',log_status:'Aufzeichnungsstatus',log_settings:'Aufzeichnungsparameter',broadcast_settings:'Funkparameter',transmit_rate:'Funkmodus',temperature_alarm:'Temperaturalarm',humidity_alarm:'Feuchtealarm'};target.append(element('dt','Nicht verfügbar'),element('dd',errors.map(key=>labels[key]||key).join(', ')));}
 }
 const deviceDraftFields={name:'#device-draft-name',broadcast_interval_seconds:'#device-draft-interval',transmit_power_dbm:'#device-draft-power',record_interval_seconds:'#device-draft-record',temperature_unit:'#device-draft-unit'};
+for(const alarm of ['temperature','humidity'])for(const bound of ['low','high'])for(const part of ['limit','enabled'])deviceDraftFields[`${alarm}_alarm_${bound}_${part}`]=`#device-draft-${alarm}-${bound}-${part}`;
+function editableDeviceValues(values) {
+  const result={...values};
+  for(const alarm of ['temperature','humidity'])for(const bound of ['low','high'])for(const part of ['limit','enabled'])if(part in (values[alarm+'_alarm']?.[bound]||{}))result[`${alarm}_alarm_${bound}_${part}`]=values[alarm+'_alarm'][bound][part];
+  return result;
+}
 let deviceDraftBase=null,deviceDraftLatest=null,deviceDraftPending=false,deviceDraftRevision=0,deviceDraftReviewed=null,configurationState=null;
 function deviceDraftValues() {
   const values={};
-  for(const [key,selector] of Object.entries(deviceDraftFields))if(deviceDraftBase&&key in deviceDraftBase.values)values[key]=['name','temperature_unit'].includes(key)?$(selector).value:Number($(selector).value)*(key==='record_interval_seconds'?60:1);
+  for(const [key,selector] of Object.entries(deviceDraftFields))if(deviceDraftBase&&key in deviceDraftBase.values&&!(key.startsWith('temperature_alarm_')&&deviceDraftBase.values.temperature_unit!=='C'))values[key]=key.endsWith('_enabled')?$(selector).checked:['name','temperature_unit'].includes(key)?$(selector).value:Number($(selector).value)*(key==='record_interval_seconds'?60:1);
   return values;
 }
 function deviceDraftDirty() {
@@ -248,12 +254,13 @@ function deviceDraftDirty() {
 }
 function deviceDraftControls() {
   const current=deviceDraftBase&&deviceDraftLatest?.capture===deviceDraftBase.capture;
-  for(const [key,selector] of Object.entries(deviceDraftFields))$(selector).disabled=!deviceDraftLatest||!deviceDraftBase||!(key in deviceDraftBase.values);
+  for(const [key,selector] of Object.entries(deviceDraftFields))$(selector).disabled=!deviceDraftLatest||!deviceDraftBase||!(key in deviceDraftBase.values)||(key.startsWith('temperature_alarm_')&&deviceDraftBase.values.temperature_unit!=='C');
   $('#device-draft-preview').disabled=deviceDraftPending||!current||!Object.keys(deviceDraftValues()).length;
   $('#device-draft-reset').disabled=deviceDraftPending||!deviceDraftLatest;
   configurationControls();
 }
 function updateDeviceDraft(data,force=false) {
+  if(data)data={...data,values:editableDeviceValues(data.values)};
   deviceDraftLatest=data;
   if(!data){deviceDraftReviewed=null;deviceDraftRevision++;$('#device-draft-result').replaceChildren();$('#device-draft-status').textContent='Zuerst für den ausgewählten Logger Geräteeinstellungen auslesen.';deviceDraftControls();return;}
   if(force||!deviceDraftBase||data.capture!==deviceDraftBase.capture){
@@ -262,7 +269,7 @@ function updateDeviceDraft(data,force=false) {
       $('#device-draft-status').textContent='Ein anderer Einstellungsstand liegt vor. Entwurf bleibt sichtbar; vor einer neuen Prüfung „Aktuellen Stand übernehmen“ wählen.';
     }else{
       deviceDraftBase=data;
-      for(const [key,selector] of Object.entries(deviceDraftFields))$(selector).value=data.values[key]==null?'':key==='record_interval_seconds'?data.values[key]/60:data.values[key];
+      for(const [key,selector] of Object.entries(deviceDraftFields))if(key.endsWith('_enabled'))$(selector).checked=data.values[key]===true;else $(selector).value=data.values[key]==null?'':key==='record_interval_seconds'?data.values[key]/60:data.values[key];
       $('#device-draft-status').textContent=`Entwurf zum Stand ${date(data.observed_at)}. Noch keine Änderungen geprüft oder am Gerät gespeichert.`;
     }
   }
@@ -281,7 +288,7 @@ async function previewDeviceDraft(event) {
     deviceDraftReviewed=result;
     $('#device-draft-status').textContent=result.notice;
     const target=$('#device-draft-result'),values=element('dl');
-    for(const item of result.changes)values.append(element('dt',item.label),element('dd',`${item.before} → ${item.after}${item.unit?' '+item.unit:''}`));
+    for(const item of result.changes)values.append(element('dt',item.label),element('dd',`${typeof item.before==='boolean'?(item.before?'an':'aus'):item.before} → ${typeof item.after==='boolean'?(item.after?'an':'aus'):item.after}${item.unit?' '+item.unit:''}`));
     target.append(values);
     if(result.broadcast_after)target.append(element('p',`Funkparameter danach: ${number(result.broadcast_after.broadcast_interval_seconds,1)} s · ${result.broadcast_after.transmit_power_dbm} dBm. Nicht bearbeitete Funkwerte bleiben erhalten.`,'hint'));
     if(result.required_steps.length){target.append(element('p','Vor einem späteren Schreiben erforderlich:'));const steps=element('ol');for(const text of result.required_steps)steps.append(element('li',text));target.append(steps);}
@@ -292,7 +299,7 @@ async function previewDeviceDraft(event) {
 function configurationMatches() {
   const prepared=configurationState?.prepared;
   if(!prepared||deviceDraftLatest?.capture!==prepared.preview.base_capture)return false;
-  const expected={...prepared.values_before};
+  const expected=editableDeviceValues(prepared.values_before);
   for(const item of prepared.preview.changes)expected[item.field]=item.after;
   return Object.entries(deviceDraftValues()).every(([key,value])=>expected[key]===value);
 }
@@ -314,7 +321,7 @@ async function refreshConfiguration() {
   $('#device-config-changes').replaceChildren();
   if(prepared){
     $('#device-config-status').textContent=`Vorbereitet · ${prepared.history.count} Werte vollständig gespeichert · gültig für ${Math.ceil(prepared.expires_in_seconds/60)} min. Vor dem Schreiben wird die aktuelle Historie erneut vollständig gelesen.`;
-    for(const item of prepared.preview.changes){const recording=item.field==='record_interval_seconds',format=value=>recording?`${number(value/60,1)} min`:typeof value==='number'?`${number(value,Number.isInteger(value)?0:1)} ${item.unit}`:String(value);$('#device-config-changes').append(element('dt',item.label),element('dd',`${format(item.before)} → ${format(item.after)}`));}
+    for(const item of prepared.preview.changes){const recording=item.field==='record_interval_seconds',format=value=>recording?`${number(value/60,1)} min`:typeof value==='number'?`${number(value,Number.isInteger(value)?0:1)} ${item.unit}`:typeof value==='boolean'?(value?'an':'aus'):String(value);$('#device-config-changes').append(element('dt',item.label),element('dd',`${format(item.before)} → ${format(item.after)}`));}
     $('#device-config-consequences').textContent=prepared.notice;
   }else $('#device-config-status').textContent=report?`${report.status==='verified'?'Änderung zurückgelesen':report.status==='parameters_verified'?'Parameter zurückgelesen; Status ohne Aufzeichnungsdetails':report.status==='blocked'?'Änderung vor Gerätebefehlen blockiert':'Gerätezustand nicht abschließend bestätigt'} · ${report.notice||'Auftrag läuft.'}`:'Noch keine Geräteänderung vorbereitet.';
   configurationControls();
