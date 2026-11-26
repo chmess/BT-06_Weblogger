@@ -124,3 +124,7 @@ Die Änderungsvorschau und Konfigurationsvorbereitung akzeptieren zusätzlich `t
 ## V0.4.8: Alarmgrenzen und Aktivierung
 
 Vorschau/Vorbereitung unterstützen flache Änderungsfelder nach dem Muster `temperature_alarm_low_limit`, `temperature_alarm_high_limit`, `temperature_alarm_low_enabled`, `temperature_alarm_high_enabled`; entsprechend `humidity_alarm_…`. Aktivierung verlangt JSON-Bool, Grenzen exakte 0,1-Schritte. Temperaturbereich -20 bis 60 °C, Feuchte 0 bis 100 % rF, Untergrenze strikt kleiner als Obergrenze. Unveränderte Gegenwerte werden aus dem vollständig gelesenen Alarmblock übernommen, niemals durch Defaults ersetzt. Temperaturänderungen benötigen ausgelesenes C und dürfen keinen Wechsel nach F enthalten; Feuchteänderungen sind auch bei F möglich. Typcodes und Verzögerung sind nicht über diese Felder änderbar. Die gespeicherte Werteantwort bleibt strukturiert (`temperature_alarm`/`humidity_alarm`, jeweils `low`/`high`); Originalbelege werden nicht umgeschrieben. Bestehender Schutzablauf unverändert.
+
+## V0.5.0: Diagrammzeitraum
+
+Keine neue API. Die Oberfläche nutzt die vorhandenen `start`/`end`-Filter für Vor-/Zurücknavigation und den Export des sichtbaren Zoomfensters. Export bleibt in Originalauflösung, unabhängig von der Grafikverdichtung. Gerätehistorien verwenden weiterhin ungeprüfte Kalenderkoordinaten für Bereichsfilter und exportieren originale Gerätesekunden; dadurch entsteht keine neue UTC-/Zeitzonenbestätigung. Die zusätzliche Exportfunktion mit bestätigter Zeitzuordnung bleibt separat.

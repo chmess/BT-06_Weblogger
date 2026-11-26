@@ -95,6 +95,7 @@ async function renderCards() {
     const button=element('button','Verlauf ansehen','secondary');button.addEventListener('click',guard(async()=>{state.logger=logger.id;$('#logger-select').value=logger.id;go('history');await loadHistory();}));card.append(button);cards.append(card);
   });
 }
+function rangeIdentity(){return JSON.stringify([state.source,state.logger,state.run?.id,state.snapshot?.id]);}
 function buildQuery() {
   if(!state.logger||state.source==='simulation'&&!state.run) return null;
   const query=new URLSearchParams({source:state.source,logger:state.logger});
@@ -103,7 +104,10 @@ function buildQuery() {
   const period=$('#period').value;
   if(period==='custom') {
     if(!$('#range-start').value||!$('#range-end').value) throw new Error('Beginn und Ende angeben. Freie Zeitangaben gelten in der Browser-Zeitzone.');
-    const suffix=state.source==='device'?'Z':'';const start=new Date($('#range-start').value+suffix),end=new Date($('#range-end').value+suffix);
+    const suffix=state.source==='device'?'Z':'',shifted=state.shiftedRange;
+    const exact=shifted&&shifted.identity===rangeIdentity()&&shifted.inputs[0]===$('#range-start').value&&shifted.inputs[1]===$('#range-end').value;
+    const start=new Date(exact?shifted.start:$('#range-start').value+suffix),end=new Date(exact?shifted.end:$('#range-end').value+suffix);
+    if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime()))throw new Error('Ungültige Zeitangabe.');
     if(start>end) throw new Error('Beginn liegt nach dem Ende.');
     query.set('start',start.toISOString());query.set('end',end.toISOString());
   } else if(Number(period)>0) {
@@ -115,24 +119,25 @@ function initChart() {
   if(!window.echarts) {notice('Lokale Diagrammbibliothek fehlt. Installation prüfen.',true);return;}
   state.chart=echarts.init($('#chart'),null,{renderer:'canvas'});
   state.chart.on('legendselectchanged',event=>{state.selection=event.selected;localStorage.setItem('bt06-curves',JSON.stringify(state.selection));});
-  state.chart.on('datazoom',()=>{if(state.source==='live'){state.follow=false;$('#live-follow').checked=false;}});
+  state.chart.on('datazoom',()=>{if(state.source==='live'){state.follow=false;$('#live-follow').checked=false;}updateChartControls();});
   new ResizeObserver(()=>state.chart.resize()).observe($('#chart'));
   if(state.chartData)renderChart(state.chartData);
 }
 function renderChart(data, reset=false) {
   if(!state.chart) return;
   const css=getComputedStyle(document.documentElement), text=css.getPropertyValue('--muted').trim(), border=css.getPropertyValue('--border').trim();
-  const savedZoom=reset?null:state.chart.getOption()?.dataZoom;
+  const savedZoom=reset?null:state.chart.getOption()?.dataZoom,domain=chartRange();
   const lines=[{name:'Warnlinie',yAxis:state.saved.humidity_warning,lineStyle:{color:'#c69e52'}},{name:'Kritische Linie',yAxis:state.saved.humidity_critical,lineStyle:{color:'#d47c7c'}}];
   state.chart.setOption({animation:false,color:['#f3a35c','#65aaff'],textStyle:{color:text},legend:{top:0,textStyle:{color:text},selected:state.selection},
     grid:{left:55,right:55,top:62,bottom:90},tooltip:{trigger:'axis',axisPointer:{type:'cross'},formatter:params=>{const valid=params.filter(p=>p.value[1]!=null);return valid.length?`${chartDate(valid[0].value[0])}<br>${valid.map(p=>`${p.marker}${p.seriesName}: ${number(p.value[1])} ${p.seriesIndex===0?'°C':'%'}`).join('<br>')}`:'Datenlücke';}},
-    xAxis:{type:'time',axisLabel:{color:text,formatter:value=>new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:state.source==='device'?'UTC':state.saved.timezone}).format(value)},splitLine:{show:false}},
+    xAxis:{type:'time',min:domain?.start??null,max:domain?.end??null,boundaryGap:false,axisLabel:{color:text,formatter:value=>new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:state.source==='device'?'UTC':state.saved.timezone}).format(value)},splitLine:{show:false}},
     yAxis:[{type:'value',name:'°C',scale:true,axisLabel:{color:text},splitLine:{lineStyle:{color:border}}},{type:'value',name:'% rF',min:0,max:100,axisLabel:{color:text},splitLine:{show:false}}],
     dataZoom:[{type:'inside',xAxisIndex:0,start:savedZoom?.[0]?.start??0,end:savedZoom?.[0]?.end??100},{type:'slider',xAxisIndex:0,bottom:12,height:25,start:savedZoom?.[1]?.start??0,end:savedZoom?.[1]?.end??100,textStyle:{color:text}}],
     series:[{name:'Temperatur',type:'line',showSymbol:false,connectNulls:false,data:data.points.map(p=>[p[0],p[1]])},{name:'Relative Feuchte',type:'line',showSymbol:false,connectNulls:false,yAxisIndex:1,data:data.points.map(p=>[p[0],p[2]]),markLine:{silent:true,symbol:'none',label:{show:false},data:lines}}]}, {notMerge:true});
+  updateChartControls();
 }
 async function loadHistory(refresh=false) {
-  const query=buildQuery(); if(!query) {state.query=null;state.chartData=null;state.chart?.clear();$('#chart-caption').textContent='Keine Daten ausgewählt.';return;}
+  const query=buildQuery(); if(!query) {state.query=null;state.chartData=null;state.chart?.clear();$('#chart-caption').textContent='Keine Daten ausgewählt.';updateChartControls();return;}
   const request=++state.loading; const data=await api(`history?${query}`);if(request!==state.loading)return;
   const assignment=query.get('source')==='device'?await api(`time-assignment?${new URLSearchParams({logger:query.get('logger'),snapshot:query.get('snapshot')})}`):null;if(request!==state.loading)return;state.timeAssignment=assignment;
   $('#chart-export-assigned').hidden=!assignment;$('#chart-export-assigned').disabled=!assignment?.timezone_confirmed;$('#timezone-panel').hidden=!assignment;
@@ -141,7 +146,39 @@ async function loadHistory(refresh=false) {
   $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}`;
   renderChart(data,reset);
 }
-function exportCSV() { if(!state.query) throw new Error('Zuerst einen Verlauf laden.');const link=document.createElement('a');link.href=`api/export?${state.query}`;link.click(); }
+function chartRange(visible=false) {
+  if(!state.query||!state.chartData)return null;
+  const points=state.chartData.points;
+  let start=state.query.has('start')?Date.parse(state.query.get('start')):points.length?new Date(points[0][0]).getTime():NaN;
+  let end=state.query.has('end')?Date.parse(state.query.get('end')):points.length?new Date(points[points.length-1][0]).getTime():NaN;
+  if(!Number.isFinite(start)||!Number.isFinite(end)||start>end)return null;
+  if(visible){const zoom=state.chart?.getOption()?.dataZoom?.[0],width=end-start;const low=Number(zoom?.start??0),high=Number(zoom?.end??100);if(!Number.isFinite(low)||!Number.isFinite(high)||low<0||high>100||low>high)return null;end=Math.round(start+width*high/100);start=Math.round(start+width*low/100);}
+  return {start,end};
+}
+function updateChartControls() {
+  const range=chartRange(true),movable=!!range&&range.end>range.start;
+  $('#chart-previous').disabled=!movable;$('#chart-next').disabled=!movable;$('#chart-export-visible').disabled=!range;
+  $('#chart-visible-range').textContent=range?`Sichtbarer Ausschnitt: ${chartDate(range.start)} bis ${chartDate(range.end)}${state.source==='device'?' · ungeprüfter Gerätekalender':''}`:'';
+}
+function rangeInput(value) {
+  const dateValue=new Date(value);
+  return new Date(value-(state.source==='device'?0:dateValue.getTimezoneOffset()*60000)).toISOString().slice(0,-1);
+}
+async function shiftChart(direction) {
+  const range=chartRange(true);if(!range||range.start===range.end)throw new Error('Zuerst einen Zeitraum mit Anfang und Ende laden.');
+  const offset=(range.end-range.start)*direction;
+  $('#range-start').value=rangeInput(range.start+offset);$('#range-end').value=rangeInput(range.end+offset);
+  state.shiftedRange={start:range.start+offset,end:range.end+offset,identity:rangeIdentity(),inputs:[$('#range-start').value,$('#range-end').value]};
+  $('#period').value='custom';$('#custom-period').hidden=false;
+  if(state.source==='live'){state.follow=false;$('#live-follow').checked=false;}
+  await loadHistory();
+}
+function exportCSV(visible=false) {
+  if(!state.query)throw new Error('Zuerst einen Verlauf laden.');
+  const query=new URLSearchParams(state.query);
+  if(visible){const range=chartRange(true);if(!range)throw new Error('Kein sichtbarer Zeitraum verfügbar.');query.set('start',new Date(range.start).toISOString());query.set('end',new Date(range.end).toISOString());}
+  const link=document.createElement('a');link.href=`api/export?${query}`;link.click();
+}
 async function diagnostics() {
   const data=await api('status');$('#version').textContent=data.version;
   $('#template-note').textContent=data.local_profiles?'Lokale Zigbee-Klimavorlagen verfügbar. Erzeugte Werte bleiben synthetisch.':'Allgemeine synthetische Klimavorlagen. Zigbee-Vorlagen können lokal eingelesen werden.';
@@ -162,7 +199,7 @@ function populateSnapshots() {
 }
 function setSource(source) {
   if(!['live','device','simulation'].includes(source))source='simulation';
-  state.loading++;state.chartData=null;state.query=null;state.chart?.clear();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
+  state.loading++;state.chartData=null;state.query=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
   state.source=source;localStorage.setItem('bt06-source',source);$('#source-select').value=source;
   const live=source==='live',device=source==='device';$('#run-label').hidden=live;$('#live-follow-label').hidden=!live;
   $('#run-title').textContent=device?'Historienstand':'Testlauf';
@@ -170,7 +207,7 @@ function setSource(source) {
   $('#source-notice strong').textContent=live?'Echte BT06-Empfänge':device?'Loggerhistorie · Gerätezeit ungeprüft':'Synthetische Testdaten';
   $('#source-notice span').textContent=live?'BLE-Advertising · Zeitbasis: Host-Empfang · keine Loggerhistorie':device?'Originale Loggerwerte · Datum und UTC-Offset nicht bestätigt · keine automatische Zeitkorrektur':'Alle dargestellten Werte dieser Datenquelle sind simuliert.';
   $('#overview-note').textContent=live?'Aktuelle Aussendungen und lokal gespeicherte Empfänge. Veraltete Werte werden gekennzeichnet.':device?'Vollständig gelesene Historienstände. Keine aktuellen Livewerte.':'Letzter Testlauf · keine Livewerte und keine Schimmelbewertung.';
-  $('#chart-time-note').textContent=device?'Zeitachse und freie Datumseingaben zeigen unveränderten Gerätekalender ohne bestätigten UTC-Offset. CSV enthält Original-Gerätesekunden und keine erfundenen UTC-Zeitstempel.':'Temperatur in °C · relative Feuchte in % · Lücken bleiben sichtbar. CSV enthält die Originalauflösung des gewählten Zeitraums, unabhängig vom Grafikzoom.';
+  $('#chart-time-note').textContent=device?'Zeitachse und freie Datumseingaben zeigen unveränderten Gerätekalender ohne bestätigten UTC-Offset. CSV enthält Original-Gerätesekunden und keine erfundenen UTC-Zeitstempel.':'Temperatur in °C · relative Feuchte in % · Lücken bleiben sichtbar. CSV enthält die Originalauflösung des gewählten Zeitraums, unabhängig vom Grafikzoom. „Sichtbaren Ausschnitt als CSV“ exportiert die Originalwerte im Zoomfenster.';
   if(source==='simulation'){const select=$('#run-select');select.replaceChildren();for(const run of state.runs)addOption(select,run.id,`${date(run.created_at)} · ${run.options.days} Tage`);select.value=state.run?.id||'';}
   chooseLogger();
 }
@@ -424,8 +461,13 @@ async function main() {
   $('#period').addEventListener('change',guard(async()=>{$('#custom-period').hidden=$('#period').value!=='custom';if($('#period').value!=='custom')await loadHistory();}));
   $('#apply-range').addEventListener('click',guard(()=>loadHistory()));
   $('#chart-reset').addEventListener('click',()=>{if(state.chartData)renderChart(state.chartData,true);});
-  $('#chart-fullscreen').addEventListener('click',guard(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else await $('#chart').requestFullscreen();}));
-  $('#chart-export').addEventListener('click',guard(exportCSV));
+  $('#chart-fullscreen').addEventListener('click',guard(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else await $('#chart-panel').requestFullscreen();}));
+  $('#chart-export').addEventListener('click',guard(()=>exportCSV()));
+  $('#chart-export-visible').addEventListener('click',guard(()=>exportCSV(true)));
+  for(const id of ['#range-start','#range-end'])$(id).addEventListener('input',()=>{state.shiftedRange=null;});
+  $('#chart-previous').addEventListener('click',guard(()=>shiftChart(-1)));
+  $('#chart-next').addEventListener('click',guard(()=>shiftChart(1)));
+  document.addEventListener('fullscreenchange',()=>{state.chart?.resize();$('#chart-fullscreen').textContent=document.fullscreenElement?'Vollbild verlassen':'Vollbild';});
   $('#chart-export-assigned').addEventListener('click',guard(()=>{if(!state.query||!state.timeAssignment?.timezone_confirmed)throw new Error('Zuerst Historienstand mit bestätigter Zeitzone laden.');const query=new URLSearchParams(state.query);query.set('time_basis','assigned');const link=document.createElement('a');link.href=`api/export?${query}`;link.click();}));
   $('#timezone-form').addEventListener('submit',guard(async event=>{event.preventDefault();if(state.source!=='device'||!state.snapshot)throw new Error('Zuerst einen Historienstand auswählen.');await post('time-assignment',{logger:state.logger,snapshot:state.snapshot.id,timezone:$('#history-timezone').value,timezone_confirmed:$('#timezone-confirmed').checked});$('#timezone-confirmed').checked=false;await loadHistory(true);notice('Zeitzone für diesen Historienstand bestätigt. Datum bleibt ungeprüft; Originaldateien erhalten.');}));
   $('#autosync-form').addEventListener('submit',guard(async event=>{event.preventDefault();await post('autosync',{enabled:$('#autosync-enabled').checked,interval_minutes:Number($('#autosync-interval').value)});await refreshAutoSync(true);notice(state.autoSync.config.enabled?'Automatische Nachladeversuche gespeichert. Erster Versuch nach Ablauf des Intervalls.':'Automatische Nachladeversuche ausgeschaltet.');}));

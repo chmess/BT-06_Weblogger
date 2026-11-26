@@ -153,3 +153,7 @@ V0.4.5: 9 Aufzeichnungs- und 19 Konfigurationstests bestanden. Zusätzliche Prü
 ## V0.4.8
 
 7 Vorschau-, 22 Konfigurations- und 15 API-Tests sowie Chromium-Browserprüfung bestanden. Neue Prüfungen: Temperatur-/Feuchtegrenzen und strikte Bool-Aktivierung, Wertebereich und 0,1-Präzision, vollständiger Gegenblock und Unter-/Obergrenzenrelation; unveränderter °C-Modus für Temperaturalarm. Integrierter Schreibtest prüft beide festen Alarmsetter, Vorab-Historie, unveränderte Typ-/Verzögerungsbytes, unveränderten Aufzeichnungsblock, Save/Abschluss und finales Rücklesen. Fehler am Alarmsetter verhindert Save und Wiederholung; unbekannte Typcodes blockieren. Browser prüft Alarm-Entwurf, Checkbox-Bool, Rücksetzen und Fahrenheit-Sperre. Keine reale Alarmänderung ausgeführt.
+
+## V0.5.0
+
+Chromium-Browserprüfung mit synthetischen Daten bestanden: alle Zeitvorgaben, Zoom-Erhalt, Vor-/Zurücknavigation mit exakter Fensterbreite, CSV-Export ausschließlich der sichtbaren Originalwerte, unveränderte Gesamtabfrage. Zusätzlicher Test mit Europe/Berlin und doppelter Ortszeit am 25.10.2026 bestätigt exakte Navigation; manuelle Eingabe entfernt die interne exakte Zuordnung. Vollbild enthält Export-/Navigationsbedienung und lässt sich verlassen. Bestehende mobile Breitenprüfung, Gerätezeitwarnungen, originale Historienexporte, Live-Follow-Verhalten und Einstellungsabläufe weiterhin bestanden; keine JavaScript-Fehler oder externen Anfragen. Backend-Tests nicht erneut ausgeführt, da API/CSV/BLE unverändert. Keine realen Gerätebefehle.

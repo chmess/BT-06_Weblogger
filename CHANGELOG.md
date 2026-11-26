@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.5.0-dev · 2026-11-27
+
+- Diagrammbedienung: Zeiträume 1/6/12/24/48 Stunden, 7/14/30/90/180/365 Tage und alles; Monatsnäherungen ausdrücklich als solche beschriftet. Vorherigen/nächsten sichtbaren Zeitraum laden, auch in Bereichen ohne Messwerte. Gerätezeit weiterhin als ungeprüften Kalender behandeln.
+- Eigener CSV-Export des sichtbaren Zoomfensters in Originalauflösung. Export des gewählten Gesamtzeitraums bleibt separat verfügbar; keine Änderung an Originaldaten oder Zeitzuordnungen.
+- Vollbild umfasst Diagramm und Bedienelemente; Zeitraum bleibt sichtbar. Exakte Zeitpunkte beim Blättern auch während der herbstlichen Zeitumstellung erhalten. Eingaben nach manueller Bearbeitung wieder als freie Ortszeit behandeln.
+- V0.4.8 im Dienst bestätigt; keine Gerätewerte verändert. Weitere V0.5-Punkte wie manuelle Achsengrenzen und persistente Ansichten bleiben offen.
+
 ## 0.4.8-dev · 2026-11-27
 
 - Unter-/Obergrenzen und Aktivierung für Temperatur- und Feuchtealarme als Entwurf, Vorschau und geschützte Geräteänderung ergänzt. Originale Alarmtypen und Verzögerungen bleiben bytegenau erhalten; unbekannte Formate blockieren. Grenzen in exakten 0,1-Schritten, untere Grenze kleiner als obere.

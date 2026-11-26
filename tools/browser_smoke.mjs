@@ -73,6 +73,38 @@ HistoryStore(Path(sys.argv[1])/'data/history').publish('12345678',**decode_captu
   const zoom=await evaluate(`state.chart.getOption().dataZoom[0].start`);
   await evaluate(`state.chart.resize();renderChart(state.chartData)`);
   assert.equal(await evaluate(`state.chart.getOption().dataZoom[0].start`),zoom);
+  const chartNavigation=await evaluate(`(async()=>{
+    const base=chartRange(),visible=chartRange(true),query=state.query.toString();
+    const anchorClick=HTMLAnchorElement.prototype.click;let href;
+    try{HTMLAnchorElement.prototype.click=function(){href=this.href;};document.querySelector('#chart-export-visible').click();await new Promise(r=>setTimeout(r,0));}finally{HTMLAnchorElement.prototype.click=anchorClick;}
+    const exported=new URL(href),csv=await fetch(exported).then(r=>r.text()),raw=await fetch('api/export?'+query).then(r=>r.text());
+    const lines=csv.trim().split('\\n'),timestampIndex=lines[0].split(';').indexOf('Zeitstempel'),rows=lines.slice(1),times=rows.map(line=>new Date(line.split(';')[timestampIndex]).getTime());
+    const queryUnchanged=state.query.toString()===query;
+    await shiftChart(-1);const previous=chartRange();await shiftChart(1);const next=chartRange();
+    document.querySelector('#period').value='24';document.querySelector('#custom-period').hidden=true;await loadHistory();
+    return {base,visible,previous,next,queryUnchanged,start:Date.parse(exported.searchParams.get('start')),end:Date.parse(exported.searchParams.get('end')),count:rows.length,rawCount:raw.trim().split('\\n').length-1,inside:times.every(t=>t>=visible.start&&t<=visible.end),presets:[...document.querySelector('#period').options].map(o=>o.value)};
+  })()`);
+  assert.equal(chartNavigation.visible.end-chartNavigation.visible.start,(chartNavigation.base.end-chartNavigation.base.start)/2);
+  assert.equal(chartNavigation.start,chartNavigation.visible.start);assert.equal(chartNavigation.end,chartNavigation.visible.end);
+  assert.ok(chartNavigation.count>0&&chartNavigation.count<chartNavigation.rawCount);assert.equal(chartNavigation.inside,true);assert.equal(chartNavigation.queryUnchanged,true);
+  assert.equal(chartNavigation.previous.end,chartNavigation.visible.start);assert.deepEqual(chartNavigation.next,chartNavigation.visible);
+  for(const period of ['1','6','12','24','48','168','336','720','2160','4320','8760','0'])assert.ok(chartNavigation.presets.includes(period));
+  const originalZone=await evaluate(`Intl.DateTimeFormat().resolvedOptions().timeZone`);
+  await send('Emulation.setTimezoneOverride',{timezoneId:'Europe/Berlin'});
+  const dstNavigation=await evaluate(`(async()=>{
+    const saved={query:state.query,data:state.chartData,shifted:state.shiftedRange,source:state.source,period:document.querySelector('#period').value,start:document.querySelector('#range-start').value,end:document.querySelector('#range-end').value},originalLoad=loadHistory;
+    try{
+      state.source='simulation';state.query=new URLSearchParams({start:'2026-10-25T01:30:00.000Z',end:'2026-10-25T02:30:00.000Z'});state.chartData={points:[]};
+      loadHistory=async()=>{state.query=buildQuery();};await shiftChart(-1);const result={start:state.query.get('start'),end:state.query.get('end'),sameLocalInput:document.querySelector('#range-start').value===document.querySelector('#range-end').value};
+      document.querySelector('#range-start').dispatchEvent(new Event('input'));result.cleared=state.shiftedRange===null;return result;
+    }finally{loadHistory=originalLoad;state.query=saved.query;state.chartData=saved.data;state.shiftedRange=saved.shifted;state.source=saved.source;document.querySelector('#period').value=saved.period;document.querySelector('#custom-period').hidden=saved.period!=='custom';document.querySelector('#range-start').value=saved.start;document.querySelector('#range-end').value=saved.end;updateChartControls();}
+  })()`);
+  assert.equal(dstNavigation.start,'2026-10-25T00:30:00.000Z');assert.equal(dstNavigation.end,'2026-10-25T01:30:00.000Z');assert.equal(dstNavigation.sameLocalInput,true);assert.equal(dstNavigation.cleared,true);
+  await send('Emulation.setTimezoneOverride',{timezoneId:originalZone});
+  await send('Runtime.evaluate',{expression:"document.querySelector('#chart-fullscreen').click()",userGesture:true});
+  await waitFor(`document.fullscreenElement?.id==='chart-panel'`);
+  assert.equal(await evaluate(`document.fullscreenElement.contains(document.querySelector('#chart-export-visible'))`),true);
+  await evaluate(`document.exitFullscreen()`);await waitFor(`!document.fullscreenElement`);
   await click('[data-page="overview"]');assert.equal(await evaluate(`document.querySelectorAll('.card').length`),3);
   await screenshot('overview-desktop.png');
   await click('[data-page="settings"]');
@@ -287,7 +319,7 @@ print(json.dumps({'settings':saved,'preview':preview,'record_preview':record_pre
   await screenshot('device-settings-mobile.png');
   assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
   assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(external.length,0,JSON.stringify(external));
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','25 minute recording draft, full preparation summary, two explicit confirmations, edit invalidation and uncertain write display','parameter verification never guesses recording state from zero summary','alarm limit and activation draft, reset and Fahrenheit guard','no JS exceptions','no external requests'],screenshots:8};
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','zoom preservation','period presets, previous/next and original-resolution visible CSV','DST fold navigation and fullscreen controls','save settings','load settings preview','load settings save','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','25 minute recording draft, full preparation summary, two explicit confirmations, edit invalidation and uncertain write display','parameter verification never guesses recording state from zero summary','alarm limit and activation draft, reset and Fahrenheit guard','no JS exceptions','no external requests'],screenshots:8};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}
