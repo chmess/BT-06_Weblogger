@@ -77,7 +77,20 @@
       </div><div class="button-row"><button type="submit">Berechnen</button><button id="climate-copy" type="button" class="secondary">Letzten dargestellten Wert übernehmen</button></div></form>
       <p id="climate-input-source" class="hint">Beispielwerte; keine übernommene Messung. Die Oberflächentemperatur ist eine manuelle Annahme.</p>
       <p id="climate-status" role="status" class="hint">Noch keine Berechnung.</p><dl id="climate-results"></dl>
-      <p class="hint">Berechnete Momentaufnahme über flüssigem Wasser, gültiger Temperaturbereich −45 bis +60 °C. Unter 0 °C kein Frostpunktmodell. Ohne Oberflächentemperatur keine Oberflächenbewertung. Keine zeitabhängige Schimmelbewertung; diese folgt in einem weiteren Schritt.</p>
+      <p class="hint">Berechnete Momentaufnahme über flüssigem Wasser, gültiger Temperaturbereich −45 bis +60 °C. Unter 0 °C kein Frostpunktmodell. Ohne Oberflächentemperatur keine Oberflächenbewertung. Zeitabhängige Feuchteindikatoren stehen unten; kein Schimmel- oder Materialmodell.</p>
+    </article>
+    <article class="panel"><h2>Zeitabhängige Feuchteauswertung</h2>
+      <p>Originalwerte des im Klimaverlauf gewählten Zeitraums auswerten. Zeitwerte werden aus benachbarten Messpaaren berechnet; größere Lücken und ungültige Werte zählen als unbekannt und unterbrechen Phasen.</p>
+      <form id="risk-form"><div class="settings-grid">
+        <label>Luftfeuchteschwelle (% rF)<input id="risk-air" type="number" min="0.1" max="100" step="any" value="70" required></label>
+        <label>Oberflächenfeuchteschwelle (% rF)<input id="risk-surface" type="number" min="0.1" max="100" step="any" value="80" required></label>
+        <label>Hysterese (Prozentpunkte)<input id="risk-hysteresis" type="number" min="0" max="99" step="any" value="2" required></label>
+        <label>Mindestphasendauer (Minuten)<input id="risk-minimum" type="number" min="0" max="43200" step="any" value="60" required></label>
+        <label>Oberflächenannahme<select id="risk-mode"><option value="none">Keine · nur Luftfeuchte</option><option value="fixed">Konstante Oberflächentemperatur</option><option value="delta">Oberfläche kälter als Luft</option></select></label>
+        <label><span id="risk-surface-label">Oberflächenwert (nicht verwendet)</span><input id="risk-value" type="number" step="any" disabled></label>
+      </div><div class="button-row"><button type="submit">Gewählten Zeitraum auswerten</button><button id="risk-visible" type="button" class="secondary">Sichtbaren Diagrammausschnitt auswerten</button></div></form>
+      <p class="hint">Die Kriterien gelten für diese Auswertung. Mindestdauer ist ein frei gewählter Filter, keine universelle Wachstumsgrenze. Phasen dauern bis unter Schwelle minus Hysterese; „Zeit ab Schwelle“ zählt nur Messpaare mit beiden Endpunkten mindestens an der Schwelle. Kein Nachweis von Schimmel oder Schimmelfreiheit.</p>
+      <p id="risk-status" class="hint" role="status">Noch kein Zeitraum ausgewertet.</p><p id="risk-range" class="hint"></p><div id="risk-results" class="cards"></div>
     </article>
   </section>
 

@@ -98,6 +98,40 @@ async function copyClimateReading(){
   $('#climate-input-source').textContent=`Übernommen aus ${state.source==='device'?'Loggerhistorie · Gerätezeit ungeprüft':state.source==='live'?'gespeicherten BLE-Empfängen':'synthetischen Testdaten'}: ${chartDate(point[0])}. Die Oberflächentemperatur bleibt eine manuelle Annahme.`;
   $('#climate-results').replaceChildren();$('#climate-status').textContent='Wert übernommen; zum Auswerten „Berechnen“ wählen.';
 }
+let riskRevision=0;
+function updateRiskControls(){const mode=$('#risk-mode').value,input=$('#risk-value');input.disabled=mode==='none';input.required=mode!=='none';input.min=mode==='fixed'?-45:0;input.max=mode==='fixed'?60:50;$('#risk-surface-label').textContent=mode==='fixed'?'Angenommene Oberfläche (°C)':mode==='delta'?'Angenommene Differenz unter Lufttemperatur (K)':'Oberflächenwert (nicht verwendet)';}
+function clearRisk(){riskRevision++;state.riskReport=null;$('#risk-results').replaceChildren();$('#risk-range').textContent='';$('#risk-status').textContent='Kriterien geändert; erneut auswerten.';}
+function markRiskStale(){riskRevision++;if(state.riskReport)$('#risk-status').textContent='Ansicht oder Quelle geändert. Der Bericht gehört weiterhin zum unten genannten Zeitraum; für die neue Auswahl erneut auswerten.';}
+function riskSelection(){return JSON.stringify([rangeIdentity(),$('#period').value,$('#range-start').value,$('#range-end').value]);}
+function renderRisk(result){
+  const target=$('#risk-results');target.replaceChildren();
+  for(const [key,title] of [['air','Luftfeuchte'],['surface','Oberfläche · Annahme'],['condensation','Kondensationsbedingung · Annahme']]){
+    const metric=result[key],card=element('article',null,'panel');card.append(element('h3',title));
+    if(!metric){card.append(element('p','Ohne Oberflächenannahme nicht ausgewertet.'));target.append(card);continue;}
+    card.append(element('p',metric.status==='insufficient_data'?'Keine ausreichenden benachbarten Messpaare.':`${metric.qualified_phase_count} Phasen erreichen die gewählte Mindestdauer.`,metric.qualified_phase_count?'tag warning':'hint'));
+    const list=element('dl');
+    for(const [label,value] of [['Schwelle / Rücksetzgrenze',`${number(metric.threshold_pct)} / ${number(metric.release_pct)} %`],['Auswertbare Messpaarzeit',`${number(metric.observed_seconds/60)} min`],['Unbekannte Zeit',`${number(metric.unknown_seconds/60)} min`],['Zeit ab Schwelle',`${number(metric.above_threshold_seconds/60)} min`],['Längste Phase inkl. Hysterese',`${number(metric.longest_phase_seconds/60)} min`],['Mindestphasendauer',`${number(metric.minimum_seconds/60)} min`]])list.append(element('dt',label),element('dd',value));
+    card.append(list);
+    if(metric.status!=='evaluated')card.append(element('p','Datenabdeckung unvollständig; unbekannte Zeit ist keine unkritische Zeit.','hint'));
+    if(metric.phases.length){const details=element('details'),items=element('ol');details.append(element('summary',`Phasen anzeigen (${metric.phases.length}${metric.omitted_phases?' von '+metric.phase_count:''})`));for(const phase of metric.phases)items.append(element('li',`${chartDate(phase.start_ms)} bis ${chartDate(phase.end_ms)} · ${number(phase.duration_seconds/60)} min · Spitze ${number(phase.peak_pct)} % · ${phase.qualified?'Mindestdauer erreicht':'kurze Phase'}${phase.left_censored||phase.right_censored?' · Rand oder Lücke begrenzt die Beobachtung':''}`));details.append(items);card.append(details);}
+    target.append(card);
+  }
+  $('#risk-range').textContent=`${result.source}: ${result.range.start_ms==null?'kein Anfang':chartDate(result.range.start_ms)} bis ${result.range.end_ms==null?'kein Ende':chartDate(result.range.end_ms)}${result.clock_verified?'':' · Gerätekalender und UTC-Zuordnung ungeprüft'}. Oberflächenmodell: ${result.criteria.surface_mode==='none'?'keine Annahme':result.criteria.surface_mode==='fixed'?number(result.criteria.surface_value)+' °C konstant':number(result.criteria.surface_value)+' K unter Lufttemperatur'}.`;
+  $('#risk-status').textContent='Auswertung aus Originalwerten abgeschlossen. Konfigurierbare Feuchteindikatoren; keine Schimmelwahrscheinlichkeit.';
+}
+async function analyzeRisk(visible=false){
+  const signature=riskSelection(),revision=++riskRevision;
+  if(visible&&(!state.query||state.chartContext!==rangeIdentity()))throw new Error('Zuerst den Klimaverlauf für die aktuelle Auswahl laden.');
+  const base=visible?new URLSearchParams(state.query):buildQuery();if(!base)throw new Error('Zuerst eine Datenquelle und einen Logger wählen.');
+  const query=new URLSearchParams(base);
+  if(visible){const range=chartRange(true);if(!range)throw new Error('Kein sichtbarer Zeitraum.');query.set('start',new Date(range.start).toISOString());query.set('end',new Date(range.end).toISOString());}
+  for(const [key,id] of [['air_threshold','#risk-air'],['surface_threshold','#risk-surface'],['hysteresis','#risk-hysteresis'],['minimum_minutes','#risk-minimum']]){if($(id).value==='')throw new Error('Alle Auswertekriterien angeben.');query.set(key,$(id).value);}
+  query.set('surface_mode',$('#risk-mode').value);query.set('surface_value',$('#risk-mode').value==='none'?'':$('#risk-value').value);
+  $('#risk-status').textContent='Originalwerte werden ausgewertet …';
+  let result;try{result=await api('risk?'+query);}catch(error){if(revision===riskRevision)$('#risk-status').textContent='Auswertung fehlgeschlagen.';throw error;}
+  if(revision!==riskRevision)return;if(signature!==riskSelection()){$('#risk-status').textContent='Auswahl geändert; erneut auswerten.';return;}
+  state.riskReport=result;renderRisk(result);
+}
 async function renderCards() {
   if(state.source==='live')return renderLiveCards();
   if(state.source==='device')return renderDeviceCards();
@@ -211,7 +245,8 @@ async function loadHistory(refresh=false) {
   const assignment=query.get('source')==='device'?await api(`time-assignment?${new URLSearchParams({logger:query.get('logger'),snapshot:query.get('snapshot')})}`):null;if(request!==state.loading)return false;state.timeAssignment=assignment;
   $('#chart-export-assigned').hidden=!assignment;$('#chart-export-assigned').disabled=!assignment?.timezone_confirmed;$('#timezone-panel').hidden=!assignment;
   if(assignment){$('#timezone-status').textContent=assignment.timezone_confirmed?`${assignment.timezone} bestätigt · ${assignment.assigned_count} Werte zugeordnet · ${assignment.unassigned_count} spätere/unbestätigte Werte · Datum weiterhin ungeprüft`:'Zeitzone dieses Historienstands noch nicht bestätigt.';if(assignment.timezone)$('#history-timezone').value=assignment.timezone;}
-  const reset=!refresh&&state.query?.toString()!==query.toString();state.query=query;state.chartData=data;
+  const changed=state.query?.toString()!==query.toString();if(changed&&state.riskReport)markRiskStale();
+  const reset=!refresh&&changed;state.query=query;state.chartData=data;state.chartContext=rangeIdentity();
   $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}${data.climate?' · Taupunkt berechnet (Magnus über Wasser)':''}`;
   renderChart(data,reset);return true;
 }
@@ -269,7 +304,7 @@ function populateSnapshots() {
 }
 function setSource(source) {
   if(!['live','device','simulation'].includes(source))source='simulation';
-  state.loading++;state.chartData=null;state.query=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
+  markRiskStale();state.loading++;state.chartData=null;state.query=null;state.chartContext=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
   state.source=source;localStorage.setItem('bt06-source',source);$('#source-select').value=source;
   const live=source==='live',device=source==='device';$('#run-label').hidden=live;$('#live-follow-label').hidden=!live;
   $('#run-title').textContent=device?'Historienstand':'Testlauf';
@@ -570,6 +605,11 @@ async function main() {
   $('#source-select').addEventListener('change',guard(async()=>{setSource($('#source-select').value);await renderCards();await loadHistory();}));
   $('#live-follow').addEventListener('change',guard(async()=>{state.follow=$('#live-follow').checked;if(state.follow)await loadHistory();}));
   $('#overview-export').addEventListener('click',guard(async()=>{await loadHistory();exportCSV();}));
+  updateRiskControls();
+  $('#risk-form').addEventListener('submit',guard(async event=>{event.preventDefault();await analyzeRisk();}));
+  $('#risk-form').addEventListener('input',()=>{updateRiskControls();clearRisk();});
+  $('#risk-mode').addEventListener('change',()=>{updateRiskControls();clearRisk();});
+  $('#risk-visible').addEventListener('click',guard(()=>analyzeRisk(true)));
   $('#climate-form').addEventListener('submit',guard(calculateClimate));
   $('#climate-form').addEventListener('input',()=>{climateRevision++;$('#climate-results').replaceChildren();$('#climate-status').textContent='Eingaben geändert; erneut berechnen.';$('#climate-input-source').textContent='Manuelle Eingaben; Oberflächentemperatur als Annahme.';});
   $('#climate-copy').addEventListener('click',guard(copyClimateReading));

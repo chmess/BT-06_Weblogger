@@ -29,6 +29,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.5.1 im Dienst bestätigt. V0.6.0 vorbereitet: Taupunkt, absolute Feuchte, Sättigungs-/Partialdruck und Oberflächenrechner mit 70/80-%-Temperaturen, Feuchte und Taupunktabstand; Taupunktkurve und Verdichtung mit Erhalt abgeleiteter Extrema. 32 gezielte Python-Tests und Browserprüfung bestanden. Als Nächstes innerhalb V0.6: zeitabhängige Risikoauswertung mit Annahmen, Datenlücken, Mindestdauer und Hysterese.
 
+- V0.6.0 im Dienst bestätigt. V0.6.1 vorbereitet: zeitabhängige Luft-/Oberflächenfeuchtephasen, Kondensationsindikator, Mindestdauer/Hysterese, unbekannte Zeit und sichtbarer Ausschnitt. 25 gezielte Python-Tests und Browserprüfung bestanden. Kriterien gelten für einzelne Auswertungen; messstellenbezogene Persistenz, automatische Ereignisse und Gesamt-Abnahme bleiben offen.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

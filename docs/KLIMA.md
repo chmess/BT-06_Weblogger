@@ -26,3 +26,21 @@ Oberflächentemperaturen sind manuelle Annahmen. Ohne Eingabe bleiben Oberfläch
 Taupunkt nutzt die °C-Achse des Klimaverlaufs. Originalpunkte und CSV-Export bleiben unverändert; ein zusätzlicher abgeleiteter Antwortbereich enthält Taupunkt und absolute Feuchte. Berechnung vor der Verdichtung, Extremwerterhalt für alle vier Größen, Lücken auch in der Taupunktkurve. Ursprüngliche dreispaltige Punktantwort bleibt erhalten.
 
 Synthetischer DeskPi-Lauf: 43.201 Originalwerte, 1.087 Grafikpunkte, etwa 2,52 s inklusive CSV-Lesen; Prozessspitze etwa 34 MiB inklusive Testdatenerzeugung und Export. Separater Vergleich derselben 43.201 Speicherzeilen: vorher etwa 0,54 s, mit Klimaberechnung etwa 1,07 s. Einzelmessungen unter vorhandener Systemlast, keine SMApi- oder BLE-Leistungsmessung.
+
+## Zeitabhängige Feuchtephasen (V0.6.1)
+
+Die Feuchteindikatoren sind konfigurierbare Auswertekriterien. Der [UBA-Schimmelleitfaden](https://www.umweltbundesamt.de/system/files/medien/4031/publikationen/240513_uba_fb_schimmelleitfaden_0.pdf) erläutert den Einfluss längerer Oberflächenfeuchte von etwa 70–80 %. Daraus folgt keine universelle feste Mindestdauer. Die Software berechnet weder Schimmelwachstum noch eine Wahrscheinlichkeit und bescheinigt keine Schimmelfreiheit.
+
+Die Oberfläche wird nur auf ausdrücklich gewählte Annahme ausgewertet: konstant eingegebene Temperatur oder Lufttemperatur minus eingegebener Differenz. Keine stillschweigende Wandtemperatur. Modellausreißer lassen den Oberflächenwert unbekannt, auch wenn die Luftfeuchte separat auswertbar ist.
+
+Dauerverfahren aus Originalzeilen, unabhängig von Grafikverdichtung:
+
+- Benachbarte gültige Messpaare zählen nur bei Abstand bis zum 1,5-fachen erwarteten Messintervall. Andere Intervalle sind unbekannt. Ungültige Werte und Lücken beenden eine Phase.
+- Zeit ab Schwelle zählt nur Paare, deren beide Endpunkte mindestens die Schwelle erreichen. Das ist eine definierte Modellierung zwischen Stichproben, keine kontinuierliche Messung.
+- Eine Phase beginnt am ersten Wert mindestens an der Schwelle. Sie bleibt aktiv bis unter Schwelle minus Hysterese. Phasendauer schließt den Hysteresebereich ein; ein Übergangsintervall zum unterschrittenen Rücksetzwert wird nicht hinzugerechnet.
+- Nur Phasen mit modellierter Dauer mindestens der gewählten Mindestdauer qualifizieren sich. Bei Mindestdauer null kann auch ein Einzelwert qualifizieren; eine ausreichende zeitliche Datenabdeckung ist damit nicht belegt.
+- Bereichsränder außerhalb vorhandener gültiger Messpaare zählen nicht als bekannte Zeit. Ein Wert allein ergibt keine bekannte Dauer. Beginn/Ende von Phasen an Rändern oder Lücken werden gekennzeichnet.
+
+Berichte nennen Beobachtungszeit, unbekannte Zeit, Zeit ab Schwelle, längste Phase und qualifizierte Phasen. Fehlende Oberflächenannahme bleibt ausdrücklich ohne Bewertung. Es werden höchstens die letzten 100 Phasendetails je Kanal übertragen; Gesamtzähler bleiben vollständig. Geänderte Auswahl kennzeichnet einen vorhandenen Bericht als zum vorherigen Zeitraum gehörend. Kein automatisches Wiederholen und keine dauerhafte Ereignisablage in dieser Version.
+
+Synthetischer Streaming-Test auf dem DeskPi: 43.201 Zeilen in etwa 1,77 s einschließlich Zeilengenerierung, drei Kanäle mit Differenzannahme. 1.080 Luftphasen gezählt, 100 Details übertragen. Keine CSV-/HTTP-/BLE-Leistungsmessung; Laufzeit unter aktueller Systemlast.

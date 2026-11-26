@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.6.1-dev · 2026-11-27
+
+- Zeitabhängige Feuchteindikatoren aus Originalzeilen: einstellbare Luft-/Oberflächenschwellen, Hysterese und Mindestphasendauer. Zeit ab Schwelle getrennt von Phasendauer einschließlich Hysterese. Lücken, ungültige Werte und unbelegte Bereichsränder zählen als unbekannt; keine Brücke über fehlende Zeit.
+- Oberflächenmodell nur nach ausdrücklicher Auswahl: konstante Temperatur oder Differenz unter Lufttemperatur. Separater Bericht für Luft, angenommene Oberfläche und Kondensationsbedingung. Ohne Annahme keine Oberflächenbewertung. Keine Schimmelwahrscheinlichkeit oder pauschale Entwarnung.
+- Gewählten Zeitraum oder sichtbaren Diagrammausschnitt auswerten; exakte Quellen-/Zeithinweise und Kennzeichnung veralteter Berichte. Kriterien gelten für die jeweilige Auswertung, kein automatischer Alarmdienst. Höchstens 100 Phasendetails je Kanal, Zähler berücksichtigen alle Phasen.
+- 8 Algorithmus- und 17 API-Tests sowie Browserprüfung bestanden. Synthetische Laufzeitmessung dokumentiert; V0.6.0 im Dienst bestätigt. Keine Geräteänderungen oder neue Messdatenablage.
+
 ## 0.6.0-dev · 2026-11-27
 
 - Taupunkt und absolute Feuchte aus gültigen Temperatur-/Feuchtepaaren berechnen. Dokumentiertes Magnus-Modell über Wasser mit Bereich −45 bis +60 °C; keine Extrapolation, fehlende Werte und 0 % rF ohne erfundenen Taupunkt. Originalmessdaten bleiben unverändert.

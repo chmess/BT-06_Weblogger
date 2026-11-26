@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from backend import VERSION
 from backend.common.climate import air_values,calculate
+from backend.common.risk import FIELDS as RISK_FIELDS,options_from_query,analyze
 from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import chart_data, csv_text, identifier, rows_in_range
@@ -184,10 +185,12 @@ def handler_for(app):
                     if set(query) != {"logger", "snapshot"} or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Zeitzuordnung benötigt genau logger und snapshot.")
                     self.send(200, app.timezones.info(query["logger"][0], query["snapshot"][0]))
-                elif path in ("/api/history", "/api/export"):
+                elif path in ("/api/history", "/api/export", "/api/risk"):
                     allowed = {"source", "run", "logger", "start", "end", "snapshot", "time_basis"}
+                    if path=="/api/risk":allowed|=RISK_FIELDS
                     if set(query) - allowed or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Ungültige Abfrageparameter.")
+                    risk_options=options_from_query(query) if path=="/api/risk" else None
                     source = query.get("source", ["simulation"])[0]
                     basis = query.get("time_basis", ["original"])[0]
                     if basis not in ("original", "assigned") or "time_basis" in query and (source != "device" or path != "/api/export"):
@@ -229,6 +232,8 @@ def handler_for(app):
                     if path == "/api/export":
                         export = csv_text(rows, fields) if fields else csv_text(rows)
                         self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}.csv")
+                    elif path=="/api/risk":
+                        self.send(200,{"source":label,"clock_verified":source!="device","axis_basis":"device_calendar" if source=="device" else "timestamp",**analyze(rows,interval,risk_options,start,end)})
                     else:
                         self.send(200, {"source": label, "clock_verified": source != "device",
                                         "axis_basis": "device_calendar" if source == "device" else "timestamp", **chart_data(rows, interval)})
