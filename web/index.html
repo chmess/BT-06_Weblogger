@@ -40,6 +40,18 @@
       <div class="toolbar"><label id="run-label"><span id="run-title">Testlauf</span><select id="run-select"></select></label><label>Messstelle<select id="logger-select"></select></label><label>Zeitraum<select id="period"><option value="1">1 Stunde</option><option value="6">6 Stunden</option><option value="12">12 Stunden</option><option value="24">24 Stunden</option><option value="48">48 Stunden</option><option value="168">7 Tage</option><option value="336">14 Tage</option><option value="720">30 Tage</option><option value="2160">90 Tage (ca. 3 Monate)</option><option value="4320">180 Tage (ca. 6 Monate)</option><option value="8760">365 Tage</option><option value="0">Alles</option><option value="custom">Frei wählen</option></select></label></div>
       <div class="toolbar" id="custom-period" hidden><label>Von<input id="range-start" type="datetime-local" step="0.001"></label><label>Bis<input id="range-end" type="datetime-local" step="0.001"></label><button id="apply-range">Zeitraum laden</button></div>
       <div class="section-heading"><p class="muted" id="chart-caption">Keine Daten ausgewählt.</p><div class="button-row"><button class="secondary" id="chart-previous" disabled>Vorheriger Zeitraum</button><button class="secondary" id="chart-next" disabled>Nächster Zeitraum</button><button class="secondary" id="chart-reset">Zoom zurücksetzen</button><button class="secondary" id="chart-fullscreen">Vollbild</button><button id="chart-export-assigned" class="secondary" disabled hidden>CSV mit Zeitzuordnung</button><button id="chart-export-visible" class="secondary" disabled>Sichtbaren Ausschnitt als CSV</button><button id="chart-export" disabled>Original-CSV · gewählter Zeitraum</button></div></div>
+      <details><summary>Achsen und gespeicherte Ansicht</summary>
+        <form id="chart-axes-form"><div class="settings-grid">
+          <label>Temperaturachse<select id="axis-temperature-mode"><option value="auto">Automatisch</option><option value="manual">Feste Grenzen</option></select></label>
+          <label>Temperatur von (°C)<input id="axis-temperature-min" type="number" step="any" value="0" disabled></label>
+          <label>Temperatur bis (°C)<input id="axis-temperature-max" type="number" step="any" value="40" disabled></label>
+          <label>Feuchteachse<select id="axis-humidity-mode"><option value="auto">Automatisch</option><option value="manual" selected>Feste Grenzen</option></select></label>
+          <label>Feuchte von (% rF)<input id="axis-humidity-min" type="number" min="0" max="100" step="any" value="0"></label>
+          <label>Feuchte bis (% rF)<input id="axis-humidity-max" type="number" min="0" max="100" step="any" value="100"></label>
+        </div><div class="button-row"><button type="submit">Achsen anwenden</button><button id="chart-axes-reset" class="secondary" type="button">Standardachsen</button></div></form>
+        <div class="button-row"><button id="chart-view-save" class="secondary" disabled>Ansicht speichern</button><button id="chart-view-load" class="secondary" disabled>Ansicht laden</button></div>
+        <p id="chart-view-status" class="hint" role="status">Zeitraum, Zoom, Achsen und Kurvenauswahl je Datenquelle und Logger nur in diesem Browser speichern. Laden stellt den gespeicherten Zeitraum wieder her.</p>
+      </details>
       <p id="chart-visible-range" class="hint" aria-live="polite"></p>
       <div id="chart" aria-label="Interaktiver Temperatur- und Feuchteverlauf"></div>
       <label class="inline-check" id="live-follow-label" hidden><input id="live-follow" type="checkbox" checked> Live aktualisieren · manueller Zoom pausiert die Aktualisierung</label>

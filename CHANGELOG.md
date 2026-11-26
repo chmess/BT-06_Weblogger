@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.5.1-dev · 2026-11-27
+
+- Temperatur- und Feuchteachse unabhängig automatisch oder mit festen Grenzen darstellen. Fehlerhafte/unvollständige Grenzen verändern das Diagramm nicht; Standardachsen und Zoom lassen sich getrennt zurücksetzen.
+- Diagrammansicht mit exaktem Zeitraum, Zoom, Achsen und Kurvenauswahl im Browser speichern/laden. Bis zu 20 Ansichten getrennt nach Quelle, Logger und Testlauf/Historienstand; keine Messdatenkopie. Laden stellt den gespeicherten Zeitraum wieder her und pausiert Live-Follow. Beschädigte Ansichten werden nicht angewendet, überholte Ladeaufträge übernehmen keinen Zoom.
+- V0.5.0 im Dienst bestätigt. Keine Geräteänderungen und keine neue API.
+
 ## 0.5.0-dev · 2026-11-27
 
 - Diagrammbedienung: Zeiträume 1/6/12/24/48 Stunden, 7/14/30/90/180/365 Tage und alles; Monatsnäherungen ausdrücklich als solche beschriftet. Vorherigen/nächsten sichtbaren Zeitraum laden, auch in Bereichen ohne Messwerte. Gerätezeit weiterhin als ungeprüften Kalender behandeln.

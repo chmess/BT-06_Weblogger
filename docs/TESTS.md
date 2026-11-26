@@ -157,3 +157,7 @@ V0.4.5: 9 Aufzeichnungs- und 19 Konfigurationstests bestanden. Zusätzliche Prü
 ## V0.5.0
 
 Chromium-Browserprüfung mit synthetischen Daten bestanden: alle Zeitvorgaben, Zoom-Erhalt, Vor-/Zurücknavigation mit exakter Fensterbreite, CSV-Export ausschließlich der sichtbaren Originalwerte, unveränderte Gesamtabfrage. Zusätzlicher Test mit Europe/Berlin und doppelter Ortszeit am 25.10.2026 bestätigt exakte Navigation; manuelle Eingabe entfernt die interne exakte Zuordnung. Vollbild enthält Export-/Navigationsbedienung und lässt sich verlassen. Bestehende mobile Breitenprüfung, Gerätezeitwarnungen, originale Historienexporte, Live-Follow-Verhalten und Einstellungsabläufe weiterhin bestanden; keine JavaScript-Fehler oder externen Anfragen. Backend-Tests nicht erneut ausgeführt, da API/CSV/BLE unverändert. Keine realen Gerätebefehle.
+
+## V0.5.1
+
+Erweiterte Chromium-Browserprüfung bestanden: Temperatur-/Feuchteachsen mit unabhängigen festen Grenzen, ungültige Grenzreihenfolge ohne Änderung der aktiven Achsen, getrenntes Zurücksetzen, Speicher-/Ladeansicht mit exaktem Zeitbereich, Zoom und ausgeblendeter Kurve. Nach echtem Seitenneuladen bleibt die browserlokale Ansicht verfügbar und stellt Grenzen, Zoom und Kurvenauswahl wieder her. Ungültiger gespeicherter Zoombereich wird abgewiesen. Bestehende Export-, Zeitumstellungs-, Vollbild-, Mobil- und Geräteeinstellungsprüfungen weiterhin bestanden; keine JavaScript-Fehler oder externen Anfragen. Backend-Tests bei unveränderter API/CSV/BLE nicht wiederholt. Keine Geräteänderung.

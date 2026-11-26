@@ -128,3 +128,7 @@ Vorschau/Vorbereitung unterstützen flache Änderungsfelder nach dem Muster `tem
 ## V0.5.0: Diagrammzeitraum
 
 Keine neue API. Die Oberfläche nutzt die vorhandenen `start`/`end`-Filter für Vor-/Zurücknavigation und den Export des sichtbaren Zoomfensters. Export bleibt in Originalauflösung, unabhängig von der Grafikverdichtung. Gerätehistorien verwenden weiterhin ungeprüfte Kalenderkoordinaten für Bereichsfilter und exportieren originale Gerätesekunden; dadurch entsteht keine neue UTC-/Zeitzonenbestätigung. Die zusätzliche Exportfunktion mit bestätigter Zeitzuordnung bleibt separat.
+
+## V0.5.1: browserlokale Diagrammansichten
+
+Keine neue API und keine Änderung am Programmeinstellungs-JSON. Achsen und gespeicherte Ansichten werden im Browser verwaltet, getrennt nach tatsächlicher Quelle und Logger sowie Testlauf oder Historienstand. Höchstens 20 Ansichten; Speichern einer weiteren entfernt den ältesten anderen Eintrag. Gespeichert werden exakte Bereichszeitpunkte, prozentualer Zoom, Achsengrenzen und Kurvenauswahl. Laden verwendet die bestehenden Historienfilter und pausiert Live-Follow; keine Änderung der Originalwerte oder ihrer Zeitzuordnung. Ansichten werden ausdrücklich geladen, nicht automatisch auf andere Datenstände übertragen. Temperaturdarstellungsgrenzen liegen aus technischen Gründen zwischen −1000 und 1000 °C, Feuchte zwischen 0 und 100 %; dies sind Diagramm-, keine Sensorgrenzen.

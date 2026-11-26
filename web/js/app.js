@@ -95,7 +95,7 @@ async function renderCards() {
     const button=element('button','Verlauf ansehen','secondary');button.addEventListener('click',guard(async()=>{state.logger=logger.id;$('#logger-select').value=logger.id;go('history');await loadHistory();}));card.append(button);cards.append(card);
   });
 }
-function rangeIdentity(){return JSON.stringify([state.source,state.logger,state.run?.id,state.snapshot?.id]);}
+function rangeIdentity(){return JSON.stringify([state.source,state.logger,state.source==='simulation'?state.run?.id:null,state.source==='device'?state.snapshot?.id:null]);}
 function buildQuery() {
   if(!state.logger||state.source==='simulation'&&!state.run) return null;
   const query=new URLSearchParams({source:state.source,logger:state.logger});
@@ -115,6 +115,50 @@ function buildQuery() {
   }
   return query;
 }
+const CHART_VIEW_KEY='bt06-chart-views-v1';
+function defaultAxes(){return {temperature:{mode:'auto',min:0,max:40},humidity:{mode:'manual',min:0,max:100}};}
+function validateAxes(value) {
+  const result={};
+  for(const axis of ['temperature','humidity']){
+    const item=value?.[axis];
+    if(!item||!['auto','manual'].includes(item.mode)||typeof item.min!=='number'||typeof item.max!=='number'||!Number.isFinite(item.min)||!Number.isFinite(item.max)||item.min>=item.max||item.min< (axis==='humidity'?0:-1000)||item.max>(axis==='humidity'?100:1000))throw new Error('Achsengrenzen prüfen: Untergrenze muss kleiner als Obergrenze sein; Feuchte 0–100 %, Temperatur −1000 bis 1000 °C.');
+    result[axis]={mode:item.mode,min:item.min,max:item.max};
+  }
+  return result;
+}
+function updateAxisControls(){for(const axis of ['temperature','humidity'])for(const bound of ['min','max'])$(`#axis-${axis}-${bound}`).disabled=$(`#axis-${axis}-mode`).value==='auto';}
+function updateAxisForm(){const axes=state.axes||defaultAxes();for(const axis of ['temperature','humidity'])for(const part of ['mode','min','max'])$(`#axis-${axis}-${part}`).value=axes[axis][part];updateAxisControls();}
+function applyAxes(event){
+  event.preventDefault();const axes=defaultAxes();
+  for(const axis of ['temperature','humidity']){axes[axis].mode=$(`#axis-${axis}-mode`).value;if(axes[axis].mode==='manual')for(const bound of ['min','max']){const raw=$(`#axis-${axis}-${bound}`).value;if(raw==='')throw new Error('Beide Achsengrenzen angeben.');axes[axis][bound]=Number(raw);}}
+  state.axes=validateAxes(axes);if(state.chartData)renderChart(state.chartData);$('#chart-view-status').textContent='Achsen angewendet. „Ansicht speichern“ sichert die Ansicht in diesem Browser.';
+}
+function readChartViews(){
+  try{const value=JSON.parse(localStorage.getItem(CHART_VIEW_KEY)||'null');return value?.version===1&&Array.isArray(value.views)&&value.views.length<=20?value.views:[];}catch{return [];}
+}
+function validateChartView(value){
+  if(!value||value.key!==rangeIdentity()||!Number.isFinite(value.range?.start)||!Number.isFinite(value.range?.end)||value.range.start>value.range.end||Math.abs(value.range.start)>8640000000000000||Math.abs(value.range.end)>8640000000000000||!Number.isFinite(value.zoom?.start)||!Number.isFinite(value.zoom?.end)||value.zoom.start<0||value.zoom.end>100||value.zoom.start>value.zoom.end)throw new Error('Gespeicherte Diagrammansicht ungültig.');
+  const selection={};for(const name of ['Temperatur','Relative Feuchte'])if(typeof value.selection?.[name]==='boolean')selection[name]=value.selection[name];
+  return {key:value.key,range:{start:value.range.start,end:value.range.end},zoom:{start:value.zoom.start,end:value.zoom.end},axes:validateAxes(value.axes),selection};
+}
+function saveChartView(){
+  const range=chartRange();if(!range)throw new Error('Zuerst einen Verlauf laden.');
+  const zoom=state.chart?.getOption()?.dataZoom?.[0];
+  const view=validateChartView({key:rangeIdentity(),range,zoom:{start:zoom?.start??0,end:zoom?.end??100},axes:state.axes||defaultAxes(),selection:state.selection});
+  const views=readChartViews().filter(item=>item?.key!==view.key).slice(-19);views.push(view);localStorage.setItem(CHART_VIEW_KEY,JSON.stringify({version:1,views}));
+  updateChartControls();$('#chart-view-status').textContent='Ansicht mit Zeitraum, Zoom, Achsen und Kurvenauswahl in diesem Browser gespeichert.';
+}
+async function loadChartView(){
+  const view=validateChartView(readChartViews().find(item=>item?.key===rangeIdentity()));
+  state.axes=view.axes;state.selection=view.selection;updateAxisForm();
+  $('#range-start').value=rangeInput(view.range.start);$('#range-end').value=rangeInput(view.range.end);
+  state.shiftedRange={...view.range,identity:view.key,inputs:[$('#range-start').value,$('#range-end').value]};
+  $('#period').value='custom';$('#custom-period').hidden=false;
+  if(state.source==='live'){state.follow=false;$('#live-follow').checked=false;}
+  const loaded=await loadHistory();if(!loaded||rangeIdentity()!==view.key)return;
+  state.chart?.dispatchAction({type:'dataZoom',start:view.zoom.start,end:view.zoom.end});
+  $('#chart-view-status').textContent='Gespeicherte Ansicht geladen; der gespeicherte Zeitraum wird angezeigt.';
+}
 function initChart() {
   if(!window.echarts) {notice('Lokale Diagrammbibliothek fehlt. Installation prüfen.',true);return;}
   state.chart=echarts.init($('#chart'),null,{renderer:'canvas'});
@@ -127,24 +171,25 @@ function renderChart(data, reset=false) {
   if(!state.chart) return;
   const css=getComputedStyle(document.documentElement), text=css.getPropertyValue('--muted').trim(), border=css.getPropertyValue('--border').trim();
   const savedZoom=reset?null:state.chart.getOption()?.dataZoom,domain=chartRange();
+  const axes=state.axes||defaultAxes(),axisLimits=axis=>({min:axes[axis].mode==='manual'?axes[axis].min:null,max:axes[axis].mode==='manual'?axes[axis].max:null});
   const lines=[{name:'Warnlinie',yAxis:state.saved.humidity_warning,lineStyle:{color:'#c69e52'}},{name:'Kritische Linie',yAxis:state.saved.humidity_critical,lineStyle:{color:'#d47c7c'}}];
   state.chart.setOption({animation:false,color:['#f3a35c','#65aaff'],textStyle:{color:text},legend:{top:0,textStyle:{color:text},selected:state.selection},
     grid:{left:55,right:55,top:62,bottom:90},tooltip:{trigger:'axis',axisPointer:{type:'cross'},formatter:params=>{const valid=params.filter(p=>p.value[1]!=null);return valid.length?`${chartDate(valid[0].value[0])}<br>${valid.map(p=>`${p.marker}${p.seriesName}: ${number(p.value[1])} ${p.seriesIndex===0?'°C':'%'}`).join('<br>')}`:'Datenlücke';}},
     xAxis:{type:'time',min:domain?.start??null,max:domain?.end??null,boundaryGap:false,axisLabel:{color:text,formatter:value=>new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:state.source==='device'?'UTC':state.saved.timezone}).format(value)},splitLine:{show:false}},
-    yAxis:[{type:'value',name:'°C',scale:true,axisLabel:{color:text},splitLine:{lineStyle:{color:border}}},{type:'value',name:'% rF',min:0,max:100,axisLabel:{color:text},splitLine:{show:false}}],
+    yAxis:[{type:'value',name:'°C',scale:true,...axisLimits('temperature'),axisLabel:{color:text},splitLine:{lineStyle:{color:border}}},{type:'value',name:'% rF',scale:true,...axisLimits('humidity'),axisLabel:{color:text},splitLine:{show:false}}],
     dataZoom:[{type:'inside',xAxisIndex:0,start:savedZoom?.[0]?.start??0,end:savedZoom?.[0]?.end??100},{type:'slider',xAxisIndex:0,bottom:12,height:25,start:savedZoom?.[1]?.start??0,end:savedZoom?.[1]?.end??100,textStyle:{color:text}}],
     series:[{name:'Temperatur',type:'line',showSymbol:false,connectNulls:false,data:data.points.map(p=>[p[0],p[1]])},{name:'Relative Feuchte',type:'line',showSymbol:false,connectNulls:false,yAxisIndex:1,data:data.points.map(p=>[p[0],p[2]]),markLine:{silent:true,symbol:'none',label:{show:false},data:lines}}]}, {notMerge:true});
   updateChartControls();
 }
 async function loadHistory(refresh=false) {
-  const query=buildQuery(); if(!query) {state.query=null;state.chartData=null;state.chart?.clear();$('#chart-caption').textContent='Keine Daten ausgewählt.';updateChartControls();return;}
-  const request=++state.loading; const data=await api(`history?${query}`);if(request!==state.loading)return;
-  const assignment=query.get('source')==='device'?await api(`time-assignment?${new URLSearchParams({logger:query.get('logger'),snapshot:query.get('snapshot')})}`):null;if(request!==state.loading)return;state.timeAssignment=assignment;
+  const query=buildQuery(); if(!query) {state.query=null;state.chartData=null;state.chart?.clear();$('#chart-caption').textContent='Keine Daten ausgewählt.';updateChartControls();return false;}
+  const request=++state.loading; const data=await api(`history?${query}`);if(request!==state.loading)return false;
+  const assignment=query.get('source')==='device'?await api(`time-assignment?${new URLSearchParams({logger:query.get('logger'),snapshot:query.get('snapshot')})}`):null;if(request!==state.loading)return false;state.timeAssignment=assignment;
   $('#chart-export-assigned').hidden=!assignment;$('#chart-export-assigned').disabled=!assignment?.timezone_confirmed;$('#timezone-panel').hidden=!assignment;
   if(assignment){$('#timezone-status').textContent=assignment.timezone_confirmed?`${assignment.timezone} bestätigt · ${assignment.assigned_count} Werte zugeordnet · ${assignment.unassigned_count} spätere/unbestätigte Werte · Datum weiterhin ungeprüft`:'Zeitzone dieses Historienstands noch nicht bestätigt.';if(assignment.timezone)$('#history-timezone').value=assignment.timezone;}
   const reset=!refresh&&state.query?.toString()!==query.toString();state.query=query;state.chartData=data;
   $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}`;
-  renderChart(data,reset);
+  renderChart(data,reset);return true;
 }
 function chartRange(visible=false) {
   if(!state.query||!state.chartData)return null;
@@ -157,6 +202,7 @@ function chartRange(visible=false) {
 }
 function updateChartControls() {
   const range=chartRange(true),movable=!!range&&range.end>range.start;
+  $('#chart-view-save').disabled=!range;$('#chart-view-load').disabled=!state.query||!readChartViews().some(item=>item?.key===rangeIdentity());
   $('#chart-previous').disabled=!movable;$('#chart-next').disabled=!movable;$('#chart-export-visible').disabled=!range;
   $('#chart-visible-range').textContent=range?`Sichtbarer Ausschnitt: ${chartDate(range.start)} bis ${chartDate(range.end)}${state.source==='device'?' · ungeprüfter Gerätekalender':''}`:'';
 }
@@ -460,6 +506,12 @@ async function main() {
   $('#logger-select').addEventListener('change',guard(async()=>{state.logger=$('#logger-select').value;await loadHistory();}));
   $('#period').addEventListener('change',guard(async()=>{$('#custom-period').hidden=$('#period').value!=='custom';if($('#period').value!=='custom')await loadHistory();}));
   $('#apply-range').addEventListener('click',guard(()=>loadHistory()));
+  updateAxisForm();
+  $('#chart-axes-form').addEventListener('submit',guard(applyAxes));
+  for(const axis of ['temperature','humidity'])$(`#axis-${axis}-mode`).addEventListener('change',updateAxisControls);
+  $('#chart-axes-reset').addEventListener('click',()=>{state.axes=defaultAxes();updateAxisForm();if(state.chartData)renderChart(state.chartData);$('#chart-view-status').textContent='Standardachsen wiederhergestellt.';});
+  $('#chart-view-save').addEventListener('click',guard(saveChartView));
+  $('#chart-view-load').addEventListener('click',guard(loadChartView));
   $('#chart-reset').addEventListener('click',()=>{if(state.chartData)renderChart(state.chartData,true);});
   $('#chart-fullscreen').addEventListener('click',guard(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else await $('#chart-panel').requestFullscreen();}));
   $('#chart-export').addEventListener('click',guard(()=>exportCSV()));
