@@ -15,12 +15,13 @@
   <nav aria-label="Hauptnavigation">
     <button data-page="overview" aria-current="page">Übersicht</button>
     <button data-page="history">Klimaverlauf</button>
+    <button data-page="climate">Taupunkt / Feuchte</button>
     <button data-page="simulation">Testdaten</button>
     <button data-page="logger">Logger / Bluetooth</button>
     <button data-page="settings">Einstellungen</button>
     <button data-page="diagnostics">Diagnose</button>
   </nav>
-  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">0.4.0-dev</span><br>Deine Daten bleiben hier.</p></div>
+  <div class="sidebar-footer"><span class="tag">LOKAL · OFFLINE</span><p>Linux V<span id="version">…</span><br>Deine Daten bleiben hier.</p></div>
 </aside>
 <main>
   <header><div><p class="eyebrow">BT-06 WEBLOGGER</p><h1 id="page-title">Übersicht</h1></div><span class="tag warning">Entwicklung · Testbetrieb</span></header>
@@ -32,7 +33,7 @@
     <div class="section-heading"><h2>Messstellen</h2><button class="secondary" id="overview-export" disabled>CSV exportieren</button></div>
     <p class="muted" id="overview-note">Letzter Testlauf · keine Livewerte und keine Schimmelbewertung.</p>
     <div id="cards" class="cards"><div class="empty"><h3>Noch keine Messdaten</h3><p>Erzeuge einen Testlauf, um die Oberfläche ohne Logger auszuprobieren.</p><button data-go="simulation">Testdaten erzeugen</button></div></div>
-    <article class="panel"><h2>Entwicklungsstand</h2><p>Liveempfang und manuelles Historienlesen für BT06 2.05 sind verfügbar. Geprüfte Fortsetzungen bilden einen Verlauf; Host-Empfänge und Simulation bleiben eigene Datenquellen. Gerätezeit und Zeitzone sind noch nicht verifiziert. Gerätekonfiguration folgt in V0.4, Klimaberechnungen in V0.6.</p></article>
+    <article class="panel"><h2>Entwicklungsstand</h2><p>Liveempfang und manuelles Historienlesen für BT06 2.05 sind verfügbar. Geprüfte Fortsetzungen bilden einen Verlauf; Host-Empfänge und Simulation bleiben eigene Datenquellen. Gerätezeit und Zeitzone sind noch nicht verifiziert. Belegte Geräteeinstellungen und erste Klimaberechnungen sind verfügbar; weitere Gerätefunktionen und die zeitabhängige Risikoauswertung bleiben offen.</p></article>
   </section>
 
   <section id="page-history" class="page" hidden>
@@ -63,6 +64,20 @@
           <p class="hint">Die Bestätigung betrifft nur die Zeitzone dieses Datenstands. Datum und Geräteuhr werden nicht als korrekt bestätigt. Originaldateien bleiben erhalten; spätere Messungen werden nicht automatisch mit bestätigt.</p>
         </form>
       </details>
+    </article>
+  </section>
+
+  <section id="page-climate" class="page" hidden>
+    <article class="panel"><h2>Taupunkt und Oberflächenbetrachtung</h2>
+      <p>Temperatur und Feuchte ergeben Taupunkt, absolute Feuchte und die Temperaturen, bei denen an einer Oberfläche rechnerisch 70 oder 80 % relative Feuchte erreicht werden.</p>
+      <form id="climate-form"><div class="settings-grid">
+        <label>Lufttemperatur (°C)<input id="climate-temperature" type="number" min="-45" max="60" step="any" value="20" required></label>
+        <label>Relative Feuchte (% rF)<input id="climate-humidity" type="number" min="0" max="100" step="any" value="50" required></label>
+        <label>Angenommene Oberflächentemperatur (°C, optional)<input id="climate-surface" type="number" min="-45" max="60" step="any"></label>
+      </div><div class="button-row"><button type="submit">Berechnen</button><button id="climate-copy" type="button" class="secondary">Letzten dargestellten Wert übernehmen</button></div></form>
+      <p id="climate-input-source" class="hint">Beispielwerte; keine übernommene Messung. Die Oberflächentemperatur ist eine manuelle Annahme.</p>
+      <p id="climate-status" role="status" class="hint">Noch keine Berechnung.</p><dl id="climate-results"></dl>
+      <p class="hint">Berechnete Momentaufnahme über flüssigem Wasser, gültiger Temperaturbereich −45 bis +60 °C. Unter 0 °C kein Frostpunktmodell. Ohne Oberflächentemperatur keine Oberflächenbewertung. Keine zeitabhängige Schimmelbewertung; diese folgt in einem weiteren Schritt.</p>
     </article>
   </section>
 

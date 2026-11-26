@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.6.0-dev · 2026-11-27
+
+- Taupunkt und absolute Feuchte aus gültigen Temperatur-/Feuchtepaaren berechnen. Dokumentiertes Magnus-Modell über Wasser mit Bereich −45 bis +60 °C; keine Extrapolation, fehlende Werte und 0 % rF ohne erfundenen Taupunkt. Originalmessdaten bleiben unverändert.
+- Taupunktkurve im gemeinsamen °C-Diagramm, berechnete Werte in Live-/Testdatenkarten. Ableitung vor Verdichtung, Extrema sämtlicher Größen und Datenlücken erhalten; ursprüngliche dreispaltige Punktantwort bleibt kompatibel.
+- Neue Seite Taupunkt/Feuchte mit Rechner für Sättigungs-/Partialdruck, absolute Feuchte, kritische Oberflächentemperaturen bei 70/80 % rF, angenommene Oberflächenfeuchte und Taupunktabstand. Herkunft übernommener Werte und manuelle Oberflächenannahme sichtbar; überholte Berechnungsantworten werden verworfen. Keine zeitabhängige Schimmelbewertung.
+- 32 gezielte Python-Tests und Browserprüfung bestanden; Performance mit synthetischen Daten gemessen. V0.5.1 im Dienst bestätigt; keine Geräteänderungen.
+
 ## 0.5.1-dev · 2026-11-27
 
 - Temperatur- und Feuchteachse unabhängig automatisch oder mit festen Grenzen darstellen. Fehlerhafte/unvollständige Grenzen verändern das Diagramm nicht; Standardachsen und Zoom lassen sich getrennt zurücksetzen.

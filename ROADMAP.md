@@ -27,6 +27,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.5.0 im Dienst bestätigt. V0.5.1 vorbereitet: unabhängige automatische/manuelle Temperatur-/Feuchteachsen, Standardachsen und gespeicherte Browseransichten je Quelle/Logger/Datenstand. Ansicht stellt Zeitraum, Zoom, Achsen und Kurvenauswahl wieder her, auch nach Browserneuladen. Gerätefunktionen mit fehlendem Protokollnachweis bleiben weiterhin offen; V1.0 ist nicht abgenommen.
 
+- V0.5.1 im Dienst bestätigt. V0.6.0 vorbereitet: Taupunkt, absolute Feuchte, Sättigungs-/Partialdruck und Oberflächenrechner mit 70/80-%-Temperaturen, Feuchte und Taupunktabstand; Taupunktkurve und Verdichtung mit Erhalt abgeleiteter Extrema. 32 gezielte Python-Tests und Browserprüfung bestanden. Als Nächstes innerhalb V0.6: zeitabhängige Risikoauswertung mit Annahmen, Datenlücken, Mindestdauer und Hysterese.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

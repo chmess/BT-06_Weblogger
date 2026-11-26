@@ -45,6 +45,16 @@ class ApiTests(unittest.TestCase):
     def auth(self):
         return {"Origin": self.origin, "X-CSRF-Token": self.app.csrf}
 
+    def test_climate_calculator_is_read_only_validated_and_session_protected(self):
+        value={'temperature_c':20,'humidity_pct':50,'surface_temperature_c':10}
+        self.assertEqual(self.request('/klima/api/climate/calculate',value)[0],403)
+        status,_,raw=self.request('/klima/api/climate/calculate',value,headers=self.auth())
+        self.assertEqual(status,200);result=json.loads(raw)
+        self.assertAlmostEqual(result['dew_point_c'],9.26,delta=0.02)
+        self.assertFalse(result['condensation_possible'])
+        for invalid in ({**value,'humidity_pct':101},{**value,'surface_temperature_c':True},{**value,'unknown':True}):
+            self.assertEqual(self.request('/klima/api/climate/calculate',invalid,headers=self.auth())[0],400)
+
     def test_auto_sync_settings_are_opt_in_and_protected(self):
         auto = json.loads(self.request('/klima/api/autosync')[2])
         self.assertFalse(auto['config']['enabled'])

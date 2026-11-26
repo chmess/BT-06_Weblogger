@@ -161,3 +161,7 @@ Chromium-Browserprüfung mit synthetischen Daten bestanden: alle Zeitvorgaben, Z
 ## V0.5.1
 
 Erweiterte Chromium-Browserprüfung bestanden: Temperatur-/Feuchteachsen mit unabhängigen festen Grenzen, ungültige Grenzreihenfolge ohne Änderung der aktiven Achsen, getrenntes Zurücksetzen, Speicher-/Ladeansicht mit exaktem Zeitbereich, Zoom und ausgeblendeter Kurve. Nach echtem Seitenneuladen bleibt die browserlokale Ansicht verfügbar und stellt Grenzen, Zoom und Kurvenauswahl wieder her. Ungültiger gespeicherter Zoombereich wird abgewiesen. Bestehende Export-, Zeitumstellungs-, Vollbild-, Mobil- und Geräteeinstellungsprüfungen weiterhin bestanden; keine JavaScript-Fehler oder externen Anfragen. Backend-Tests bei unveränderter API/CSV/BLE nicht wiederholt. Keine Geräteänderung.
+
+## V0.6.0
+
+6 Klimatests, 10 Kerntests und 16 API-Tests bestanden. Prüft Referenzwerte, Sättigung an Modellgrenzen, 70-/80-%-Schwellen, fehlende Oberflächenannahme, Kondensationsbedingung, 0 % rF, Ausreißer, Bool-/Text-/NaN-/Riesenwerte und fehlende Felder. Ableitung vor Verdichtung erhält ein Taupunktmaximum, das weder Temperatur- noch Feuchtemaximum ist; ursprüngliches Punktformat, gemeinsame Zeitkoordinaten und Lücken bleiben erhalten. Browserprüfung bestätigt Taupunktkurve, Rechnerwerte, Herkunft, Oberflächenannahme, Verwerfen überholter Antworten und mobile Breite; bestehende Diagramm-/CSV-/Einstellungsprüfungen weiterhin bestanden. Keine Geräteaktion. Synthetische Laufzeitmessung in KLIMA.md dokumentiert.

@@ -1,7 +1,7 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
 const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null, autoSync:null, timeAssignment:null};
-const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
+const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
 function notice(message, error=false) { const box=$('#notice'); box.textContent=message; box.hidden=false; box.classList.toggle('error', error); }
@@ -75,6 +75,29 @@ function chooseLogger() {
   if(state.source==='device') populateSnapshots();
   $('#chart-export').disabled=!state.logger;$('#overview-export').disabled=!state.logger;
 }
+function climateSummary(value){
+  if(!value||value.absolute_humidity_g_m3==null)return element('p','Berechnete Feuchtewerte nicht verfügbar (fehlende Eingaben oder außerhalb des Modells).','hint');
+  return element('p',`Berechnet: Taupunkt ${number(value.dew_point_c)} °C · absolute Feuchte ${number(value.absolute_humidity_g_m3)} g/m³${value.dew_point_c==null?' · Taupunkt nicht im Modellbereich':''}`,'hint');
+}
+let climateRevision=0;
+async function calculateClimate(event){
+  event.preventDefault();const value={temperature_c:Number($('#climate-temperature').value),humidity_pct:Number($('#climate-humidity').value),surface_temperature_c:$('#climate-surface').value===''?null:Number($('#climate-surface').value)};
+  if($('#climate-temperature').value===''||$('#climate-humidity').value==='')throw new Error('Lufttemperatur und Feuchte angeben.');
+  const revision=++climateRevision,target=$('#climate-results');target.replaceChildren();$('#climate-status').textContent='Berechnung läuft …';
+  let result;try{result=await post('climate/calculate',value);}catch(error){if(revision===climateRevision)$('#climate-status').textContent='Berechnung fehlgeschlagen.';throw error;}
+  if(revision!==climateRevision)return;
+  const pairs=[['Taupunkt',result.dew_point_c,'°C'],['Absolute Feuchte',result.absolute_humidity_g_m3,'g/m³'],['Sättigungsdampfdruck',result.saturation_pressure_hpa,'hPa'],['Wasserdampf-Partialdruck',result.vapor_pressure_hpa,'hPa'],['Oberflächentemperatur bei 70 % rF',result.critical_surface_70_c,'°C'],['Oberflächentemperatur bei 80 % rF',result.critical_surface_80_c,'°C'],['Oberfläche: Abstand zum Taupunkt',result.surface_dew_point_margin_c,'K']];
+  for(const [label,reading,unit] of pairs)target.append(element('dt',label),element('dd',reading==null?'Nicht verfügbar':`${number(reading,2)} ${unit}`));
+  target.append(element('dt','Rechnerische Oberflächenfeuchte'),element('dd',result.surface_relative_humidity_pct==null?'Keine Oberflächentemperatur angegeben':result.surface_relative_humidity_pct>=100?'≥ 100 % rF · Kondensationsbedingung':`${number(result.surface_relative_humidity_pct,1)} % rF`));
+  $('#climate-status').textContent=(result.condensation_possible===true?'An der angenommenen Oberfläche ist die Kondensationsbedingung erreicht. ':result.condensation_possible===false?'An der angenommenen Oberfläche ist die Kondensationsbedingung rechnerisch nicht erreicht. ':'Keine Oberflächenbewertung ohne Annahme. ')+(result.status==='ok'?'Momentaufnahme; keine zeitabhängige Schimmelbewertung.':'Taupunkt nicht verfügbar: keine Feuchte oder außerhalb des Modellbereichs.');
+}
+async function copyClimateReading(){
+  const revision=++climateRevision,key=rangeIdentity(),loaded=await loadHistory();if(!loaded||revision!==climateRevision||key!==rangeIdentity())return;const point=state.chartData?.latest;
+  if(!point||point[1]==null||point[2]==null)throw new Error('Kein vollständiger Wert im ausgewählten Zeitraum.');
+  $('#climate-temperature').value=point[1];$('#climate-humidity').value=point[2];
+  $('#climate-input-source').textContent=`Übernommen aus ${state.source==='device'?'Loggerhistorie · Gerätezeit ungeprüft':state.source==='live'?'gespeicherten BLE-Empfängen':'synthetischen Testdaten'}: ${chartDate(point[0])}. Die Oberflächentemperatur bleibt eine manuelle Annahme.`;
+  $('#climate-results').replaceChildren();$('#climate-status').textContent='Wert übernommen; zum Auswerten „Berechnen“ wählen.';
+}
 async function renderCards() {
   if(state.source==='live')return renderLiveCards();
   if(state.source==='device')return renderDeviceCards();
@@ -90,6 +113,7 @@ async function renderCards() {
     for(const [label,val,unit,cls] of [['Temperatur',data.latest?.[1],'°C','temperature'],['Relative Feuchte',data.latest?.[2],'%','humidity']]) {
       const reading=element('div',null,'reading');reading.append(element('strong',`${number(val)} ${unit}`,cls),element('span',label));readings.append(reading);
     }
+    card.append(climateSummary(data.climate?.latest));
     card.append(readings,element('p',`24 h: ${number(data.min_temperature)}–${number(data.max_temperature)} °C · ${number(data.min_humidity,0)}–${number(data.max_humidity,0)} % rF`,'hint'));
     card.append(element('time',data.latest?`Letzter Testwert: ${date(data.latest[0])}`:'Keine Werte im Zeitraum.'));
     const button=element('button','Verlauf ansehen','secondary');button.addEventListener('click',guard(async()=>{state.logger=logger.id;$('#logger-select').value=logger.id;go('history');await loadHistory();}));card.append(button);cards.append(card);
@@ -138,7 +162,7 @@ function readChartViews(){
 }
 function validateChartView(value){
   if(!value||value.key!==rangeIdentity()||!Number.isFinite(value.range?.start)||!Number.isFinite(value.range?.end)||value.range.start>value.range.end||Math.abs(value.range.start)>8640000000000000||Math.abs(value.range.end)>8640000000000000||!Number.isFinite(value.zoom?.start)||!Number.isFinite(value.zoom?.end)||value.zoom.start<0||value.zoom.end>100||value.zoom.start>value.zoom.end)throw new Error('Gespeicherte Diagrammansicht ungültig.');
-  const selection={};for(const name of ['Temperatur','Relative Feuchte'])if(typeof value.selection?.[name]==='boolean')selection[name]=value.selection[name];
+  const selection={};for(const name of ['Temperatur','Relative Feuchte','Taupunkt'])if(typeof value.selection?.[name]==='boolean')selection[name]=value.selection[name];
   return {key:value.key,range:{start:value.range.start,end:value.range.end},zoom:{start:value.zoom.start,end:value.zoom.end},axes:validateAxes(value.axes),selection};
 }
 function saveChartView(){
@@ -173,12 +197,12 @@ function renderChart(data, reset=false) {
   const savedZoom=reset?null:state.chart.getOption()?.dataZoom,domain=chartRange();
   const axes=state.axes||defaultAxes(),axisLimits=axis=>({min:axes[axis].mode==='manual'?axes[axis].min:null,max:axes[axis].mode==='manual'?axes[axis].max:null});
   const lines=[{name:'Warnlinie',yAxis:state.saved.humidity_warning,lineStyle:{color:'#c69e52'}},{name:'Kritische Linie',yAxis:state.saved.humidity_critical,lineStyle:{color:'#d47c7c'}}];
-  state.chart.setOption({animation:false,color:['#f3a35c','#65aaff'],textStyle:{color:text},legend:{top:0,textStyle:{color:text},selected:state.selection},
-    grid:{left:55,right:55,top:62,bottom:90},tooltip:{trigger:'axis',axisPointer:{type:'cross'},formatter:params=>{const valid=params.filter(p=>p.value[1]!=null);return valid.length?`${chartDate(valid[0].value[0])}<br>${valid.map(p=>`${p.marker}${p.seriesName}: ${number(p.value[1])} ${p.seriesIndex===0?'°C':'%'}`).join('<br>')}`:'Datenlücke';}},
+  state.chart.setOption({animation:false,color:['#f3a35c','#65aaff','#70c7a2'],textStyle:{color:text},legend:{top:0,textStyle:{color:text},selected:state.selection},
+    grid:{left:55,right:55,top:62,bottom:90},tooltip:{trigger:'axis',axisPointer:{type:'cross'},formatter:params=>{const valid=params.filter(p=>p.value[1]!=null);return valid.length?`${chartDate(valid[0].value[0])}<br>${valid.map(p=>`${p.marker}${p.seriesName}: ${number(p.value[1])} ${p.seriesName==='Relative Feuchte'?'% rF':'°C'}`).join('<br>')}`:'Datenlücke';}},
     xAxis:{type:'time',min:domain?.start??null,max:domain?.end??null,boundaryGap:false,axisLabel:{color:text,formatter:value=>new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:state.source==='device'?'UTC':state.saved.timezone}).format(value)},splitLine:{show:false}},
     yAxis:[{type:'value',name:'°C',scale:true,...axisLimits('temperature'),axisLabel:{color:text},splitLine:{lineStyle:{color:border}}},{type:'value',name:'% rF',scale:true,...axisLimits('humidity'),axisLabel:{color:text},splitLine:{show:false}}],
     dataZoom:[{type:'inside',xAxisIndex:0,start:savedZoom?.[0]?.start??0,end:savedZoom?.[0]?.end??100},{type:'slider',xAxisIndex:0,bottom:12,height:25,start:savedZoom?.[1]?.start??0,end:savedZoom?.[1]?.end??100,textStyle:{color:text}}],
-    series:[{name:'Temperatur',type:'line',showSymbol:false,connectNulls:false,data:data.points.map(p=>[p[0],p[1]])},{name:'Relative Feuchte',type:'line',showSymbol:false,connectNulls:false,yAxisIndex:1,data:data.points.map(p=>[p[0],p[2]]),markLine:{silent:true,symbol:'none',label:{show:false},data:lines}}]}, {notMerge:true});
+    series:[{name:'Temperatur',type:'line',showSymbol:false,connectNulls:false,data:data.points.map(p=>[p[0],p[1]])},{name:'Relative Feuchte',type:'line',showSymbol:false,connectNulls:false,yAxisIndex:1,data:data.points.map(p=>[p[0],p[2]]),markLine:{silent:true,symbol:'none',label:{show:false},data:lines}},{name:'Taupunkt',type:'line',showSymbol:false,connectNulls:false,lineStyle:{type:'dashed'},data:(data.climate?.points||data.points.map(p=>[p[0],null])).map(p=>[p[0],p[1]])}]}, {notMerge:true});
   updateChartControls();
 }
 async function loadHistory(refresh=false) {
@@ -188,7 +212,7 @@ async function loadHistory(refresh=false) {
   $('#chart-export-assigned').hidden=!assignment;$('#chart-export-assigned').disabled=!assignment?.timezone_confirmed;$('#timezone-panel').hidden=!assignment;
   if(assignment){$('#timezone-status').textContent=assignment.timezone_confirmed?`${assignment.timezone} bestätigt · ${assignment.assigned_count} Werte zugeordnet · ${assignment.unassigned_count} spätere/unbestätigte Werte · Datum weiterhin ungeprüft`:'Zeitzone dieses Historienstands noch nicht bestätigt.';if(assignment.timezone)$('#history-timezone').value=assignment.timezone;}
   const reset=!refresh&&state.query?.toString()!==query.toString();state.query=query;state.chartData=data;
-  $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}`;
+  $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}${data.climate?' · Taupunkt berechnet (Magnus über Wasser)':''}`;
   renderChart(data,reset);return true;
 }
 function chartRange(visible=false) {
@@ -455,6 +479,7 @@ async function renderLiveCards() {
     const card=element('article',null,'card');card.append(element('div',fresh?'BLE · AKTUELLER EMPFANG':'BLE · GESPEICHERT / VERALTET','source'),element('h3',logger.name));
     const readings=element('div',null,'readings');
     for(const [label,value,unit,cls] of [['Temperatur',reading?reading.temperature_c:data.latest?.[1],'°C','temperature'],['Relative Feuchte',reading?reading.humidity_pct:data.latest?.[2],'%','humidity']]){const block=element('div',null,'reading');block.append(element('strong',`${number(value)} ${unit}`,cls),element('span',label));readings.append(block);}
+    card.append(climateSummary(reading?state.live.latest_climate:data.climate?.latest));
     card.append(readings,element('p',reading?`${number(reading.voltage_v,2)} V · ${reading.rssi} dBm · ${reading.recording} · Firmware ${reading.firmware}`:'Keine aktuelle Aussendung in dieser Sitzung.','hint'));
     card.append(element('time',reading?`Empfangen: ${date(reading.received_at)}`:data.latest?`Zuletzt gespeichert: ${date(data.latest[0])}`:'Noch kein gespeicherter Wert.'));
     if(state.live?.error)card.append(element('p',state.live.error,'hint'));
@@ -545,6 +570,9 @@ async function main() {
   $('#source-select').addEventListener('change',guard(async()=>{setSource($('#source-select').value);await renderCards();await loadHistory();}));
   $('#live-follow').addEventListener('change',guard(async()=>{state.follow=$('#live-follow').checked;if(state.follow)await loadHistory();}));
   $('#overview-export').addEventListener('click',guard(async()=>{await loadHistory();exportCSV();}));
+  $('#climate-form').addEventListener('submit',guard(calculateClimate));
+  $('#climate-form').addEventListener('input',()=>{climateRevision++;$('#climate-results').replaceChildren();$('#climate-status').textContent='Eingaben geändert; erneut berechnen.';$('#climate-input-source').textContent='Manuelle Eingaben; Oberflächentemperatur als Annahme.';});
+  $('#climate-copy').addEventListener('click',guard(copyClimateReading));
   $('#simulation-form').addEventListener('submit',guard(async event=>{
     event.preventDefault();const button=event.target.querySelector('button[type=submit]');button.disabled=true;button.textContent='Wird erzeugt …';
     try{const form=new FormData(event.target);const result=await post('simulation',{scenario:form.get('scenario'),days:Number(form.get('days')),interval_minutes:Number(form.get('interval_minutes')),seed:Number(form.get('seed'))});setSource('simulation');await refreshRuns(result.id);go('history');await loadHistory();notice('Testdaten gespeichert. Alle Werte sind synthetisch.');}finally{button.disabled=false;button.textContent='Testdaten erzeugen';}

@@ -7,6 +7,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from .climate import MODEL,air_values
+
 FIELDS = ["Schema", "DatensatzID", "Zeitstempel", "Temperatur", "Feuchte", "Batterie", "RSSI", "Quelle", "Messstelle", "Qualitaet"]
 ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$")
 
@@ -69,17 +71,20 @@ def read_months(folder, start=None, end=None, fields=FIELDS):
 
 
 def chart_data(rows, interval_minutes, budget=1600):
-    """Bounded chart payload, including both T/RH extrema and explicit gaps."""
+    """Derive before decimation; retain extrema of T/RH/dew point/density."""
     points = []
     for row in rows:
         points.append([int(parse_time(row["Zeitstempel"]).timestamp() * 1000),
                        float(row["Temperatur"].replace(",", ".")) if row["Temperatur"] else None,
                        float(row["Feuchte"].replace(",", ".")) if row["Feuchte"] else None])
+        derived=air_values(points[-1][1],points[-1][2])
+        points[-1].extend((derived["dew_point_c"],derived["absolute_humidity_g_m3"]))
     if not points:
         return {"points": [], "raw_count": 0, "latest": None, "min_temperature": None,
-                "max_temperature": None, "min_humidity": None, "max_humidity": None}
+                "max_temperature": None, "min_humidity": None, "max_humidity": None,
+                "climate":{"model":MODEL,"latest":None,"points":[],"min_dew_point_c":None,"max_dew_point_c":None}}
     count = len(points)
-    summary = {"raw_count": count, "latest": points[-1],
+    summary = {"raw_count": count, "latest": points[-1][:3],
                "min_temperature": min((p[1] for p in points if p[1] is not None), default=None),
                "max_temperature": max((p[1] for p in points if p[1] is not None), default=None),
                "min_humidity": min((p[2] for p in points if p[2] is not None), default=None),
@@ -90,10 +95,11 @@ def chart_data(rows, interval_minutes, budget=1600):
     for i in range(1, count):
         if points[i][0] - points[i - 1][0] > gap_ms or [v is None for v in points[i][1:]] != [v is None for v in points[i-1][1:]]:
             selected.update((i - 1, i))
-    width = max(1, (count + budget // 4 - 1) // (budget // 4))
+    buckets=max(1,budget//8)
+    width = max(1, (count+buckets-1)//buckets)
     for left in range(0, count, width):
         indices = range(left, min(left + width, count))
-        for column in (1, 2):
+        for column in (1, 2, 3, 4):
             valid = [i for i in indices if points[i][column] is not None]
             if valid:
                 selected.add(min(valid, key=lambda i: points[i][column]))
@@ -102,7 +108,10 @@ def chart_data(rows, interval_minutes, budget=1600):
     previous_index = None
     for i in sorted(selected):
         if previous_index is not None and i == previous_index + 1 and points[i][0] - points[previous_index][0] > gap_ms:
-            reduced.append([points[previous_index][0] + interval_minutes * 60_000, None, None])
+            reduced.append([points[previous_index][0] + interval_minutes * 60_000, None, None, None, None])
         reduced.append(points[i])
         previous_index = i
-    return {**summary, "points": reduced}
+    dew_points=[point[3] for point in points if point[3] is not None]
+    return {**summary, "points": [point[:3] for point in reduced],
+            "climate":{"model":MODEL,"latest":derived,"points":[[point[0],point[3],point[4]] for point in reduced],
+                       "min_dew_point_c":min(dew_points,default=None),"max_dew_point_c":max(dew_points,default=None)}}

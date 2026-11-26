@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from backend import VERSION
+from backend.common.climate import air_values,calculate
 from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import chart_data, csv_text, identifier, rows_in_range
@@ -157,7 +158,8 @@ def handler_for(app):
                 elif path == "/api/ble":
                     self.send(200, app.bluetooth.status())
                 elif path == "/api/live":
-                    self.send(200, app.receiver.status())
+                    live=app.receiver.status();reading=live.get("latest") or {}
+                    self.send(200, {**live,"latest_climate":air_values(reading.get("temperature_c"),reading.get("humidity_pct"))})
                 elif path == "/api/loggers":
                     self.send(200, {"loggers": app.loggers()})
                 elif path == "/api/sync":
@@ -272,6 +274,8 @@ def handler_for(app):
                         raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
                     if path == "/api/settings":
                         self.send(200, app.settings.save(value))
+                    elif path == "/api/climate/calculate":
+                        self.send(200,calculate(value))
                     elif path == "/api/autosync":
                         self.send(200, app.auto_sync.configure(value))
                     elif path == "/api/time-assignment":
