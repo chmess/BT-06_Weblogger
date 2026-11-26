@@ -7,3 +7,5 @@
 @media(max-width:700px){.source-strip{justify-content:flex-start}.source-strip label{width:100%;justify-content:space-between}.source-strip select{min-width:0;max-width:220px}.source-strip+div{margin-top:8px}}
 
 #chart-panel:fullscreen{height:100vh;overflow:auto;border-radius:0;background:var(--panel);padding:20px}#chart-panel:fullscreen #chart{height:max(300px,calc(100vh - 290px))}#chart-visible-range{overflow-wrap:anywhere}
+
+.table-scroll{max-width:100%;overflow-x:auto;margin:18px 0}.table-scroll table{width:100%;min-width:850px;border-collapse:collapse}.table-scroll th,.table-scroll td{text-align:left;padding:12px;border-bottom:1px solid var(--border);vertical-align:top}.table-scroll th{font-size:.8rem;color:var(--muted)}.table-scroll td{font-size:.85rem}

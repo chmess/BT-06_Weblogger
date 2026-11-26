@@ -44,3 +44,13 @@ Dauerverfahren aus Originalzeilen, unabhängig von Grafikverdichtung:
 Berichte nennen Beobachtungszeit, unbekannte Zeit, Zeit ab Schwelle, längste Phase und qualifizierte Phasen. Fehlende Oberflächenannahme bleibt ausdrücklich ohne Bewertung. Es werden höchstens die letzten 100 Phasendetails je Kanal übertragen; Gesamtzähler bleiben vollständig. Geänderte Auswahl kennzeichnet einen vorhandenen Bericht als zum vorherigen Zeitraum gehörend. Kein automatisches Wiederholen und keine dauerhafte Ereignisablage in dieser Version.
 
 Synthetischer Streaming-Test auf dem DeskPi: 43.201 Zeilen in etwa 1,77 s einschließlich Zeilengenerierung, drei Kanäle mit Differenzannahme. 1.080 Luftphasen gezählt, 100 Details übertragen. Keine CSV-/HTTP-/BLE-Leistungsmessung; Laufzeit unter aktueller Systemlast.
+
+## Grundstatistik (V0.7.0)
+
+Min/Max und Stichprobenmittel verwenden alle gültigen Originalwerte des ausgewählten Bereichs. Gültige Stichproben zählen gleich, unabhängig von ihrem zeitlichen Abstand. Das Zeitmittel gewichtet dagegen die lineare Verbindung benachbarter gültiger Messpaare nach deren Dauer. Paare mit mehr als dem 1,5-fachen nominalen Messintervall Abstand oder mit ungültigem Endpunkt werden nicht verbunden; keine Extrapolation über den ersten/letzten Wert hinaus.
+
+Bekannte und unbekannte Zeit werden je Größe ausgewiesen. Eine fehlende Temperatur kann z. B. die Taupunktabdeckung unterbrechen, während die separat vorhandene relative Feuchte weiter auswertbar bleibt. Bei einem Einzelwert ist ein Stichprobenmittel möglich, aber kein Zeitmittel und keine bekannte Paardauer. Größere Zeitlücken zählen nicht als zusätzliche Zeilen; fehlende Zeilenwerte und unbekannte Zeit sind unterschiedliche Kennzahlen.
+
+Taupunkt und absolute Feuchte werden vor der Aggregation aus jedem gültigen Originalpaar berechnet, einschließlich der vorhandenen Modellgrenzen. Die Statistik ist unabhängig von der Grafikverdichtung und beschreibt ausschließlich den ausgewerteten Zeitraum, keine aktuellen oder unbekannten Bedingungen. Keine zusätzliche Messdatenablage.
+
+Synthetischer DeskPi-Test für die Statistik: 43.201 Zeilen in etwa 2,38 s einschließlich Zeilengenerierung; aggregierte Antwort ohne Quellenmetadaten etwa 2,1 KB. Keine CSV-/HTTP-/BLE-Leistungsmessung.

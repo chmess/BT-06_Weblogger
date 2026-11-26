@@ -1,7 +1,7 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
 const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null, autoSync:null, timeAssignment:null};
-const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
+const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', statistics:'Statistik', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
 function notice(message, error=false) { const box=$('#notice'); box.textContent=message; box.hidden=false; box.classList.toggle('error', error); }
@@ -102,7 +102,7 @@ let riskRevision=0;
 function updateRiskControls(){const mode=$('#risk-mode').value,input=$('#risk-value');input.disabled=mode==='none';input.required=mode!=='none';input.min=mode==='fixed'?-45:0;input.max=mode==='fixed'?60:50;$('#risk-surface-label').textContent=mode==='fixed'?'Angenommene Oberfläche (°C)':mode==='delta'?'Angenommene Differenz unter Lufttemperatur (K)':'Oberflächenwert (nicht verwendet)';}
 function clearRisk(){riskRevision++;state.riskReport=null;$('#risk-results').replaceChildren();$('#risk-range').textContent='';$('#risk-status').textContent='Kriterien geändert; erneut auswerten.';}
 function markRiskStale(){riskRevision++;if(state.riskReport)$('#risk-status').textContent='Ansicht oder Quelle geändert. Der Bericht gehört weiterhin zum unten genannten Zeitraum; für die neue Auswahl erneut auswerten.';}
-function riskSelection(){return JSON.stringify([rangeIdentity(),$('#period').value,$('#range-start').value,$('#range-end').value]);}
+function selectionSignature(){return JSON.stringify([rangeIdentity(),$('#period').value,$('#range-start').value,$('#range-end').value]);}
 function renderRisk(result){
   const target=$('#risk-results');target.replaceChildren();
   for(const [key,title] of [['air','Luftfeuchte'],['surface','Oberfläche · Annahme'],['condensation','Kondensationsbedingung · Annahme']]){
@@ -119,19 +119,46 @@ function renderRisk(result){
   $('#risk-range').textContent=`${result.source}: ${result.range.start_ms==null?'kein Anfang':chartDate(result.range.start_ms)} bis ${result.range.end_ms==null?'kein Ende':chartDate(result.range.end_ms)}${result.clock_verified?'':' · Gerätekalender und UTC-Zuordnung ungeprüft'}. Oberflächenmodell: ${result.criteria.surface_mode==='none'?'keine Annahme':result.criteria.surface_mode==='fixed'?number(result.criteria.surface_value)+' °C konstant':number(result.criteria.surface_value)+' K unter Lufttemperatur'}.`;
   $('#risk-status').textContent='Auswertung aus Originalwerten abgeschlossen. Konfigurierbare Feuchteindikatoren; keine Schimmelwahrscheinlichkeit.';
 }
-async function analyzeRisk(visible=false){
-  const signature=riskSelection(),revision=++riskRevision;
+function analysisQuery(visible=false){
   if(visible&&(!state.query||state.chartContext!==rangeIdentity()))throw new Error('Zuerst den Klimaverlauf für die aktuelle Auswahl laden.');
   const base=visible?new URLSearchParams(state.query):buildQuery();if(!base)throw new Error('Zuerst eine Datenquelle und einen Logger wählen.');
   const query=new URLSearchParams(base);
   if(visible){const range=chartRange(true);if(!range)throw new Error('Kein sichtbarer Zeitraum.');query.set('start',new Date(range.start).toISOString());query.set('end',new Date(range.end).toISOString());}
+  return query;
+}
+async function analyzeRisk(visible=false){
+  const signature=selectionSignature(),revision=++riskRevision,query=analysisQuery(visible);
   for(const [key,id] of [['air_threshold','#risk-air'],['surface_threshold','#risk-surface'],['hysteresis','#risk-hysteresis'],['minimum_minutes','#risk-minimum']]){if($(id).value==='')throw new Error('Alle Auswertekriterien angeben.');query.set(key,$(id).value);}
   query.set('surface_mode',$('#risk-mode').value);query.set('surface_value',$('#risk-mode').value==='none'?'':$('#risk-value').value);
   $('#risk-status').textContent='Originalwerte werden ausgewertet …';
   let result;try{result=await api('risk?'+query);}catch(error){if(revision===riskRevision)$('#risk-status').textContent='Auswertung fehlgeschlagen.';throw error;}
-  if(revision!==riskRevision)return;if(signature!==riskSelection()){$('#risk-status').textContent='Auswahl geändert; erneut auswerten.';return;}
+  if(revision!==riskRevision)return;if(signature!==selectionSignature()){$('#risk-status').textContent='Auswahl geändert; erneut auswerten.';return;}
   state.riskReport=result;renderRisk(result);
 }
+let statisticsRevision=0;
+function markStatisticsStale(){statisticsRevision++;if(state.statisticsReport)$('#statistics-status').textContent='Auswahl geändert. Tabelle und CSV gehören weiterhin zum unten genannten Berichtszeitraum; für die neue Auswahl erneut auswerten.';else if(state.statisticsPending)$('#statistics-status').textContent='Auswahl geändert; erneut auswerten.';state.statisticsPending=false;}
+function renderStatistics(result){
+  const target=$('#statistics-values');target.replaceChildren();
+  for(const [key,label,unit] of [['temperature_c','Temperatur','°C'],['humidity_pct','Relative Feuchte','% rF'],['dew_point_c','Taupunkt · berechnet','°C'],['absolute_humidity_g_m3','Absolute Feuchte · berechnet','g/m³']]){
+    const metric=result.metrics[key],row=element('tr');row.append(element('th',`${label} (${unit})`));row.firstChild.scope='row';
+    row.append(element('td',`${metric.valid_samples.toLocaleString('de-DE')} / ${metric.missing_samples.toLocaleString('de-DE')}`));
+    for(const bound of ['minimum','maximum']){const cell=element('td',number(metric[bound]?.value,2));if(metric[bound])cell.title=chartDate(metric[bound].time_ms);row.append(cell);}
+    for(const value of [metric.sample_mean,metric.time_weighted_mean])row.append(element('td',number(value,2)));
+    row.append(element('td',`${number(metric.observed_seconds/60)} min`),element('td',`${number(metric.unknown_seconds/60)} min`));target.append(row);
+  }
+  $('#statistics-table').hidden=false;
+  $('#statistics-range').textContent=`${result.source}: ${result.range.start_ms==null?'kein Anfang':chartDate(result.range.start_ms)} bis ${result.range.end_ms==null?'kein Ende':chartDate(result.range.end_ms)}${result.clock_verified?'':' · Gerätekalender und UTC-Zuordnung ungeprüft'}. ${result.raw_count.toLocaleString('de-DE')} Originalzeilen · ${result.gap_count} größere Zeitlücken · erwartetes Messintervall ${number(result.interval_minutes)} min.`;
+  $('#statistics-status').textContent='Statistik berechnet. Fehlende oder nicht abgedeckte Zeit bleibt je Größe unbekannt.';
+}
+async function analyzeStatistics(visible=false){
+  const signature=selectionSignature(),revision=++statisticsRevision,query=analysisQuery(visible);
+  state.statisticsReport=null;state.statisticsQuery=null;state.statisticsPending=true;$('#statistics-table').hidden=true;$('#statistics-export').disabled=true;$('#statistics-range').textContent='';$('#statistics-status').textContent='Originalwerte werden statistisch ausgewertet …';
+  let result;try{result=await api('statistics?'+query);}catch(error){if(revision===statisticsRevision){state.statisticsPending=false;$('#statistics-status').textContent='Statistik fehlgeschlagen.';}throw error;}
+  if(revision!==statisticsRevision)return;state.statisticsPending=false;
+  if(signature!==selectionSignature()){$('#statistics-status').textContent='Auswahl geändert; erneut auswerten.';return;}
+  state.statisticsReport=result;state.statisticsQuery=query;renderStatistics(result);$('#statistics-export').disabled=false;
+}
+function exportStatistics(){if(!state.statisticsQuery)throw new Error('Zuerst Statistik berechnen.');const link=document.createElement('a');link.href='api/export?'+state.statisticsQuery;link.click();}
 async function renderCards() {
   if(state.source==='live')return renderLiveCards();
   if(state.source==='device')return renderDeviceCards();
@@ -245,7 +272,7 @@ async function loadHistory(refresh=false) {
   const assignment=query.get('source')==='device'?await api(`time-assignment?${new URLSearchParams({logger:query.get('logger'),snapshot:query.get('snapshot')})}`):null;if(request!==state.loading)return false;state.timeAssignment=assignment;
   $('#chart-export-assigned').hidden=!assignment;$('#chart-export-assigned').disabled=!assignment?.timezone_confirmed;$('#timezone-panel').hidden=!assignment;
   if(assignment){$('#timezone-status').textContent=assignment.timezone_confirmed?`${assignment.timezone} bestätigt · ${assignment.assigned_count} Werte zugeordnet · ${assignment.unassigned_count} spätere/unbestätigte Werte · Datum weiterhin ungeprüft`:'Zeitzone dieses Historienstands noch nicht bestätigt.';if(assignment.timezone)$('#history-timezone').value=assignment.timezone;}
-  const changed=state.query?.toString()!==query.toString();if(changed&&state.riskReport)markRiskStale();
+  const changed=state.query?.toString()!==query.toString();if(changed&&state.riskReport)markRiskStale();if(changed&&state.statisticsReport)markStatisticsStale();
   const reset=!refresh&&changed;state.query=query;state.chartData=data;state.chartContext=rangeIdentity();
   $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}${data.climate?' · Taupunkt berechnet (Magnus über Wasser)':''}`;
   renderChart(data,reset);return true;
@@ -304,7 +331,7 @@ function populateSnapshots() {
 }
 function setSource(source) {
   if(!['live','device','simulation'].includes(source))source='simulation';
-  markRiskStale();state.loading++;state.chartData=null;state.query=null;state.chartContext=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
+  markRiskStale();markStatisticsStale();state.loading++;state.chartData=null;state.query=null;state.chartContext=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
   state.source=source;localStorage.setItem('bt06-source',source);$('#source-select').value=source;
   const live=source==='live',device=source==='device';$('#run-label').hidden=live;$('#live-follow-label').hidden=!live;
   $('#run-title').textContent=device?'Historienstand':'Testlauf';
@@ -605,6 +632,9 @@ async function main() {
   $('#source-select').addEventListener('change',guard(async()=>{setSource($('#source-select').value);await renderCards();await loadHistory();}));
   $('#live-follow').addEventListener('change',guard(async()=>{state.follow=$('#live-follow').checked;if(state.follow)await loadHistory();}));
   $('#overview-export').addEventListener('click',guard(async()=>{await loadHistory();exportCSV();}));
+  $('#statistics-range-button').addEventListener('click',guard(()=>analyzeStatistics()));
+  $('#statistics-visible').addEventListener('click',guard(()=>analyzeStatistics(true)));
+  $('#statistics-export').addEventListener('click',guard(exportStatistics));
   updateRiskControls();
   $('#risk-form').addEventListener('submit',guard(async event=>{event.preventDefault();await analyzeRisk();}));
   $('#risk-form').addEventListener('input',()=>{updateRiskControls();clearRisk();});

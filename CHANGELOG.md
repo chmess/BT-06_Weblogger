@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.7.0-dev · 2026-11-27
+
+- Grundstatistik aus Originalzeilen: Min/Max mit Zeitpunkt, Stichprobenmittel, zeitgewichtetes Mittel und Datenabdeckung für Temperatur, relative Feuchte, Taupunkt und absolute Feuchte. Fehlende Werte und Zeiten bleiben je Größe getrennt sichtbar. Keine Statistik aus verdichteten Grafikpunkten.
+- Zeitmittel mit linearer Verbindung ausschließlich benachbarter gültiger Messpaare bis zum 1,5-fachen Messintervall; kein Brückenbau über Lücken und keine Extrapolation. Einzelwerte erhalten kein Zeitmittel. Laufende Aggregation ohne zusätzliche Messdatenkopie.
+- Neue Statistikseite für gewählten Zeitraum oder sichtbaren Ausschnitt, Original-CSV exakt für den Bericht, mobile Tabelle und Schutz vor überholten Antworten. Kriterien und Gerätezeitwarnungen bleiben sichtbar.
+- 7 Statistik- und 18 API-Tests sowie Browserprüfung bestanden. V0.6.1 im Dienst bestätigt. Ereignisprotokoll und erweiterte Exporte innerhalb V0.7 noch offen.
+
 ## 0.6.1-dev · 2026-11-27
 
 - Zeitabhängige Feuchteindikatoren aus Originalzeilen: einstellbare Luft-/Oberflächenschwellen, Hysterese und Mindestphasendauer. Zeit ab Schwelle getrennt von Phasendauer einschließlich Hysterese. Lücken, ungültige Werte und unbelegte Bereichsränder zählen als unbekannt; keine Brücke über fehlende Zeit.

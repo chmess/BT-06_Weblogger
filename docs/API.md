@@ -146,3 +146,11 @@ Keine neue API und keine Änderung am Programmeinstellungs-JSON. Achsen und gesp
 Die Antwort enthält Quellen-/Zeitbasis, Kriterien, exakten Bereich und die Berichte `air`, `surface`, `condensation`. Ohne Annahme sind die letzten beiden `null`. Je Bericht: Schwelle/Rücksetzgrenze, Mindestdauer, auswertbare Messpaarzeit, unbekannte Zeit, Abdeckung, Zeit ab Schwelle, gültige/ungültige Stichproben, gesamte/qualifizierte Phasen und längste Phase. `phases` enthält höchstens die letzten 100 Details mit Zeitkoordinaten, Dauer, Spitze, Qualifikation und Randkennzeichnung; `omitted_phases` nennt ausgelassene Details. Status `insufficient_data`, `incomplete` oder `evaluated` bewertet ausschließlich die Datenabdeckung, keine Schimmelfreiheit.
 
 Details zu Paarintervallen, Hysterese, Bereichsrändern und Kondensationsmodell: [KLIMA.md](KLIMA.md). Gerätehistorien behalten ungeprüfte Kalenderkoordinaten; die Auswertung bestätigt weder Datum noch UTC-Offset.
+
+## V0.7.0: Grundstatistik
+
+`GET /api/statistics` akzeptiert dieselben Quellen-/Logger-/Lauf-/Historienstand- und Zeitraumparameter wie `/api/history`, keine Feuchtekriterien oder abgeleitete Zeitbasis. Berechnung aus Originalzeilen, nicht Grafikpunkten. Keine Schreib- oder BLE-Aktion.
+
+Antwort: Quellen-/Zeitbasis, Modell, Originalzeilenanzahl, nominales Intervall, Anzahl größerer Zeitlücken, größter Stichprobenabstand, genauer Bereich und `metrics` für `temperature_c`, `humidity_pct`, `dew_point_c`, `absolute_humidity_g_m3`. Je Größe: gültige/fehlende Zeilenwerte, Minimum/Maximum mit Zeitpunkt, `sample_mean`, `time_weighted_mean`, letzter gültiger Wert, bekannte/unbekannte Sekunden, Abdeckung und Status. Ohne benachbarte gültige Messpaare bleibt Zeitmittel `null`, auch bei einem gültigen Einzelwert. Zeitgewichtung linear zwischen gültigen Endpunkten, maximal 1,5 nominale Intervalle Abstand. Bereichsränder außerhalb gültiger Messpaare sind unbekannt. Ursprüngliche Gerätezeit bleibt ungeprüft.
+
+Die Statistikseite bindet den vorhandenen Original-CSV-Export an exakt dieselbe Berichtsabfrage. Geänderte Ansicht kennzeichnet einen bestehenden Bericht; Export bleibt explizit dem alten Bericht zugeordnet. Noch kein Export der statistischen Zusammenfassung und keine zusätzliche Datenablage.

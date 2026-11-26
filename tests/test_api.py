@@ -61,6 +61,25 @@ class ApiTests(unittest.TestCase):
                     self.assertEqual(self.request('/klima/api/risk?'+invalid)[0],400)
                 self.assertEqual(self.request('/klima/api/history?'+query)[0],400)
 
+    def test_statistics_retains_original_device_time_and_export_bytes(self):
+        from backend.common.history_store import HistoryStore
+        from backend.common.history_capture import decode_capture
+        from history_fixture import capture
+        with tempfile.TemporaryDirectory() as folder:
+            store=HistoryStore(Path(folder));snapshot=store.publish('12345678',**decode_capture(capture()))
+            query=f"source=device&logger={snapshot['logger']}&snapshot={snapshot['id']}"
+            with patch.object(self.app,'history_store',store):
+                before=self.request('/klima/api/export?'+query)[2]
+                status,_,payload=self.request('/klima/api/statistics?'+query)
+                self.assertEqual(status,200);value=json.loads(payload)
+                self.assertFalse(value['clock_verified']);self.assertEqual(value['axis_basis'],'device_calendar')
+                self.assertEqual(value['raw_count'],3)
+                self.assertEqual(value['metrics']['temperature_c']['valid_samples'],3)
+                self.assertEqual(value['metrics']['temperature_c']['observed_seconds'],1200)
+                self.assertEqual(self.request('/klima/api/export?'+query)[2],before)
+                for invalid in (query+'&unknown=1',query+'&source=device',query+'&time_basis=assigned',query+'&air_threshold=70'):
+                    self.assertEqual(self.request('/klima/api/statistics?'+invalid)[0],400)
+
     def test_climate_calculator_is_read_only_validated_and_session_protected(self):
         value={'temperature_c':20,'humidity_pct':50,'surface_temperature_c':10}
         self.assertEqual(self.request('/klima/api/climate/calculate',value)[0],403)

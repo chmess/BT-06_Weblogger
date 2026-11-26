@@ -16,6 +16,7 @@
     <button data-page="overview" aria-current="page">Übersicht</button>
     <button data-page="history">Klimaverlauf</button>
     <button data-page="climate">Taupunkt / Feuchte</button>
+    <button data-page="statistics">Statistik</button>
     <button data-page="simulation">Testdaten</button>
     <button data-page="logger">Logger / Bluetooth</button>
     <button data-page="settings">Einstellungen</button>
@@ -64,6 +65,17 @@
           <p class="hint">Die Bestätigung betrifft nur die Zeitzone dieses Datenstands. Datum und Geräteuhr werden nicht als korrekt bestätigt. Originaldateien bleiben erhalten; spätere Messungen werden nicht automatisch mit bestätigt.</p>
         </form>
       </details>
+    </article>
+  </section>
+
+  <section id="page-statistics" class="page" hidden>
+    <article class="panel"><h2>Grundstatistik aus Originalwerten</h2>
+      <p>Datenquelle, Logger und Zeitraum im Klimaverlauf wählen. Die Statistik nutzt alle Originalwerte im Bereich, unabhängig von der Verdichtung der Grafik.</p>
+      <div class="button-row"><button id="statistics-range-button">Gewählten Zeitraum auswerten</button><button id="statistics-visible" class="secondary">Sichtbaren Diagrammausschnitt auswerten</button><button id="statistics-export" class="secondary" disabled>Originalwerte dieses Berichts als CSV</button></div>
+      <p id="statistics-status" class="hint" role="status">Noch keine Statistik berechnet.</p><p id="statistics-range" class="hint"></p>
+      <div class="table-scroll" tabindex="0" aria-label="Statistiktabelle, bei Bedarf seitlich scrollen"><table id="statistics-table" hidden><thead><tr><th scope="col">Größe</th><th scope="col">Gültige / fehlende Werte</th><th scope="col">Minimum</th><th scope="col">Maximum</th><th scope="col">Stichprobenmittel</th><th scope="col">Zeitmittel</th><th scope="col">Auswertbare Zeit</th><th scope="col">Unbekannte Zeit</th></tr></thead><tbody id="statistics-values"></tbody></table></div>
+      <p class="hint">Stichprobenmittel: jeder gültige Wert zählt gleich. Zeitmittel: linear zwischen benachbarten gültigen Messpaaren bis zum 1,5-fachen Messintervall; keine Extrapolation oder Überbrückung größerer Lücken. Ein Einzelwert hat keinen zeitlichen Mittelwert. Min/Max-Zeitpunkte erscheinen als Hinweis an den Tabellenwerten.</p>
+      <p class="hint">Taupunkt und absolute Feuchte sind berechnet, Modellbereich −45 bis +60 °C. Weniger gültige Werte bedeuten keine automatisch günstigeren Bedingungen. Zeitabhängige Feuchtephasen stehen unter Taupunkt / Feuchte.</p>
     </article>
   </section>
 
