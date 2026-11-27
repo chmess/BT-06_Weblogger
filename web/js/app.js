@@ -109,10 +109,10 @@ function updateHistorySites(data=null){
   $('#history-site-label').hidden=state.source!=='live';$('#history-site-note').hidden=state.source!=='live'||!select.value;
 }
 function selectedSite(){return state.source==='live'?$('#history-site').value:'';}
-function siteReportLabel(result){const item=result.site_selection;return item?` · Messstelle ${item.site_id} (aktueller Name: ${item.current_name}) · Logger ${item.logger}`:'';}
+function siteReportLabel(result){const item=result.site_selection;return item?` · Messstelle ${item.site_id} (aktueller Name: ${item.current_name}) · Logger ${item.logger==='all'?'übergreifend ('+item.loggers.join(', ')+')':item.logger}`:'';}
 function chooseLogger() {
   const select=$('#logger-select'), previous=state.logger;select.replaceChildren();
-  const loggers=state.source==='live'?state.liveLoggers:state.source==='device'?[...new Set(state.snapshots.map(s=>s.logger))].map(id=>({id,name:'BT06 '+id.replace('bt06-','')})):state.run?.loggers||[];
+  const loggers=state.source==='live'?[...state.liveLoggers,...(selectedSite()?[{id:'all',name:'Alle Logger dieser Messstelle'}]:[])]:state.source==='device'?[...new Set(state.snapshots.map(s=>s.logger))].map(id=>({id,name:'BT06 '+id.replace('bt06-','')})):state.run?.loggers||[];
   for(const logger of loggers) addOption(select,logger.id,logger.name);
   state.logger=loggers.find(l=>l.id===previous)?.id||loggers[0]?.id||null;
   select.value=state.logger||'';updateHistorySites();
@@ -745,7 +745,7 @@ async function main() {
   window.addEventListener('hashchange',guard(async()=>{go(location.hash.slice(1));if(location.hash==='#history')await loadHistory();}));
   $('#run-select').addEventListener('change',guard(async()=>{if(state.source==='device')state.snapshot=state.snapshots.find(s=>s.id===$('#run-select').value);else state.run=state.runs.find(r=>r.id===$('#run-select').value);chooseLogger();await loadHistory();}));
   $('#storage-check').addEventListener('click',guard(checkStorage));
-  $('#history-site').addEventListener('change',guard(async()=>{updateHistorySites();markRiskStale();markStatisticsStale();invalidateExport();await loadHistory();}));
+  $('#history-site').addEventListener('change',guard(async()=>{updateHistorySites();chooseLogger();markRiskStale();markStatisticsStale();invalidateExport();await loadHistory();}));
   $('#logger-select').addEventListener('change',guard(async()=>{state.logger=$('#logger-select').value;await loadHistory();}));
   $('#period').addEventListener('change',guard(async()=>{$('#custom-period').hidden=$('#period').value!=='custom';if($('#period').value!=='custom')await loadHistory();}));
   $('#apply-range').addEventListener('click',guard(()=>loadHistory()));
@@ -804,7 +804,7 @@ async function main() {
   $('#events-form').addEventListener('submit',guard(async event=>{event.preventDefault();await loadEvents();}));
   $('#events-form').addEventListener('input',invalidateEvents);
   $('#events-export').addEventListener('click',guard(exportEvents));
-  $('#events-selected').addEventListener('click',()=>{$('#events-logger').value=state.logger||'';invalidateEvents();});
+  $('#events-selected').addEventListener('click',()=>{$('#events-logger').value=state.logger==='all'?'':state.logger||'';invalidateEvents();});
   $('#statistics-range-button').addEventListener('click',guard(()=>analyzeStatistics()));
   $('#statistics-visible').addEventListener('click',guard(()=>analyzeStatistics(true)));
   $('#statistics-export').addEventListener('click',guard(exportStatistics));

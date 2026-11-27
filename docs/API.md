@@ -1,4 +1,4 @@
-# HTTP-API · V0.8.3-dev
+# HTTP-API · V0.8.4-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
@@ -203,7 +203,7 @@ Optionaler Queryparameter `site=site-<UUID>` für `/api/history`, `/api/statisti
 
 Der Filter verwendet Original-Messstellen-ID UND historisches Host-Zuordnungsintervall. Anfang einschließlich, Ende ausschließlich; keine nachträgliche Umzuordnung von Altzeilen. JSON-Berichte ergänzen `site_selection` mit `site_id`, `current_name` (ausdrücklich aktueller Name), `logger`, Messstellen-`revision`, `assignment_intervals`, `basis=stored_id_and_host_assignment`, `criteria_automatic=false`. Keine passenden Zeilen ergibt einen regulären leeren Bericht.
 
-Zuordnungsgrenzen unterbrechen Grafiklinien, Zeitmittel und Feuchtephasen unabhängig vom zeitlichen Abstand; in Phasendetails heißt der Abschluss `assignment_boundary`. Statistik-`gap_count` zählt bei gefilterten Daten auch Zuordnungsgrenzen zwischen ausgewerteten Zeilen. Die bisherige Berichtsspanne/Abdeckungsdefinition bleibt erhalten. Kriterien bleiben explizite API-Eingaben. CSV enthält ausschließlich die originalen Zeilen bzw. ausdrücklich gewählten Ableitungen, keine internen Segmentspalten. Dateinamen ergänzen die stabile Messstellen-ID. Mehrere Logger werden in dieser Version nicht zusammengeführt.
+Zuordnungsgrenzen unterbrechen Grafiklinien, Zeitmittel und Feuchtephasen unabhängig vom zeitlichen Abstand; in Phasendetails heißt der Abschluss `assignment_boundary`. Statistik-`gap_count` zählt bei gefilterten Daten auch Zuordnungsgrenzen zwischen ausgewerteten Zeilen. Die bisherige Berichtsspanne/Abdeckungsdefinition bleibt erhalten. Kriterien bleiben explizite API-Eingaben. CSV enthält ausschließlich die originalen Zeilen bzw. ausdrücklich gewählten Ableitungen, keine internen Segmentspalten. Dateinamen ergänzen die stabile Messstellen-ID. Seit V0.8.4 ist zusätzlich die unten beschriebene Zusammenführung verfügbar.
 
 
 ## Empfangsdateidiagnose V0.8.3
@@ -215,3 +215,12 @@ Antwort enthält `scope=host_csv_only`, Host-Prüfzeit `checked_at`, `state` (`e
 Prüft pro Datei Schema/Kopf, vollständigen Dateischluss, Spaltenzahl, Schema 2/Advertising/Hostzeitbasis, gültigen Offsetzeitstempel im Dateimonat, streng aufsteigende Zeitfolge, nicht leere/eindeutige Datensatzkennungen und endliche Temperatur-/Feuchtewerte (Feuchte 0–100, fehlende Werte zulässig). Nur ein gemeinsamer nicht blockierender Leselock je Datei; wird geschrieben, bleibt sie übersprungen. Keine zeitübergreifende Transaktionssicht sämtlicher Dateien. Symbolische Links werden nicht gelesen, Zugriffsfehler nicht als leerer Bestand gewertet.
 
 Limits: 100 Dateien, 32 MiB, 250.000 Zeilen, 10.000 Verzeichniseinträge, etwa fünf Sekunden. Erreichte Grenzen ergeben Teilprüfung; kein stilles Auslassen mit Erfolgsbehauptung. Blockierende Betriebssystemzugriffe können die Zeitgrenze überschreiten. Die Prüfung ersetzt weder Historien-Vollständigkeitsbelege noch eine Prüfung von Historienarchiven, Simulation, Ereignis-CSV oder geräteseitiger Messrichtigkeit.
+
+
+## Messstelle über Loggerwechsel V0.8.4
+
+Für dieselben Diagramm-/Statistik-/Feuchte-/Export-Routen erlaubt `source=live&logger=all&site=<ID>` die Zusammenführung der historisch zugeordneten Logger. Ohne Messstelle oder bei anderen Datenquellen ist `logger=all` ungültig. Auswahl basiert weiterhin ausschließlich auf gespeicherter Original-ID und passendem damaligem Hostintervall. Die Quellen werden anhand einer gemeinsamen Konfigurationsrevision ermittelt; nur Zuordnungen mit Überschneidung des Zeitraums werden geöffnet.
+
+`site_selection.logger` ist `all`, `loggers` nennt die potenziellen historischen Quellen im angefragten Zeitraum, nicht eine Zusage vorhandener Messwerte je Logger. Originalzeilen werden laufend per zeitlicher Zusammenführung verarbeitet, keine zusätzliche Gesamtkopie für den Filter. Höchstens 64 Logger im Zeitraum; darüber expliziter Fehler mit Aufforderung, den Zeitraum einzugrenzen. Auch bei vorzeitigem Abbruch werden geöffnete Leseströme geschlossen. Diagrammverdichtung und Zeitbewertungen behalten sämtliche Zuordnungsgrenzen als Unterbrechungen; keine angenommene Kontinuität bei Gerätewechsel. Erwartetes Messintervall ist wie bisher das konfigurierte Host-Speicherintervall, keine Rekonstruktion historischer Intervalländerungen.
+
+Zusammengeführte CSV ergänzt die Herkunftsspalte `Logger`, die bei Original-, Spalten- und Klima-Export nicht entfernt werden kann. Werte/Originalkennungen bleiben erhalten. Einzelne Logger behalten ihr bisheriges Schema. Dateinamen enthalten `all` und die stabile Messstellen-ID. Die Oberfläche bietet „Alle Logger dieser Messstelle“ erst nach Messstellenwahl an. Bei Aufheben des Filters fällt die Auswahl auf einen einzelnen verfügbaren Logger zurück; Berichte, Exportvorbereitungen und gespeicherte Ansichten bleiben an ihre genaue Auswahl gebunden.

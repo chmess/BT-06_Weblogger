@@ -10,7 +10,7 @@ LABELS={'Taupunkt_C':'Taupunkt (°C)','AbsoluteFeuchte_g_m3':'Absolute Feuchte (
 
 
 def options(original_fields):
-    required=[key for key in original_fields if key in {'Schema','DatensatzID','Zeitstempel','Quelle','Messstelle','Qualitaet',
+    required=[key for key in original_fields if key in {'Logger','Schema','DatensatzID','Zeitstempel','Quelle','Messstelle','Qualitaet',
               'GeraeteSekunden','Geraetekalender','Zeitbasis','Firmware','ZugeordneteZeit','BestaetigteZeitzone','Zeitzuordnung'}]
     return {'original_fields':list(original_fields),'required_fields':required,'export_metadata':EXPORT_METADATA,
             'calculated_fields':list(CALCULATED),'calculated_metadata':CALC_METADATA,'labels':LABELS,'model':MODEL}

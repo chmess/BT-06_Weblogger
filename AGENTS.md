@@ -14,6 +14,7 @@ Verbindliche Spezifikation: [PROJEKTBESCHREIBUNG.md](PROJEKTBESCHREIBUNG.md). Pr
 - SMApi-Verträglichkeit berücksichtigen: sparsame Laufzeit, getrennte Umgebung, gemeinsamer Bluetooth-Adapter als zu prüfende Ressource. Keine ungefragte Installation auf SMApi.
 
 ## Arbeitsregeln
+- Tests nach Änderungsumfang auswählen: standardmäßig nur betroffene Funktionen und Schnittstellen prüfen. Gesamtsuite bei breiten Änderungen, gemeinsamen Kernfunktionen oder vor größeren Freigaben; vollständige Browserprüfung nur bei entsprechend breiten UI-Änderungen. Bestehende Tests behalten, keine unnötigen neuen Tests oder Wiederholungen. Sicherheits- und Datenintegritätsprüfungen nicht auslassen.
 - Linux ist führende Entwicklungsversion; Windows bleibt bis zur funktionierenden Linux-Version zurückgestellt.
 - Vorhandenen ESPA-Monitor sofern zugänglich als Architektur- und Bedienreferenz analysieren; kompakte Growbox-Weboberfläche als Gestaltungsreferenz, sofern verfügbar. Referenzprojekte nicht verändern.
 - Originalmessdaten ausschließlich in CSV, keine SQLite oder andere Datenbank. Einstellungen JSON. Gemeinsame Weboberfläche und API.

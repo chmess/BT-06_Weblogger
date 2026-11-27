@@ -214,3 +214,20 @@ Vollständige Chromium-Prüfung mit 15 lokalen Screenshots bestanden: Messstelle
 206 Tests der Gesamtsuite und vollständige Chromium-Prüfung bestanden. Sieben neue Speicherdiagnose-Kerntests prüfen leeren/gültigen Bestand, unveränderte Originalbytes und Änderungszeit, defekte Kopfzeile, Dateischluss/UTF-8, doppelte Kennungen, falschen Monat, Zeitfolge, nicht endliche Messwerte/ungültige Feuchte, falsches Schema, aktive Schreibsperre, Byte-/Zeilen-/Datei-/Zeitgrenzen, Quellenabgrenzung, symbolische Links und unlesbare Verzeichnisse. Fehler enthalten keine rohen Dateiinhalte. API-Test bestätigt parameterlose Strecke, Hostschutz, Auftragssperre und keine Empfängeraktivierung.
 
 Browser bestätigt sichtbaren Konfigurations-/Ereignisstatus sowie explizite Empfangsdateiprüfung mit vier synthetischen Zeilen ohne Befund in der mobilen Ansicht. Insgesamt 16 lokale Screenshots; bisherige Messstellen-, Einstellungs-, Diagramm-, Statistik-, Export- und Geräteabläufe weiter bestanden, keine JavaScript-Ausnahmen oder externen Anfragen. Tatsächlicher Empfangsbestand anschließend separat rein lesend geprüft, keine Reparatur oder Geräteaktion. Keine neue Dauerlastmessung oder allgemeine Integritätszusage für nicht geprüfte Datenquellen.
+
+
+## V0.8.4 · gezielte Prüfung
+
+Auf Benutzerwunsch Prüfungen künftig nach Änderungsumfang wählen: bestehende Tests behalten, aber Gesamtsuite und vollständige Browserstrecke nicht bei jedem Versionsschritt ausführen. Notwendige Datenintegritäts- und Sicherheitsprüfungen bleiben verbindlich.
+
+Acht Messstellen-/API-Tests und fünf Exporttests bestanden. Neue Abdeckung: zwei historische Logger gemeinsam chronologisch auswählen, exklusive Wechselgrenze, vollständige Logger-Herkunft ohne Änderung der Ausgangszeilen, keine Verbindung von Kurven/Phasen/Zeitmitteln über Wechsel, Zeitraumeingrenzung/leer vor erster Zuordnung, konsistente Revision, Quellenlimit und Freigabe vorzeitig abgebrochener Leseströme. Gemeinsame API-Strecke prüft Diagramm/Statistik, Original-/Spaltenexport mit verpflichtendem Logger, Exportoptionen und ungültiges `all` ohne Messstelle; bisheriger Einzel-CSV bleibt unverändert.
+
+Gezielter Browserlauf mit zwei synthetischen Loggern bestätigt Standort-/Loggerwechsel, gemeinsamen Verlauf mit Unterbrechung, Statistik, CSV-Provenienz, getrennte gespeicherte Ansicht, mobile Breite und ungültig gewordene Exportvorbereitung nach Filteraufhebung. Wechsel zur Gerätehistorie entfernt den Messstellenfilter. Keine JavaScript-Ausnahmen oder externen Anfragen; ein Screenshot, separater Bericht `test-results/browser-site-continuity.json`. Keine echten Geräte oder Zuordnungen. Python-Gesamtsuite nicht erneut ausgeführt.
+
+```sh
+python3 -m unittest discover -s tests -p test_site_selection.py -q
+python3 -m unittest discover -s tests -p test_export.py -q
+node tools/browser_smoke.mjs --site-continuity
+```
+
+Der Browserparameter wählt ausschließlich dieses Szenario im vorhandenen temporären Testaufbau; ohne Parameter bleibt die vollständige Browserstrecke verfügbar.

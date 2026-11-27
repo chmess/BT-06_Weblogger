@@ -1,4 +1,4 @@
-# Messstellen V0.8.2
+# Messstellen V0.8.4
 
 Messstellen sind lokale Metadaten unter `config/application.json` (bis V0.8.0: `config/sites.json`), keine Geräteeinstellungen. Anlage/Änderung/Zuordnung senden keine BLE-Befehle und ändern keine Geräteuhr. Es werden keine Namen, Räume oder echten Zuordnungen ohne ausdrückliche Eingabe angelegt.
 
@@ -12,7 +12,7 @@ Neue Host-Empfänge werden anhand ihres Empfangszeitpunkts unter der passenden s
 
 ## Grenzen dieser Ausbaustufe
 
-Diagramme, Statistik und Exporte wählen einen Logger und Zeitraum. Bei echten Host-Empfängen lässt sich seit V0.8.2 zusätzlich eine Messstelle wählen. Ohne Filter kann der Bereich mehrere Messstellen umfassen. Der Filter verlangt sowohl die bereits gespeicherte Original-ID als auch das passende damalige Host-Zuordnungsintervall (Beginn einschließlich, Ende ausschließlich). Unzugeordnete Altzeilen werden nicht rückwirkend ergänzt. Berichte nennen die stabile ID, den gewählten Logger und den ausdrücklich aktuellen Messstellennamen. Frühere Namen/Kriterien bleiben in der Zuordnungshistorie nachlesbar. Zusammenführung mehrerer Logger und Gerätehistorienzuordnung benötigen einen weiteren Schritt. Save Settings enthält Messstellen und Historie. Load Settings zeigt Änderungen vorab; Messstellen sind abwählbar. Bestehende Historie wird ergänzt, aktive Loggerbindungen bleiben erhalten. Importierte offene Intervalle enden am Dateistand und werden nicht aktiviert. Änderungen aktueller Angaben gelten erst ab Übernahme, widersprüchliche Historie blockiert den Import.
+Diagramme, Statistik und Exporte wählen einen Logger und Zeitraum. Bei echten Host-Empfängen lässt sich seit V0.8.2 zusätzlich eine Messstelle wählen. Ohne Filter kann der Bereich mehrere Messstellen umfassen. Der Filter verlangt sowohl die bereits gespeicherte Original-ID als auch das passende damalige Host-Zuordnungsintervall (Beginn einschließlich, Ende ausschließlich). Unzugeordnete Altzeilen werden nicht rückwirkend ergänzt. Berichte nennen die stabile ID, den gewählten Logger und den ausdrücklich aktuellen Messstellennamen. Frühere Namen/Kriterien bleiben in der Zuordnungshistorie nachlesbar. Seit V0.8.4 lässt sich nach Messstellenwahl „Alle Logger dieser Messstelle“ wählen. Gerätehistorienzuordnung bleibt ein weiterer Schritt. Save Settings enthält Messstellen und Historie. Load Settings zeigt Änderungen vorab; Messstellen sind abwählbar. Bestehende Historie wird ergänzt, aktive Loggerbindungen bleiben erhalten. Importierte offene Intervalle enden am Dateistand und werden nicht aktiviert. Änderungen aktueller Angaben gelten erst ab Übernahme, widersprüchliche Historie blockiert den Import.
 
 ## Integrität
 
@@ -30,3 +30,10 @@ Der Filter verwendet einen konsistenten Snapshot der Zuordnungshistorie je Anfra
 Jede Zuordnungsgrenze, auch eine Metadatenversionierung ohne Ortswechsel, unterbricht Kurven und benachbarte Messpaare für Zeitmittel/Feuchtephasen. Beide Grenzpunkte bleiben bei Verdichtung erhalten; dazwischen wird eine sichtbare Kurvenlücke eingefügt. Zeiten ohne gültiges Messpaar bleiben unbekannt. Die Berichtsspanne umfasst weiterhin den angefragten Zeitraum; unzugeordnete Abschnitte werden nicht als unkritisch gezählt. Ohne Messstellenfilter bleiben bisherige loggerbezogene Auswertungen unverändert.
 
 Auswertekriterien stammen weiterhin aus dem manuellen Formular und werden im Bericht ausgewiesen. Auswahl einer Messstelle aktiviert weder ihre aktuellen Kriterien automatisch noch eine historische Kriterienmischung oder einen Alarmdienst. Die Oberfläche erlaubt weiterhin bewusstes Übernehmen aktueller Messstellenkriterien. Simulation und ungeprüfte Gerätezeit bieten keinen Messstellenfilter.
+
+
+## Loggerwechsel gemeinsam darstellen
+
+Nach Auswahl einer Messstelle steht im Loggerfeld zusätzlich „Alle Logger dieser Messstelle“ bereit. Damit erscheinen frühere und aktuelle Logger im selben Verlauf, derselben Statistik/Feuchteauswertung und im selben CSV. Die damaligen Zuordnungen entscheiden über die Herkunft; es wird keine reale Zuordnung geändert oder angelegt. Der aktuelle Name wird weiterhin ausdrücklich als aktuell bezeichnet, Kriterien bleiben manuell.
+
+Loggerwechsel und sämtliche weiteren Intervallgrenzen bleiben Kurven-/Zeitbewertungsunterbrechungen. Im zusammengeführten CSV ist `Logger` eine zusätzliche Pflichtspalte; einzelne Logger behalten ihren bisherigen Originalexport. Nur relevante Zuordnungen im gewählten Zeitraum werden berücksichtigt, höchstens 64 Logger gleichzeitig. Beim Aufheben des Filters wechselt die Ansicht zurück auf einen einzelnen Logger, unpassende Exportvorbereitungen werden verworfen. Gerätezeit und Simulation bleiben getrennt.

@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.4-dev · 2026-11-27
+
+- Messstellenansicht über historische Loggerwechsel: Nach Messstellenwahl optional alle zugeordneten Logger zusammenführen. Diagramm, Statistik, Feuchteauswertung und CSV nutzen denselben zeitlich sortierten Originalbestand; Zuordnungsgrenzen bleiben Unterbrechungen. Keine Umzuordnung alter Zeilen oder Gerätehistorien.
+- Zusammengeführter CSV ergänzt die verpflichtende Herkunftsspalte Logger, auch bei Spaltenauswahl. Bisherige einzelne Logger und deren Original-CSV bleiben unverändert. Konsistenter Messstellenstand pro Anfrage, laufende Zusammenführung mit höchstens 64 Quellen im Zeitraum und explizitem Freigeben der Leseströme.
+- Sparsamere Prüfregel dauerhaft festgehalten. Acht betroffene Messstellen-/API-Tests, fünf Exporttests und gezielte Browserprüfung für Loggerwechsel, Statistik, Quellennachweis, gespeicherte Ansicht, mobile Breite und Filterwechsel bestanden. Kein erneuter Lauf der gesamten Python-Suite.
+- V0.8.3 im Dienst fehlerfrei bestätigt; keine echten Zuordnungen oder Geräteänderungen.
+
 ## 0.8.3-dev · 2026-11-27
 
 - Diagnose zeigt gemeinsame Konfigurationsablage, Revision und unbestätigte Schreibfehler sowie aktuelle/frühere Ereignis-Schreibfehler der Dienstsitzung.

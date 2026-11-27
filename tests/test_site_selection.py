@@ -5,9 +5,9 @@ import threading
 import unittest
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 from backend.common.sites import SiteStore
-from backend.common.site_selection import select_site
+from backend.common.site_selection import select_site,select_all_loggers
 from backend.common.storage import chart_data,csv_text
 from backend.common.live_store import LIVE_FIELDS
 from backend.common.statistics import summarize
@@ -86,6 +86,41 @@ class SiteSelectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):select_site(self.store,LOGGER,'site-'+'f'*32,[])
         with self.assertRaises(ValueError):select_site(self.store,LOGGER,'../private',[])
 
+    def test_all_loggers_merge_originals_and_preserve_logger_and_interval_boundaries(self):
+        self.now=self.start+timedelta(seconds=120)
+        other='bt06-23456789';self.store.assign({'revision':2,'logger':other,'site_id':self.site})
+        sources={LOGGER:[self.row(n) for n in (0,60,120)],other:[self.row(n) for n in (60,120,180)]}
+        live=Mock();live.rows.side_effect=lambda logger,*args:iter(sources[logger])
+        selected,context=select_all_loggers(self.store,live,self.site)
+        rows=list(selected)
+        self.assertEqual([row['DatensatzID'] for row in rows],['0','60','120','180'])
+        self.assertEqual([row['Logger'] for row in rows],[LOGGER,LOGGER,other,other])
+        self.assertEqual(context['loggers'],[LOGGER,other]);self.assertEqual(context['logger'],'all')
+        self.assertEqual(sum(p[1] is None for p in chart_data(iter(rows),1)['points']),1)
+        self.assertEqual(summarize(iter(rows),1)['metrics']['humidity_pct']['observed_seconds'],120)
+        self.assertEqual(analyze(iter(rows),1,CRITERIA)['air']['phase_count'],2)
+        export=csv_text(iter(rows),LIVE_FIELDS+['Logger']);self.assertIn('Logger',export);self.assertIn(other,export)
+        self.assertNotIn('Logger',sources[LOGGER][0])
+        later,context=select_all_loggers(self.store,live,self.site,self.row(120)['Zeitstempel'],self.row(180)['Zeitstempel'])
+        self.assertEqual(context['loggers'],[other]);self.assertEqual(len(list(later)),2)
+        empty,context=select_all_loggers(self.store,live,self.site,end=self.row(-1)['Zeitstempel'])
+        self.assertEqual(list(empty),[]);self.assertEqual(context['loggers'],[])
+        with self.assertRaises(ValueError):select_all_loggers(self.store,live,self.site,self.row(180)['Zeitstempel'],self.row(0)['Zeitstempel'])
+
+    def test_combined_snapshot_source_limit_and_early_close_release_streams(self):
+        live=Mock();closed=[]
+        def source(*args):
+            try:yield from [self.row(0),self.row(60)]
+            finally:closed.append(True)
+        live.rows.side_effect=source
+        rows,context=select_all_loggers(self.store,live,self.site)
+        next(rows);rows.close();self.assertEqual(closed,[True])
+        rows,context=select_all_loggers(self.store,live,self.site)
+        self.now=self.start+timedelta(seconds=1);self.store.assign({'revision':2,'logger':LOGGER,'site_id':None})
+        self.assertEqual(len(list(rows)),2);self.assertEqual(context['revision'],2)
+        with patch('backend.common.site_selection.MAX_LOGGERS',0):
+            with self.assertRaises(ValueError):select_all_loggers(self.store,live,self.site)
+
     def test_api_reuses_filter_for_chart_statistics_risk_and_both_exports(self):
         app=Application(self.root,'/klima');app.sites=self.store
         self.version()
@@ -111,6 +146,17 @@ class SiteSelectionTests(unittest.TestCase):
                 self.assertEqual(get('history'+query.replace('source=live','source=device'))[0],400)
                 self.assertEqual(get('history'+query.replace('source=live','source=simulation'))[0],400)
                 self.assertEqual(get('history'+query.replace(self.site,'site-'+'f'*32))[0],400)
+                all_query=f'?source=live&logger=all&site={self.site}'
+                for route in ('history','statistics'):
+                    code,body=get(route+all_query);self.assertEqual(code,200,body)
+                    self.assertEqual(json.loads(body)['site_selection']['loggers'],[LOGGER])
+                code,body=get('export'+all_query);self.assertEqual(code,200,body)
+                self.assertEqual(body.decode('utf-8-sig'),csv_text([{**rows[0],'Logger':LOGGER},{**rows[2],'Logger':LOGGER}],LIVE_FIELDS+['Logger']))
+                code,body=get('export/options'+all_query);self.assertEqual(code,200,body)
+                self.assertIn('Logger',json.loads(body)['required_fields'])
+                code,body=get('export'+all_query+'&fields=Temperatur');self.assertEqual(code,200,body)
+                self.assertIn('Logger',body.decode().splitlines()[0]);self.assertIn(LOGGER,body.decode())
+                self.assertEqual(get('history?source=live&logger=all')[0],400)
                 code,body=get(f'export?source=live&logger={LOGGER}')
                 self.assertEqual(code,200);self.assertEqual(body.decode('utf-8-sig'),csv_text(rows,LIVE_FIELDS))
         finally:server.shutdown();server.server_close();thread.join()

@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 
 const project=resolve(fileURLToPath(new URL('..',import.meta.url)));
+const focusedSites=process.argv.includes('--site-continuity');
 const scratch=await mkdtemp(join(tmpdir(),'bt06-browser-'));
 const artifacts=join(project,'test-results');await mkdir(artifacts,{recursive:true});
 let screenshotCount=0;
@@ -37,7 +38,16 @@ from history_fixture import capture
 from backend.common.history_capture import decode_capture
 from backend.common.history_store import HistoryStore
 HistoryStore(Path(sys.argv[1])/'data/history').publish('12345678',**decode_capture(capture()))
-`,join(scratch,'data')],{cwd:project,encoding:'utf8'});
+if sys.argv[2]=='sites':
+    from datetime import datetime,timedelta,timezone
+    from test_live import frame
+    from backend.common.bt06 import decode
+    from backend.common.live_store import LiveStore
+    store=LiveStore(Path(sys.argv[1])/'data')
+    for device in ['12345678','23456789']:
+        payload=bytearray(frame());payload[4:8]=bytes.fromhex(device)
+        store.append(decode(payload).json(),-50,(datetime.now(timezone.utc)-timedelta(hours=1)).isoformat())
+`,join(scratch,'data'),focusedSites?'sites':''],{cwd:project,encoding:'utf8'});
   assert.equal(snapshotFixture.status,0,snapshotFixture.stderr);
   app=spawn('python3',[join(project,'app.py'),'--root',join(scratch,'data'),'serve','--port','0','--base-path','/klima'],{cwd:project,stdio:['ignore','pipe','pipe']});
   let appError='';app.stderr.on('data',chunk=>{appError+=chunk.toString();});
@@ -63,6 +73,7 @@ HistoryStore(Path(sys.argv[1])/'data/history').publish('12345678',**decode_captu
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await send('Page.navigate',{url});
   await waitFor(`document.querySelector('#template-note')?.textContent.includes('Allgemeine')`);
+  async function fullChecks(){
   assert.equal(await evaluate(`document.querySelector('#page-overview').hidden`),false);
   await screenshot('overview-empty.png');
   await click('[data-page="simulation"]');
@@ -455,6 +466,13 @@ print(json.dumps({'settings':saved,'preview':preview,'record_preview':record_pre
   assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(external.length,0,JSON.stringify(external));
   const report={passed:true,checks:['empty state','generator','three cards','chart canvas','dew point curve and climate calculator with stale response guard','original-row humidity phases, explicit surface assumption and visible-range analysis','original-row statistics, visible range, exact CSV and stale reply guard','persistent event table, filters, full filtered CSV and source separation','selection climate CSV, mandatory provenance and exact export scopes','measuring sites, assignment history and stale draft protection','site-filtered chart, assignment gaps, statistics, original CSV, scoped export and reset','read-only bounded storage diagnostics and visible persistence status','zoom preservation','period presets, previous/next and original-resolution visible CSV','DST fold navigation and fullscreen controls','manual axes, invalid range guard and saved view restored after reload','save settings','load settings preview','load settings save','combined settings/sites preview, cancel, preference-only and edited import','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','25 minute recording draft, full preparation summary, two explicit confirmations, edit invalidation and uncertain write display','parameter verification never guesses recording state from zero summary','alarm limit and activation draft, reset and Fahrenheit guard','no JS exceptions','no external requests'],screenshots:screenshotCount};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+  }
+  if(focusedSites){
+    const {runSiteContinuity}=await import('./browser_site_continuity.mjs');
+    const checks=await runSiteContinuity({evaluate,waitFor,click,screenshot,send,project,scratch});
+    assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
+    const report={passed:true,scope:'site-continuity',checks,screenshots:screenshotCount};await writeFile(join(artifacts,'browser-site-continuity.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+  }else await fullChecks();
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}
   if(app){app.kill('SIGTERM');await new Promise(resolve=>{if(app.exitCode!==null)resolve();else{app.once('exit',resolve);setTimeout(resolve,5000);}});}

@@ -23,7 +23,7 @@ from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
 from backend.common.storage_diagnostics import inspect_live
-from backend.common.site_selection import select_site
+from backend.common.site_selection import select_site,select_all_loggers
 from backend.common.sites import SiteStore
 from backend.common.configuration import Configuration,MAX_BYTES as SETTINGS_MAX_BYTES
 from backend.linux.ble_jobs import BluetoothJobs, BusyError
@@ -233,6 +233,8 @@ def handler_for(app):
                         raise ValueError("Zeitzuordnung ist nur für den zusätzlichen Historien-CSV-Export verfügbar.")
                     logger = identifier(query.get("logger", [""])[0])
                     start, end = query.get("start", [None])[0], query.get("end", [None])[0]
+                    selection={}
+                    if logger=="all" and (source!="live" or not query.get("site",[""])[0]):raise ValueError("Alle Logger benötigen echte Host-Empfänge und eine Messstelle.")
                     if source == "simulation":
                         if "snapshot" in query:
                             raise ValueError("Historienstand ist kein Testlauf.")
@@ -244,12 +246,15 @@ def handler_for(app):
                         rows = rows_in_range(app.simulation, run, logger, start, end)
                         interval, fields, label = manifest["options"]["interval_minutes"], None, "Simulation"
                     elif source == "live":
-                        if "run" in query or "snapshot" in query or logger not in {item["id"] for item in app.loggers()}:
+                        if "run" in query or "snapshot" in query or logger!="all" and logger not in {item["id"] for item in app.loggers()}:
                             raise ValueError("Unbekannter echter Logger oder ungültige Abfrage.")
                         run = "ble"
-                        rows = app.live_store.rows(logger, start, end)
+                        if logger=="all":
+                            rows,selected_site=select_all_loggers(app.sites,app.live_store,query["site"][0],start,end)
+                            selection={"site_selection":selected_site}
+                        else:rows = app.live_store.rows(logger, start, end)
                         interval = app.receiver.status()["config"]["save_interval_seconds"] / 60
-                        fields, label = LIVE_FIELDS, "BLE-Advertising"
+                        fields, label = LIVE_FIELDS+(["Logger"] if logger=="all" else []), "BLE-Advertising"
                     elif source == "device":
                         if "run" in query:
                             raise ValueError("Loggerhistorie ist kein Testlauf.")
@@ -265,8 +270,7 @@ def handler_for(app):
                             fields = HISTORY_FIELDS + ASSIGNED_FIELDS
                     else:
                         raise ValueError("Unbekannte Datenquelle.")
-                    selection={}
-                    if "site" in query:
+                    if "site" in query and logger!="all":
                         if source!="live":raise ValueError("Messstellenfilter ist nur für Host-Empfänge verfügbar; Gerätezeit und Simulation werden nicht zugeordnet.")
                         rows,selected_site=select_site(app.sites,logger,query["site"][0],rows)
                         selection={"site_selection":selected_site}
