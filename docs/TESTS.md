@@ -248,3 +248,16 @@ python3 -m unittest discover -s tests -p test_events.py -q
 PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_live_exposes_session_warning_status_without_starting_receiver -q
 node tools/browser_smoke.mjs --climate-warnings
 ```
+
+
+## V0.8.6 · gezielte Prüfung
+
+Sechs neue Historien-Diagnosetests und ein API-Test bestanden. Voll-/Deltakette samt Basis, Datei-/Zeilen-/Prüfaufwand, byte- und mtime-unveränderte Originale, manipulierte/fehlende Basisdatei, defektes Manifest, inkonsistente Kettentiefe, Datei-/Byte-/Zeit-/Zeilenlimits, symbolische Pfade, ungültige Kennungen, belegte Ablage und logische Verifizierungsfehler geprüft. Ungeprüfte Gerätezeit bleibt ausdrücklich ungeprüft, rohe Fehlermeldungen werden nicht ausgegeben. API prüft passende Auswahl, Abweisung zusätzlicher/mehrfacher Parameter, gemeinsame Auftragssperre und keine Empfängeraktivierung.
+
+Gezielter Browserlauf gegen echte synthetische Archive: explizit gewählten Stand prüfen, drei Messwerte und unverifizierte Gerätezeit anzeigen, mobile Breite, beschädigten Rohbeleg ohne automatische Reparatur melden, nach Wiederherstellen des Testoriginals erneut erfolgreich prüfen und Aktion ohne Archiv deaktivieren. Ein Screenshot, Bericht `test-results/browser-history-diagnostics.json`; keine JavaScript-Ausnahmen oder externen Anfragen. Keine Gesamt-Test-/Browserstrecke wiederholt. Neuester tatsächlicher DeskPi-Archivstand anschließend separat rein lesend ohne Befund geprüft; kein Hardware-/Uhrtest.
+
+```sh
+python3 -m unittest discover -s tests -p test_history_diagnostics.py -q
+PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_history_diagnostics_validates_scope_lock_and_corruption_without_bluetooth -q
+node tools/browser_smoke.mjs --history-diagnostics
+```

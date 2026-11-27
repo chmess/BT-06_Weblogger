@@ -23,6 +23,7 @@ from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
 from backend.common.climate_warnings import ClimateWarnings
+from backend.common.history_diagnostics import inspect_history
 from backend.common.storage_diagnostics import inspect_live
 from backend.common.site_selection import select_site,select_all_loggers
 from backend.common.sites import SiteStore
@@ -169,6 +170,13 @@ def handler_for(app):
                     if not app.diagnostics_lock.acquire(blocking=False):
                         self.send(409,{"error":"Eine Empfangsdateiprüfung läuft bereits."});return
                     try:result=inspect_live(app.root/"data")
+                    finally:app.diagnostics_lock.release()
+                    self.send(200,result)
+                elif path == "/api/diagnostics/history":
+                    if set(query)!={"logger","snapshot"} or any(len(value)!=1 for value in query.values()):raise ValueError("Historienprüfung benötigt genau logger und snapshot.")
+                    if not app.diagnostics_lock.acquire(blocking=False):
+                        self.send(409,{"error":"Eine Dateiprüfung läuft bereits."});return
+                    try:result=inspect_history(app.history_store,query["logger"][0],query["snapshot"][0])
                     finally:app.diagnostics_lock.release()
                     self.send(200,result)
                 elif path == "/api/session":

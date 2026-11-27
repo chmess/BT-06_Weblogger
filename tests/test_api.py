@@ -284,6 +284,28 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/klima/api/settings", DEFAULTS,
                                       {"Host": "deskpi.test", "Origin": "http://not-approved.test", "X-CSRF-Token": self.app.csrf})[0], 403)
 
+    def test_history_diagnostics_validates_scope_lock_and_corruption_without_bluetooth(self):
+        from backend.common.history_store import HistoryStore
+        from backend.common.history_capture import decode_capture
+        from history_fixture import capture
+        with tempfile.TemporaryDirectory() as folder:
+            store=HistoryStore(Path(folder));meta=store.publish('12345678',**decode_capture(capture()))
+            query=f"?logger={meta['logger']}&snapshot={meta['id']}"
+            with patch.object(self.app,'history_store',store),patch.object(self.app.receiver,'start') as start:
+                code,_,body=self.request('/klima/api/diagnostics/history'+query)
+                self.assertEqual(code,200);result=json.loads(body)
+                self.assertEqual(result['state'],'ok');self.assertEqual(result['rows_checked'],3);self.assertFalse(result['clock_verified'])
+                self.assertEqual(self.request('/klima/api/diagnostics/history')[0],400)
+                self.assertEqual(self.request('/klima/api/diagnostics/history'+query+'&repair=1')[0],400)
+                self.assertEqual(self.request('/klima/api/diagnostics/history'+query+'&logger=another')[0],400)
+                self.app.diagnostics_lock.acquire()
+                try:self.assertEqual(self.request('/klima/api/diagnostics/history'+query)[0],409)
+                finally:self.app.diagnostics_lock.release()
+                path=store.root/meta['logger']/meta['id']/'capture.csv';damaged=path.read_bytes()+b'broken';path.write_bytes(damaged)
+                code,_,body=self.request('/klima/api/diagnostics/history'+query)
+                self.assertEqual(code,200);self.assertEqual(json.loads(body)['state'],'error');self.assertEqual(path.read_bytes(),damaged)
+                start.assert_not_called()
+
     def test_live_exposes_session_warning_status_without_starting_receiver(self):
         self.assertIs(self.app.receiver.warnings,self.app.warnings)
         with patch.object(self.app.receiver,'start') as start:

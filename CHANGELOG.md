@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.6-dev · 2026-11-27
+
+- Manuelle Diagnose eines gespeicherten Loggerhistorienstands einschließlich benötigter Nachladebasis. Prüft CSV-/Rohbeleg-Prüfsummen, Sequenzen, Anzahlen, Inhaltskennungen und Kettentiefe über den vorhandenen Historienverifizierer. Keine Reparatur, Loggerverbindung, Uhrkorrektur oder Messdatenänderung.
+- Begrenzter Vorabcheck: maximal 32 Kettenglieder, 100 Dateien, 32 MiB, 250.000 aufsummierte Zeilen-Prüfschritte und etwa fünf Sekunden. Symbolische Pfade und fehlerhafte Archive melden Fehler, belegte Ablage/erreichte Grenzen eine Teilprüfung. Gemeinsame Auftragssperre mit Empfangsdateidiagnose.
+- Neue Auswahl und Ergebnisanzeige auf der Diagnoseseite, getrennt von der aktuellen Diagrammquelle. Prüfung nur auf Klick; kein zusätzlicher Hintergrundaufwand. Gerätezeit bleibt unabhängig vom Integritätsergebnis ungeprüft.
+- Sechs neue Kerntests, ein API-Test und gezielte mobile Browserprüfung bestanden. Neuester gespeicherter DeskPi-Stand separat rein lesend ohne Befund geprüft. V0.8.5 im Dienst bestätigt; keine Geräteänderung. Batterieereignisse mangels belegter Warnschwelle weiterhin offen.
+
 ## 0.8.5-dev · 2026-11-27
 
 - Automatische lokale Feuchteindikatoren für neu dauerhaft gespeicherte Host-Empfänge mit passender Messstellenzuordnung. Kriterien aus dem damaligen Zuordnungsstand: Luftfeuchte, optionale angenommene Oberflächenfeuchte/Kondensation, Mindestphasendauer und Hysterese. Keine Gerätealarme oder Schimmelwahrscheinlichkeit.

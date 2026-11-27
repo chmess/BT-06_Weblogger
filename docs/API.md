@@ -1,4 +1,4 @@
-# HTTP-API · V0.8.5-dev
+# HTTP-API · V0.8.6-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
@@ -235,3 +235,16 @@ Nur nach erfolgreichem primärem CSV-Anhang/fsync wird die Bewertung fortgeschri
 Ereignisquelle `climate-monitor`, Typen `climate.warning`, `climate.cleared`, `climate.unknown`. Aktivmeldung einmal je qualifizierter Phase; Freigabemeldung ausschließlich bei tatsächlich gemessener Unterschreitung der jeweiligen Freigabeschwelle. Ungültige Werte, mehr als 1,5-facher Speicherabstand, Hostpause/Empfangsunterbrechung, Zuordnungs-/Kriterien-/Intervallwechsel oder rückwärts laufende Hostzeit brechen den Nachweis ab. Zuvor aktive Indikatoren erzeugen einmalig unbekannt, keine Entwarnung. Reines Verstreichen von Zeit qualifiziert keine Phase ohne neues Messpaar. Ereignisfehler führen zu keiner Wiederholung und verhindern die Messwertspeicherung nicht.
 
 Laufende Phasen sind absichtlich Sitzungszustand im RAM; Ereignisse bleiben CSV. Nach Dienstneustart beginnt die belegte Dauer mit neuen Messwerten. Keine Rekonstruktion aus alten CSV, Historienarchiven oder Simulation. Zuordnungs-/Lückenprüfung erfolgt im vorhandenen Empfängerzyklus und bei Statusabruf; kein zusätzlicher Dienst, Thread, BLE-Befehl oder externes Benachrichtigungssystem. Statusabruf kann eine inzwischen abgelaufene Beurteilung auf unbekannt setzen und deren einmaliges Ereignis protokollieren.
+
+
+## Gespeicherte Historie prüfen V0.8.6
+
+`GET /api/diagnostics/history?logger=<BT06-ID>&snapshot=<vollständige SHA256-ID>` verlangt genau diese beiden einfachen Parameter. Falsche/mehrfache/zusätzliche Parameter oder ungültige Kennungsform: 400. Eine bereits laufende Empfangs-/Historienprüfung: 409. Bestehender Hostschutz. Prüfung wird im Browser nur bewusst ausgelöst; sie legt weder Daten an noch führt sie Bluetooth-, Reparatur- oder Uhrbefehle aus.
+
+Antwort: `scope=selected_history_chain`, Logger/Stand, `checked_at`, `state` (`ok`, `partial`, `error`), `complete`, stets `clock_verified=false`, `snapshots_checked`, `files_checked`, `rows_checked`, `bytes_planned`, `row_work_planned`, `elapsed_seconds`, `reason` und `limits`. Geprüft wird ausschließlich der gewählte Stand samt erforderlicher Basis, nicht jedes andere Archiv oder der aktuelle Gerätebestand. Fehlerantworten enthalten keine Rohwerte oder absoluten Hostpfade. Archivfehler sind ein regulärer Bericht mit HTTP 200 und `state=error`, kein Erfolgsnachweis.
+
+Vorab: Historienablage ohne Warten sperren, höchstens 32 Kettenglieder, 100 Dateien einschließlich Manifesten, 32 MiB Dateiumfang, 256 KiB je Manifest sowie 250.000 aufsummierte Zeilen-Prüfschritte (jeder verifizierte Präfix zählt). Pfade müssen regulär und ohne symbolische Links sein; Basisbezüge/Kettentiefe werden kontrolliert. Danach verwendet die Prüfung `HistoryStore.rows` für SHA256 aller referenzierten CSV/Rohbelege sowie Sequenz-, Anzahl- und Inhaltskennungsprüfung sämtlicher Glieder. Keine Änderung oder Rückdatierung.
+
+Zeitbudget etwa fünf Sekunden: Vorabprüfungen werden begrenzt, eine bereits laufende Inhaltsprüfung wird nicht hart unterbrochen. Ein Zeitüberzug bleibt ausdrücklich `partial`; Betriebssystemzugriffe können länger blockieren. Erreichte Ressourcenlimits und belegte Historienablage sind Teilprüfungen. Vollständige Zähler werden erst nach erfolgreicher Inhaltsprüfung gesetzt; bei einem Fehler davor sind null Zähler keine Aussage über einen leeren Archivbestand. Der Dateizähler umfasst validierte Manifeste und referenzierte Dateien; Zeilenzähler bezeichnet den rekonstruierten gewählten Gesamtstand.
+
+Ein Integritätsergebnis bestätigt weder die reale Geräteuhr noch eine metrologische Kalibrierung oder Vollständigkeit des aktuell noch im Logger befindlichen Bestands. Eine ausdrücklich bestätigte historische Zeitzonenzuordnung bleibt davon getrennt.

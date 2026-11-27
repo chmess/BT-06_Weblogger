@@ -21,6 +21,7 @@ function go(page) {
   if(location.hash!==`#${page}`) history.replaceState(null,'',`#${page}`);
   $('.source-strip').hidden=['events','sites'].includes(page);$('#source-notice').hidden=['events','sites'].includes(page);
   if(page==='sites')loadSites().catch(error=>notice(error.message,true));
+  if(page==='diagnostics')historyCheckOptions();
   if(page==='events')loadEvents().catch(error=>notice(error.message,true));
   if(page==='history') { if(!state.chart) initChart(); state.chart?.resize(); }
 }
@@ -471,6 +472,21 @@ async function checkStorage(){
     for(const item of [...data.errors,...data.skipped])$('#storage-check-details').append(element('li',item.file+': '+item.reason));
   }catch(error){$('#storage-check-status').textContent='Prüfung fehlgeschlagen; kein Integritätsnachweis.';throw error;}finally{button.disabled=false;}
 }
+let historyCheckBusy=false;
+function historyCheckOptions(){
+  if(historyCheckBusy)return;const select=$('#history-check-select'),previous=select.value;select.replaceChildren();
+  for(const item of state.snapshots)addOption(select,item.logger+'/'+item.id,`${item.logger} · ${date(item.imported_at)} · ${item.count} Werte · ${item.id.slice(0,10)}`);
+  if(state.snapshots.some(item=>item.logger+'/'+item.id===previous))select.value=previous;
+  $('#history-check').disabled=!select.value;
+}
+async function checkHistory(){
+  const selected=state.snapshots.find(item=>item.logger+'/'+item.id===$('#history-check-select').value);if(!selected)throw new Error('Zuerst einen gespeicherten Historienstand wählen.');
+  historyCheckBusy=true;$('#history-check').disabled=true;$('#history-check-select').disabled=true;$('#history-check-summary').replaceChildren();$('#history-check-status').textContent='Archivstand wird rein lesend geprüft …';
+  try{const data=await api('diagnostics/history?'+new URLSearchParams({logger:selected.logger,snapshot:selected.id}));
+    $('#history-check-status').textContent=({ok:'Prüfung ohne Befund. ',partial:'Nur teilweise geprüft. ',error:'Fehler gefunden. '})[data.state]+data.reason;
+    for(const [key,value] of [['Logger',data.logger],['Historienstand',data.snapshot.slice(0,16)],['Vollständig geprüfte Kettenglieder',data.snapshots_checked],['Vollständig geprüfte Dateien',data.files_checked],['Werte im geprüften Gesamtstand',data.rows_checked],['Prüfdauer',number(data.elapsed_seconds)+' s'],['Stand der Prüfung',date(data.checked_at)],['Gerätezeit','Ungeprüft; keine Uhrkorrektur']])$('#history-check-summary').append(element('dt',key),element('dd',String(value)));
+  }catch(error){$('#history-check-status').textContent='Prüfung fehlgeschlagen; kein Integritätsnachweis.';throw error;}finally{historyCheckBusy=false;$('#history-check-select').disabled=false;historyCheckOptions();}
+}
 function populateSnapshots() {
   const selected=state.snapshots.filter(s=>s.logger===state.logger),heads=state.series.filter(s=>s.logger===state.logger);
   state.snapshot=selected.find(s=>s.id===state.snapshot?.id)||heads[0]||selected[0]||null;
@@ -500,7 +516,7 @@ function setSource(source) {
 async function refreshSnapshots() {
   const previousHead=state.series.find(s=>s.id===state.snapshot?.id&&s.logger===state.logger);
   const [snapshots,series]=await Promise.all([api('snapshots'),api('series')]);
-  state.snapshots=snapshots.snapshots;state.series=series.series;
+  state.snapshots=snapshots.snapshots;state.series=series.series;historyCheckOptions();
   if(previousHead){const successors=state.series.filter(s=>s.logger===previousHead.logger&&s.member_ids.includes(previousHead.id));if(successors.length===1)state.snapshot=successors[0];}
   const list=$('#snapshot-list');list.replaceChildren();
   if(!state.snapshots.length)list.append(element('p','Noch keine Loggerhistorie gespeichert.','muted'));
@@ -756,6 +772,8 @@ async function main() {
   window.addEventListener('hashchange',guard(async()=>{go(location.hash.slice(1));if(location.hash==='#history')await loadHistory();}));
   $('#run-select').addEventListener('change',guard(async()=>{if(state.source==='device')state.snapshot=state.snapshots.find(s=>s.id===$('#run-select').value);else state.run=state.runs.find(r=>r.id===$('#run-select').value);chooseLogger();await loadHistory();}));
   $('#storage-check').addEventListener('click',guard(checkStorage));
+  $('#history-check').addEventListener('click',guard(checkHistory));
+  $('#history-check-select').addEventListener('change',()=>{$('#history-check-status').textContent='Auswahl geändert; angezeigter Bericht gehört weiterhin zum genannten Stand.';});
   $('#history-site').addEventListener('change',guard(async()=>{updateHistorySites();chooseLogger();markRiskStale();markStatisticsStale();invalidateExport();await loadHistory();}));
   $('#logger-select').addEventListener('change',guard(async()=>{state.logger=$('#logger-select').value;await loadHistory();}));
   $('#period').addEventListener('change',guard(async()=>{$('#custom-period').hidden=$('#period').value!=='custom';if($('#period').value!=='custom')await loadHistory();}));
