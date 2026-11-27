@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.3-dev · 2026-11-27
+
+- Diagnose zeigt gemeinsame Konfigurationsablage, Revision und unbestätigte Schreibfehler sowie aktuelle/frühere Ereignis-Schreibfehler der Dienstsitzung.
+- Neue manuelle, rein lesende Empfangs-CSV-Prüfung: Schema, Dateischluss, Zeilenstruktur, Hostzeitbasis/UTC-Monat, Zeitfolge, Datensatzkennungen und Temperatur-/Feuchtewerte. Kein Reparieren, Löschen oder BLE-Zugriff; Historienarchive und Simulation bleiben ausdrücklich außerhalb des Prüfumfangs.
+- Aufwand begrenzt auf 100 Dateien, 32 MiB, 250.000 Zeilen, 10.000 Verzeichniseinträge und etwa fünf Sekunden. Gleichzeitige Aufträge blockieren; aktive Schreiber werden nicht abgewartet. Teilprüfungen, leere Bestände, Fehler und vollständig geprüfte Dateien getrennt anzeigen.
+- 206 Tests und vollständige Chromium-Prüfung mit mobiler Diagnose bestanden. Bestehende Empfangsdatei auf dem DeskPi rein lesend ohne Befund geprüft. V0.8.2 im Dienst bestätigt; keine Geräteänderung.
+
 ## 0.8.2-dev · 2026-11-27
 
 - Messstellenfilter im Klimaverlauf für echte Host-Empfänge innerhalb des gewählten Loggers. Dieselbe Auswahl gilt für Statistik, Feuchteauswertung, sichtbaren Ausschnitt und Original-/Auswahl-/Klima-CSV; Dateinamen tragen die stabile Messstellen-ID.

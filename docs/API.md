@@ -1,4 +1,4 @@
-# HTTP-API · V0.8.2-dev
+# HTTP-API · V0.8.3-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
@@ -204,3 +204,14 @@ Optionaler Queryparameter `site=site-<UUID>` für `/api/history`, `/api/statisti
 Der Filter verwendet Original-Messstellen-ID UND historisches Host-Zuordnungsintervall. Anfang einschließlich, Ende ausschließlich; keine nachträgliche Umzuordnung von Altzeilen. JSON-Berichte ergänzen `site_selection` mit `site_id`, `current_name` (ausdrücklich aktueller Name), `logger`, Messstellen-`revision`, `assignment_intervals`, `basis=stored_id_and_host_assignment`, `criteria_automatic=false`. Keine passenden Zeilen ergibt einen regulären leeren Bericht.
 
 Zuordnungsgrenzen unterbrechen Grafiklinien, Zeitmittel und Feuchtephasen unabhängig vom zeitlichen Abstand; in Phasendetails heißt der Abschluss `assignment_boundary`. Statistik-`gap_count` zählt bei gefilterten Daten auch Zuordnungsgrenzen zwischen ausgewerteten Zeilen. Die bisherige Berichtsspanne/Abdeckungsdefinition bleibt erhalten. Kriterien bleiben explizite API-Eingaben. CSV enthält ausschließlich die originalen Zeilen bzw. ausdrücklich gewählten Ableitungen, keine internen Segmentspalten. Dateinamen ergänzen die stabile Messstellen-ID. Mehrere Logger werden in dieser Version nicht zusammengeführt.
+
+
+## Empfangsdateidiagnose V0.8.3
+
+`GET /api/diagnostics/storage` ohne Parameter startet eine rein lesende Prüfung nativer Hostdateien unter `data/bt06-<Kennung>/<Jahr>/*.csv`. Bestehender Hostschutz, kein CORS. Unbekannte Parameter: 400; weitere Prüfung während eines laufenden Auftrags: 409. Keine BLE-Kommunikation, automatische Wiederholung oder Reparatur. Die Oberfläche ruft diesen Endpunkt nur auf ausdrücklichen Klick auf, nicht im Aktualisierungstakt.
+
+Antwort enthält `scope=host_csv_only`, Host-Prüfzeit `checked_at`, `state` (`empty`, `ok`, `partial`, `error`), `complete`, `files_checked`, `rows_checked`, `bytes_checked`, `elapsed_seconds`, `limits`, `errors` und `skipped`. Fehler/übersprungene Dateien nennen nur relative Pfade und feste Ursachen, keine Originalwerte oder absoluten Hostpfade. `complete` bezeichnet das Abarbeiten des erfassten Umfangs, nicht die Fehlerfreiheit; bei `state=error` liegt auch bei abgeschlossenem Durchlauf ein Befund vor. Zeilenzähler zählen bis dahin erfolgreich validierte Zeilen, Dateizähler nur vollständig validierte Dateien; Bytes zählen berücksichtigte Dateigrößen.
+
+Prüft pro Datei Schema/Kopf, vollständigen Dateischluss, Spaltenzahl, Schema 2/Advertising/Hostzeitbasis, gültigen Offsetzeitstempel im Dateimonat, streng aufsteigende Zeitfolge, nicht leere/eindeutige Datensatzkennungen und endliche Temperatur-/Feuchtewerte (Feuchte 0–100, fehlende Werte zulässig). Nur ein gemeinsamer nicht blockierender Leselock je Datei; wird geschrieben, bleibt sie übersprungen. Keine zeitübergreifende Transaktionssicht sämtlicher Dateien. Symbolische Links werden nicht gelesen, Zugriffsfehler nicht als leerer Bestand gewertet.
+
+Limits: 100 Dateien, 32 MiB, 250.000 Zeilen, 10.000 Verzeichniseinträge, etwa fünf Sekunden. Erreichte Grenzen ergeben Teilprüfung; kein stilles Auslassen mit Erfolgsbehauptung. Blockierende Betriebssystemzugriffe können die Zeitgrenze überschreiten. Die Prüfung ersetzt weder Historien-Vollständigkeitsbelege noch eine Prüfung von Historienarchiven, Simulation, Ereignis-CSV oder geräteseitiger Messrichtigkeit.

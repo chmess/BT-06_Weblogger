@@ -284,6 +284,18 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/klima/api/settings", DEFAULTS,
                                       {"Host": "deskpi.test", "Origin": "http://not-approved.test", "X-CSRF-Token": self.app.csrf})[0], 403)
 
+    def test_storage_diagnostics_is_read_only_serialized_and_rejects_parameters(self):
+        with patch('backend.server.inspect_live',return_value={'state':'empty'}) as inspect,patch.object(self.app.receiver,'start') as start:
+            code,_,body=self.request('/klima/api/diagnostics/storage')
+            self.assertEqual(code,200);self.assertEqual(json.loads(body)['state'],'empty')
+            inspect.assert_called_once_with(self.app.root/'data');start.assert_not_called()
+            self.assertEqual(self.request('/klima/api/diagnostics/storage?repair=1')[0],400)
+            inspect.reset_mock();self.app.diagnostics_lock.acquire()
+            try:self.assertEqual(self.request('/klima/api/diagnostics/storage')[0],409)
+            finally:self.app.diagnostics_lock.release()
+            inspect.assert_not_called()
+            self.assertEqual(self.request('/klima/api/diagnostics/storage',headers={'Host':'unapproved.test'})[0],403)
+
     def test_real_source_export_is_separate_and_requires_known_logger(self):
         from datetime import datetime, timezone
         payload = bytearray(24)

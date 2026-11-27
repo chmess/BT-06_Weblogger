@@ -22,6 +22,7 @@ from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
+from backend.common.storage_diagnostics import inspect_live
 from backend.common.site_selection import select_site
 from backend.common.sites import SiteStore
 from backend.common.configuration import Configuration,MAX_BYTES as SETTINGS_MAX_BYTES
@@ -57,6 +58,7 @@ class Application:
             if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username:
                 raise ValueError("Public Origin muss eine HTTP(S)-Origin ohne Pfad sein.")
         self.generation_lock = threading.Lock()
+        self.diagnostics_lock = threading.Lock()
         radio_lock = threading.Lock()
         self.bluetooth = BluetoothJobs(radio_lock)
         self.configuration_store=Configuration(self.root/"config",self.events)
@@ -160,6 +162,13 @@ def handler_for(app):
                     return
                 if path == "/api/status":
                     self.send(200, app.status())
+                elif path == "/api/diagnostics/storage":
+                    if query:raise ValueError("Speicherprüfung benötigt keine Parameter.")
+                    if not app.diagnostics_lock.acquire(blocking=False):
+                        self.send(409,{"error":"Eine Empfangsdateiprüfung läuft bereits."});return
+                    try:result=inspect_live(app.root/"data")
+                    finally:app.diagnostics_lock.release()
+                    self.send(200,result)
                 elif path == "/api/session":
                     self.send(200, {"csrf_token": app.csrf})
                 elif path == "/api/settings":

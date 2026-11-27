@@ -460,7 +460,16 @@ async function diagnostics() {
   const data=await api('status');$('#version').textContent=data.version;
   $('#template-note').textContent=data.local_profiles?'Lokale Zigbee-Klimavorlagen verfügbar. Erzeugte Werte bleiben synthetisch.':'Allgemeine synthetische Klimavorlagen. Zigbee-Vorlagen können lokal eingelesen werden.';
   const target=$('#diagnostics');target.replaceChildren();
-  for(const [key,value] of [['Version',data.version],['Betrieb',data.mode==='advertising'?'BLE-Advertising-Empfang':'Offline'],['Laufzeit',`${data.uptime_seconds} Sekunden`],['Bluetooth',data.ble.status],['Freier Speicher',`${number(data.free_bytes/1073741824)} GiB`],['Einstellungen','JSON · Save / Load'],['Datenquellen','BLE-Empfänge / Simulation getrennt']])target.append(element('dt',key),element('dd',value));
+  for(const [key,value] of [['Version',data.version],['Betrieb',data.mode==='advertising'?'BLE-Advertising-Empfang':'Offline'],['Laufzeit',`${data.uptime_seconds} Sekunden`],['Bluetooth',data.ble.status],['Freier Speicher',`${number(data.free_bytes/1073741824)} GiB`],['Einstellungen','JSON · Save / Load'],['Datenquellen','BLE-Empfänge / Simulation getrennt'],['Konfigurationsablage',data.configuration?.error||`${data.configuration?.path||'unbekannt'} · ${data.configuration?.persisted?'gespeichert':'bisheriger Stand / Standardwerte'} · Revision ${data.configuration?.revision??'–'}`],['Ereignisablage',data.event_log?.error||`Kein aktueller Schreibfehler · ${data.event_log?.failed_this_session??0} Fehler seit Dienststart`]])target.append(element('dt',key),element('dd',value));
+}
+async function checkStorage(){
+  const button=$('#storage-check');button.disabled=true;$('#storage-check-status').textContent='Empfangsdateien werden rein lesend geprüft …';$('#storage-check-summary').replaceChildren();$('#storage-check-details').replaceChildren();
+  try{
+    const data=await api('diagnostics/storage'),labels={ok:'Empfangsdateien innerhalb des Prüfumfangs ohne Befund.',empty:'Keine Empfangsdateien vorhanden; keine Messdaten geprüft.',partial:'Nur teilweise geprüft. Kein vollständiger Integritätsnachweis.',error:'Fehler gefunden. Originaldateien unverändert; keine Reparatur ausgeführt.'};
+    $('#storage-check-status').textContent=labels[data.state]+' Stand: '+date(data.checked_at);
+    for(const [key,value] of [['Vollständig geprüfte Dateien',data.files_checked],['Geprüfte Zeilen',data.rows_checked],['Berücksichtigte Dateigröße',number(data.bytes_checked/1048576)+' MiB'],['Prüfdauer',number(data.elapsed_seconds)+' s'],['Prüfumfang',data.complete?'Erfasster Bestand vollständig abgearbeitet':'Begrenzt / nicht vollständig abgearbeitet']])$('#storage-check-summary').append(element('dt',key),element('dd',String(value)));
+    for(const item of [...data.errors,...data.skipped])$('#storage-check-details').append(element('li',item.file+': '+item.reason));
+  }catch(error){$('#storage-check-status').textContent='Prüfung fehlgeschlagen; kein Integritätsnachweis.';throw error;}finally{button.disabled=false;}
 }
 function populateSnapshots() {
   const selected=state.snapshots.filter(s=>s.logger===state.logger),heads=state.series.filter(s=>s.logger===state.logger);
@@ -735,6 +744,7 @@ async function main() {
   for(const button of document.querySelectorAll('[data-go]'))button.addEventListener('click',()=>go(button.dataset.go));
   window.addEventListener('hashchange',guard(async()=>{go(location.hash.slice(1));if(location.hash==='#history')await loadHistory();}));
   $('#run-select').addEventListener('change',guard(async()=>{if(state.source==='device')state.snapshot=state.snapshots.find(s=>s.id===$('#run-select').value);else state.run=state.runs.find(r=>r.id===$('#run-select').value);chooseLogger();await loadHistory();}));
+  $('#storage-check').addEventListener('click',guard(checkStorage));
   $('#history-site').addEventListener('change',guard(async()=>{updateHistorySites();markRiskStale();markStatisticsStale();invalidateExport();await loadHistory();}));
   $('#logger-select').addEventListener('change',guard(async()=>{state.logger=$('#logger-select').value;await loadHistory();}));
   $('#period').addEventListener('change',guard(async()=>{$('#custom-period').hidden=$('#period').value!=='custom';if($('#period').value!=='custom')await loadHistory();}));
