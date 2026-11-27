@@ -20,8 +20,9 @@ from backend.common.statistics import summarize
 from backend.common.events import EventStore,FIELDS as EVENT_FIELDS
 from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
-from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
+from backend.common.storage import FIELDS,chart_data, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
+from backend.common.csv_download import prepared_csv,CHUNK_BYTES
 from backend.common.climate_warnings import ClimateWarnings
 from backend.common.simulation_diagnostics import inspect_simulation
 from backend.common.history_diagnostics import inspect_history
@@ -62,6 +63,7 @@ class Application:
                 raise ValueError("Public Origin muss eine HTTP(S)-Origin ohne Pfad sein.")
         self.generation_lock = threading.Lock()
         self.diagnostics_lock = threading.Lock()
+        self.export_lock = threading.Lock()
         radio_lock = threading.Lock()
         self.bluetooth = BluetoothJobs(radio_lock)
         self.configuration_store=Configuration(self.root/"config",self.events)
@@ -128,12 +130,10 @@ def handler_for(app):
             allowed.update(urlsplit(origin).netloc for origin in app.public_origins)
             return host in allowed
 
-        def send(self, status, payload, content_type="application/json; charset=utf-8", filename=None):
-            if not isinstance(payload, bytes):
-                payload = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        def response_headers(self,status,length,content_type,filename=None):
             self.send_response(status)
             self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Content-Length", str(length))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "same-origin")
@@ -141,7 +141,29 @@ def handler_for(app):
             if filename:
                 self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
             self.end_headers()
-            self.wfile.write(payload)
+
+        def send(self, status, payload, content_type="application/json; charset=utf-8", filename=None):
+            if not isinstance(payload,bytes):payload=json.dumps(payload,ensure_ascii=False,allow_nan=False).encode("utf-8")
+            self.response_headers(status,len(payload),content_type,filename);self.wfile.write(payload)
+
+        def send_csv(self,rows,fields,filename):
+            if not app.export_lock.acquire(blocking=False):
+                if hasattr(rows,'close'):rows.close()
+                self.send(409,{"error":"Ein CSV-Download läuft bereits. Nach Abschluss erneut versuchen."});return
+            committed=False;previous_timeout=self.connection.gettimeout()
+            try:
+                with prepared_csv(rows,fields,app.root/'runtime') as (stream,length):
+                    self.connection.settimeout(30)
+                    committed=True
+                    self.response_headers(200,length,"text/csv; charset=utf-8",filename)
+                    shutil.copyfileobj(stream,self.wfile,CHUNK_BYTES)
+            except Exception:
+                if committed:self.close_connection=True
+                else:raise
+            finally:
+                try:self.connection.settimeout(previous_timeout)
+                except OSError:pass
+                app.export_lock.release()
 
         def route(self):
             if not self.valid_host():
@@ -213,7 +235,7 @@ def handler_for(app):
                     filters={key:query[key][0] for key in ("start","end","logger","level") if key in query}
                     if "type" in query:filters['event_type']=query['type'][0]
                     if path=="/api/events":self.send(200,app.events.query(int(query.get('limit',['100'])[0]),**filters))
-                    else:self.send(200,csv_text(app.events.rows(**filters),EVENT_FIELDS).encode('utf-8-sig'),"text/csv; charset=utf-8","bt06-ereignisse.csv")
+                    else:self.send_csv(app.events.rows(**filters),EVENT_FIELDS,"bt06-ereignisse.csv")
                 elif path == "/api/loggers":
                     self.send(200, {"loggers": app.loggers()})
                 elif path == "/api/sync":
@@ -303,10 +325,10 @@ def handler_for(app):
                         climate='climate' in query
                         if custom:
                             selected=selected_fields(fields or FIELDS,query.get('fields',[None])[0],climate)
-                            export=csv_text(project_rows(rows,selected,climate),selected)
-                        else:export = csv_text(rows, fields) if fields else csv_text(rows)
+                            rows=project_rows(rows,selected,climate)
+                        else:selected=fields or FIELDS
                         suffix='_klima' if climate else '_auswahl' if custom else ''
-                        self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}{'_'+query['site'][0] if 'site' in query else ''}{suffix}.csv")
+                        self.send_csv(rows,selected, f"{run}_{logger}{'_'+query['site'][0] if 'site' in query else ''}{suffix}.csv")
                     elif path=="/api/statistics":
                         self.send(200,{**selection,"source":label,"clock_verified":source!="device","axis_basis":"device_calendar" if source=="device" else "timestamp",**summarize(rows,interval,start,end)})
                     elif path=="/api/risk":

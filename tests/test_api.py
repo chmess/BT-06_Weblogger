@@ -284,6 +284,45 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/klima/api/settings", DEFAULTS,
                                       {"Host": "deskpi.test", "Origin": "http://not-approved.test", "X-CSRF-Token": self.app.csrf})[0], 403)
 
+    def test_csv_preparation_failure_and_concurrency_never_return_partial_success(self):
+        from backend.common.storage import FIELDS
+        closed=[]
+        def broken_rows(*args,**kwargs):
+            try:
+                yield dict.fromkeys(FIELDS,'')
+                raise OSError('synthetic source failure')
+            finally:closed.append(True)
+        from backend.common.simulation import generate
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);meta=generate(root,{'days':1,'interval_minutes':60})
+            path=f"/klima/api/export?source=simulation&run={meta['id']}&logger={meta['loggers'][0]['id']}"
+            with patch.object(self.app,'simulation',root),patch('backend.server.rows_in_range',side_effect=broken_rows):
+                code,headers,body=self.request(path)
+                self.assertEqual(code,503);self.assertTrue(headers['Content-Type'].startswith('application/json'))
+                self.assertNotIn('Content-Disposition',headers);self.assertEqual(closed,[True])
+            with patch.object(self.app,'simulation',root):
+                self.app.export_lock.acquire()
+                try:self.assertEqual(self.request(path)[0],409)
+                finally:self.app.export_lock.release()
+                code,headers,body=self.request(path)
+                self.assertEqual(code,200);self.assertEqual(int(headers['Content-Length']),len(body));self.assertTrue(body.startswith(b'\xef\xbb\xbf'))
+
+    def test_csv_transport_failure_closes_connection_without_appended_error_json(self):
+        from backend.common.simulation import generate
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);meta=generate(root,{'days':1,'interval_minutes':60})
+            path=f"/klima/api/export?source=simulation&run={meta['id']}&logger={meta['loggers'][0]['id']}"
+            def interrupted(source,target,length):
+                target.write(source.read(5));raise OSError('synthetic transport failure')
+            with patch.object(self.app,'simulation',root),patch('backend.server.shutil.copyfileobj',side_effect=interrupted):
+                connection=http.client.HTTPConnection('127.0.0.1',self.port,timeout=10)
+                try:
+                    connection.request('GET',path);response=connection.getresponse();self.assertEqual(response.status,200)
+                    with self.assertRaises(http.client.IncompleteRead) as failure:response.read()
+                    self.assertEqual(len(failure.exception.partial),5);self.assertNotIn(b'error',failure.exception.partial)
+                finally:connection.close()
+            self.assertTrue(self.app.export_lock.acquire(blocking=False));self.app.export_lock.release()
+
     def test_simulation_diagnostics_validates_run_scope_lock_and_damage(self):
         from backend.common.simulation import generate
         with tempfile.TemporaryDirectory() as folder:

@@ -288,3 +288,20 @@ Million-Zeilen-Benchmark vor/nach Änderung: gleiche künstliche CSV-Prüfsumme 
 PYTHONPATH=tests python3 -m unittest test_core test_climate test_live test_site_selection -q
 node tools/check_background_refresh.mjs
 ```
+
+
+## V0.9.1 · gezielte Exportprüfung
+
+Vier neue Vorbereitungstests und 20 gezielte Export-/API-Prüfungen bestanden: bytegleiche CSV einschließlich BOM, Unicode, Anführungszeichen, Semikolon, Zeilenumbruch und Leerwert; exakte Länge, private temporäre Datei, einmaliges Schließen der Quelle vor Übergabe, Bereinigung bei Vorbereitungs-/Verbraucherfehlern sowie Größen-/Platzreserve.
+
+HTTP-Prüfungen bestätigen: Quellenfehler nach erster vorbereiteter Zeile liefert 503/JSON ohne Downloadheader, paralleler CSV-Auftrag 409, anschließender Erfolg mit passender Länge. Künstlicher Übertragungsfehler nach fünf Bytes führt beim Client zu `IncompleteRead`, ohne angehängte Fehler-JSON; Sperre wird wieder frei. Nach Ergänzung der allgemeinen Transfer-Fehlergrenze und des Socket-Timeouts nur diesen Abbruchtest erneut geprüft. Nach Nachführung der Platzreserve nur die vier Vorbereitungstests erneut geprüft.
+
+Bestehende Original-/Klima-/Ereignis-/Zeitzuordnungs-/Statistik-/Live-/Messstellen-Exporte sowie verpflichtende Logger-Herkunft weiter bestanden. Der vorhandene fokussierte Browserablauf `--site-continuity` prüft echte CSV-Antworten im Browser einschließlich Statistikexport und mobiler Auswahl; bestanden, keine JavaScript-Ausnahmen oder externen Anfragen. Danach nur ein erläuternder Hinweis zur 256-MiB-Grenze ergänzt. Keine Gesamt-Test-/Browserstrecke wiederholt.
+
+Million-Zeilen-Vergleich prüft gleiche CSV-Inhaltskennung und Dateilänge bei erheblich geringerem Worker-RSS; Methodik und Grenzen in [PERFORMANCE.md](PERFORMANCE.md). Keine echten Messdaten, System- oder Geräteparameter verändert.
+
+```sh
+python3 -m unittest discover -s tests -p test_csv_download.py -q
+PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_csv_preparation_failure_and_concurrency_never_return_partial_success test_api.ApiTests.test_csv_transport_failure_closes_connection_without_appended_error_json test_api.ApiTests.test_selection_and_climate_export_preserve_original_and_unverified_time test_api.ApiTests.test_events_filters_limits_export_and_private_storage test_api.ApiTests.test_time_assignment_export_is_explicit_and_preserves_originals test_api.ApiTests.test_statistics_retains_original_device_time_and_export_bytes test_api.ApiTests.test_real_source_export_is_separate_and_requires_known_logger test_site_selection test_export -q
+node tools/browser_smoke.mjs --site-continuity
+```

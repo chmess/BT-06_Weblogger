@@ -105,6 +105,7 @@
     <article class="panel"><h2>CSV mit Spaltenauswahl und Klimagrößen</h2>
       <p>Eine zusätzliche CSV-Kopie in Originalauflösung erstellen. Quellen-, Zeit- und Qualitätskennzeichnung bleiben als Pflichtspalten erhalten; berechnete Werte erhalten Modell und Berechnungsstatus.</p>
       <div class="toolbar"><label>Zeitraum<select id="export-scope"><option value="selected">Im Klimaverlauf gewählter Zeitraum</option><option value="visible">Sichtbarer Diagrammausschnitt</option><option value="statistics">Zeitraum des Statistikberichts</option></select></label><button id="export-prepare">Spaltenauswahl vorbereiten</button></div>
+      <p class="hint">Höchstens 256 MiB je CSV-Download. Größere Zeitbereiche in mehrere Dateien aufteilen.</p>
       <p id="export-context" class="hint"></p>
       <div id="export-choices" hidden><fieldset><legend>Originalspalten</legend><div id="export-original-fields" class="settings-grid"></div></fieldset>
         <label class="inline-check"><input id="export-climate" type="checkbox"> Berechnete Klimagrößen hinzufügen</label>

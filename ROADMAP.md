@@ -55,6 +55,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.8.7 im Dienst fehlerfrei bestätigt. V0.9.0 vorbereitet: erste CPU-/RAM-Baseline, isolierter Million-Zeilen-Benchmark, kompakte Diagrammverarbeitung mit 81,5 % geringerem Spitzen-RAM und identischer Ergebnissignatur sowie serialisierte Hauptaktualisierung. Gezielte Funktions-/Randfallprüfungen bestanden. Noch keine Dauerbetriebs-, HTTP- oder SMApi-Abnahme; große Statistik-/Exportabfragen und lange Diagrammlaufzeiten bleiben Engpässe (docs/PERFORMANCE.md).
 
+- V0.9.0 im Dienst fehlerfrei bestätigt. V0.9.1 vorbereitet: vollständige CSV-Vorbereitung in privater temporärer Datei, danach blockweise Übertragung mit genauer Länge; Fehler-/Abbruchschutz, Größen-/Platzbudget und ein Download gleichzeitig. Im isolierten Million-Zeilen-Vergleich 93,3 % weniger Spitzen-RSS bei identischer CSV, rund zwei Sekunden längere Vorbereitung. 24 gezielte Python-Prüfungen und fokussierter Browserablauf bestanden. Weiter offen: reale SSD-/HTTP-Last, große Statistikabfragen, Wiederanlauf und Dauerbetrieb.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

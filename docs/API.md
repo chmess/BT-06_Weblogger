@@ -1,4 +1,4 @@
-# HTTP-API · V0.8.7-dev
+# HTTP-API · V0.9.1-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
@@ -261,3 +261,14 @@ Prüft Schema 1, passende Laufkennung/Quelle, kanonische Generatoroptionen, gül
 Grenzen: 100 Dateien, 32 MiB Dateiumfang, 256 KiB Manifest, 250.000 Zeilen, 10.000 Verzeichniseinträge, etwa fünf Sekunden. Erreichte Grenzen sind ausdrücklich Teilprüfung; blockierende Betriebssystemzugriffe können länger dauern. Nur der gewählte veröffentlichte Testlauf wird geprüft, keine versteckten Generator-Zwischenstände oder anderen Datenquellen.
 
 Das unveränderte Testdatenformat besitzt keine gespeicherten Referenz-Prüfsummen. Eine erfolgreiche Strukturprüfung ist daher kein Nachweis unveränderter Temperatur-/Feuchtewerte, keine bitgleiche Reproduktion privater Vorlagen und keine Messrichtigkeitsprüfung. Diese Grenze bleibt im Ergebnis und in der Oberfläche sichtbar.
+
+
+## CSV-Downloadvorbereitung V0.9.1
+
+Alle Messdaten-/Auswahl-/Klima-/Zeitzuordnungs-/Messstellen- und Ereignis-CSV verwenden denselben Vorbereitungsweg. CSV-Schema, Spalten, Originalauflösung, Dateiname, BOM und bisherige Schutzheader bleiben erhalten. Vollständige CSV wird zunächst in einer privaten anonymen temporären Datei unter `runtime` erzeugt, Quelldatenströme geschlossen, Puffer geleert und die genaue Länge ermittelt. Erst danach folgen HTTP 200, `Content-Type: text/csv; charset=utf-8`, `Content-Disposition` und die exakte `Content-Length`; Übertragung blockweise mit 64 KiB. Keine persistente Export-/Backupablage, keine Systeminstallation oder neue Dienstfreigabe nötig.
+
+Nur ein CSV-Auftrag gleichzeitig, einschließlich Transfer. Weitere CSV-Anfragen: 409/JSON. Andere API-Aufträge werden davon nicht generell gesperrt. Maximal 256 MiB einschließlich BOM; außerdem anfänglich mindestens 64 MiB freier Speicher außerhalb des Exportbudgets, mit erneuter Prüfung ungefähr je MiB und Nachführung des verbleibenden Budgets. Grenzverletzung vor Transfer: 400/JSON mit Aufforderung zum Eingrenzen bzw. Speicherhinweis; tatsächlicher Dateizugriffsfehler: 503/JSON. Keine teilweise vorbereitete CSV als Erfolg. Andere Prozesse können freien Speicher unabhängig verändern; die Reserve ist keine systemweite Reservierung.
+
+Nach begonnenem Transfer ist keine zweite JSON-/HTTP-Antwort erlaubt: Fehler schließen die Verbindung. Ein unvollständiger Body widerspricht der angekündigten Länge und muss vom Client als unvollständig behandelt werden. CSV-Transfer verwendet 30 Sekunden Socket-Inaktivitätslimit; dies ist keine absolute Gesamtzeitgrenze. Ein langsam weiterlesender Client kann die einzelne Exportfreigabe länger belegen. Sperre und temporäre Datei werden bei regulärem Erfolg und Fehler freigegeben. HTTP-Erfolg bedeutet hier vollständige serverseitige Vorbereitung, keinen Nachweis, dass der Client die Datei dauerhaft gespeichert hat.
+
+Die Quelldaten können eigene Speicher-/Lesekosten besitzen, insbesondere rekonstruierte Historien. Die Änderung begrenzt die CSV-Ausgabepufferung. Dateisystemcache bzw. tmpfs-Speicher gehören nicht zum gemessenen Prozess-RSS; siehe [PERFORMANCE.md](PERFORMANCE.md).

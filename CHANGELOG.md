@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.9.1-dev · 2026-11-27
+
+- CSV-Downloads werden vollständig in einer privaten, automatisch entfernten temporären Datei unter runtime vorbereitet und danach in 64-KiB-Blöcken übertragen. Original-/Auswahl-/Klima-/Zeitzuordnungs-/Messstellen- und Ereignis-CSV behalten ihre Bytes einschließlich UTF-8-BOM, Dateinamen, Schutzheader und genaue Content-Length.
+- Kein HTTP-CSV-Erfolg vor abgeschlossener Vorbereitung. Bei Quelle-/Schreibfehler normale Fehlerantwort; nach Übertragungsbeginn keine angehängte Fehler-JSON, sondern Verbindungsabbruch mit unvollständiger angekündigter Länge. Quelldatenströme werden vor dem Transfer geschlossen, temporäre Daten auch bei Fehlern entfernt.
+- Ein CSV-Download gleichzeitig, maximal 256 MiB je Datei, 64 MiB anfängliche Platzreserve mit laufender Nachprüfung, 30 Sekunden Socket-Inaktivitätslimit während der Übertragung. Größen-/Reservegrenzen schlagen vor dem Download fehl; vorhandene Daten bleiben unberührt. Kein zusätzlicher Dienst, keine persistente Exportablage.
+- Eine Million Zeilen: Spitzen-RSS 294,9 → 19,8 MiB (93,3 % weniger), Vorbereitung/Lesetest 25,707 → 27,647 s. Dateilänge und CSV-Inhaltsprüfsumme identisch. Temporärer Benchmark auf tmpfs; kein SSD-/HTTP-Dauerlastnachweis und kein Nachweis entsprechend gesunkenen gesamten System-RAMs.
+- Vier neue Vorbereitungstests und 20 gezielte Export-/API-Prüfungen sowie bestehender fokussierter Messstellen-Browserablauf bestanden. Nach Ergänzung von Transfer-Fehlergrenze/Timeout und Reserve-Nachführung jeweils betroffene Prüfungen wiederholt. V0.9.0 im Dienst bestätigt; keine System-/Geräteänderung.
+
 ## 0.9.0-dev · 2026-11-27
 
 - Erste Ressourcen-/Performanceabnahme begonnen. Laufender V0.8.7-Dienst über zehn Sekunden ohne zusätzliche HTTP-Last beobachtet: etwa 33,2 MiB RSS, 0,9 % eines CPU-Kerns, drei Threads. Kein Dauerbetriebsnachweis.
