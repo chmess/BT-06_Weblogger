@@ -1,7 +1,7 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
 const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null, autoSync:null, timeAssignment:null};
-const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', statistics:'Statistik', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
+const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', statistics:'Statistik', events:'Ereignisse', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
 function notice(message, error=false) { const box=$('#notice'); box.textContent=message; box.hidden=false; box.classList.toggle('error', error); }
@@ -19,6 +19,8 @@ function go(page) {
   for(const button of document.querySelectorAll('[data-page]')) { if(button.dataset.page===page) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current'); }
   $('#page-title').textContent=titles[page];
   if(location.hash!==`#${page}`) history.replaceState(null,'',`#${page}`);
+  $('.source-strip').hidden=page==='events';$('#source-notice').hidden=page==='events';
+  if(page==='events')loadEvents().catch(error=>notice(error.message,true));
   if(page==='history') { if(!state.chart) initChart(); state.chart?.resize(); }
 }
 function chartDate(value) { return state.source==='device'?new Intl.DateTimeFormat('de-DE',{dateStyle:'short',timeStyle:'short',timeZone:'UTC'}).format(new Date(value)):date(value); }
@@ -159,6 +161,25 @@ async function analyzeStatistics(visible=false){
   state.statisticsReport=result;state.statisticsQuery=query;renderStatistics(result);$('#statistics-export').disabled=false;
 }
 function exportStatistics(){if(!state.statisticsQuery)throw new Error('Zuerst Statistik berechnen.');const link=document.createElement('a');link.href='api/export?'+state.statisticsQuery;link.click();}
+let eventsRevision=0;
+function invalidateEvents(){eventsRevision++;state.eventsQuery=null;$('#events-export').disabled=true;$('#events-table').hidden=true;$('#events-status').textContent='Filter geändert; erneut laden.';}
+function eventsQuery(){
+  const query=new URLSearchParams({limit:$('#events-limit').value});
+  for(const field of ['logger','level','type'])if($(`#events-${field}`).value)query.set(field,$(`#events-${field}`).value);
+  for(const field of ['start','end']){const raw=$(`#events-${field}`).value;if(raw){const dateValue=new Date(raw);if(!Number.isFinite(dateValue.getTime()))throw new Error('Ungültiger Ereigniszeitraum.');query.set(field,dateValue.toISOString());}}
+  return query;
+}
+async function loadEvents(){
+  const query=eventsQuery(),revision=++eventsRevision;$('#events-status').textContent='Ereignisse werden geladen …';$('#events-export').disabled=true;
+  let result;try{result=await api('events?'+query);}catch(error){if(revision===eventsRevision){$('#events-status').textContent='Ereignisprotokoll konnte nicht gelesen werden; Originaldateien erhalten.';$('#events-table').hidden=true;}throw error;}
+  if(revision!==eventsRevision)return;
+  const chosen=$('#events-type').value;$('#events-type').replaceChildren();addOption($('#events-type'),'','Alle');for(const [key,label] of Object.entries(result.event_types))addOption($('#events-type'),key,label);$('#events-type').value=chosen;
+  const target=$('#events-values');target.replaceChildren();const levels={info:'Information',warning:'Warnung',error:'Fehler'};
+  for(const item of result.events){const row=element('tr');for(const value of [date(item.Zeitstempel),levels[item.Stufe],result.event_types[item.Typ],item.Logger||'–',item.Nachricht])row.append(element('td',value));target.append(row);}
+  $('#events-table').hidden=false;state.eventsQuery=query;$('#events-export').disabled=false;
+  $('#events-status').textContent=`${result.events.length} Ereignisse geladen${result.truncated?' · weitere Treffer vorhanden; CSV enthält alle passenden Einträge':''}.${result.log_status.failed_this_session?' '+result.log_status.failed_this_session+' Ereignisse in dieser Sitzung nicht dauerhaft bestätigt.':''}${result.log_status.error?' '+result.log_status.error:''}`;
+}
+function exportEvents(){if(!state.eventsQuery)throw new Error('Zuerst Ereignisse laden.');const query=new URLSearchParams(state.eventsQuery);query.delete('limit');const link=document.createElement('a');link.href='api/events/export?'+query;link.click();}
 async function renderCards() {
   if(state.source==='live')return renderLiveCards();
   if(state.source==='device')return renderDeviceCards();
@@ -632,6 +653,10 @@ async function main() {
   $('#source-select').addEventListener('change',guard(async()=>{setSource($('#source-select').value);await renderCards();await loadHistory();}));
   $('#live-follow').addEventListener('change',guard(async()=>{state.follow=$('#live-follow').checked;if(state.follow)await loadHistory();}));
   $('#overview-export').addEventListener('click',guard(async()=>{await loadHistory();exportCSV();}));
+  $('#events-form').addEventListener('submit',guard(async event=>{event.preventDefault();await loadEvents();}));
+  $('#events-form').addEventListener('input',invalidateEvents);
+  $('#events-export').addEventListener('click',guard(exportEvents));
+  $('#events-selected').addEventListener('click',()=>{$('#events-logger').value=state.logger||'';invalidateEvents();});
   $('#statistics-range-button').addEventListener('click',guard(()=>analyzeStatistics()));
   $('#statistics-visible').addEventListener('click',guard(()=>analyzeStatistics(true)));
   $('#statistics-export').addEventListener('click',guard(exportStatistics));

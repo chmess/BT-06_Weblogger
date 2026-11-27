@@ -80,6 +80,27 @@ class ApiTests(unittest.TestCase):
                 for invalid in (query+'&unknown=1',query+'&source=device',query+'&time_basis=assigned',query+'&air_threshold=70'):
                     self.assertEqual(self.request('/klima/api/statistics?'+invalid)[0],400)
 
+    def test_events_filters_limits_export_and_private_storage(self):
+        from backend.common.events import EventStore,FIELDS
+        import csv,io
+        with tempfile.TemporaryDirectory() as folder:
+            store=EventStore(Path(folder)/'events')
+            store.append('application.started','info','Start.',at='2026-11-01T00:00:00Z')
+            store.append('receiver.error','error','Testfehler.',source='receiver',logger='bt06-12345678',at='2026-11-01T00:01:00Z')
+            path=next(store.root.glob('*/*.csv'));before=path.read_bytes()
+            with patch.object(self.app,'events',store):
+                status,_,payload=self.request('/klima/api/events?limit=1')
+                self.assertEqual(status,200);result=json.loads(payload)
+                self.assertTrue(result['truncated']);self.assertEqual(result['events'][0]['Typ'],'receiver.error')
+                status,headers,payload=self.request('/klima/api/events/export?level=error&logger=bt06-12345678')
+                self.assertEqual(status,200);self.assertIn('text/csv',headers['Content-Type'])
+                records=list(csv.DictReader(io.StringIO(payload.decode('utf-8-sig')),delimiter=';'))
+                self.assertEqual(list(records[0]),FIELDS);self.assertEqual(len(records),1)
+                self.assertEqual(path.read_bytes(),before)
+                for query in ('limit=501','limit=abc','type=unknown','level=critical','logger=../private','source=simulation','limit=1&limit=2'):
+                    self.assertEqual(self.request('/klima/api/events?'+query)[0],400)
+                self.assertEqual(self.request('/klima/api/events/export?limit=1')[0],400)
+
     def test_climate_calculator_is_read_only_validated_and_session_protected(self):
         value={'temperature_c':20,'humidity_pct':50,'surface_temperature_c':10}
         self.assertEqual(self.request('/klima/api/climate/calculate',value)[0],403)

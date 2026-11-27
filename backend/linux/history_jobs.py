@@ -11,7 +11,8 @@ from .settings_reader import retrieve_settings
 
 
 class HistoryJobs:
-    def __init__(self, receiver, store, settings_store=None):
+    def __init__(self, receiver, store, settings_store=None, events=None):
+        self.events=events
         self.receiver, self.store = receiver, store
         self.settings_store = settings_store
         self.lock = threading.RLock()
@@ -143,6 +144,19 @@ class HistoryJobs:
             with self.lock:
                 self.value.update(state='error' if self.value['error'] else 'done', phase='finished')
                 completion = deepcopy(self.value)
+            if self.events:
+                result=completion.get('result') or {};report=result.get('report') or {}
+                labels={'full':'Vollauslesung','incremental':'Nachladen','settings':'Geräteeinstellungen lesen',
+                        'configuration_prepare':'Änderung vorbereiten','configuration_write':'Geräteparameter ändern',
+                        'configuration_verify':'Änderung nachprüfen','recording_prepare':'Aufnahmestart vorbereiten',
+                        'recording_start':'Aufnahmestart','recording_verify':'Aufnahme nachprüfen'}
+                warning=bool(completion.get('resume_error')) or report.get('status') in ('uncertain','start_pending')
+                message=labels[mode]+(': '+completion['error'] if completion['error'] else ' beendet; '+('Ergebnis unvollständig bestätigt.' if warning else 'Ergebnis im Auftrag geprüft.'))
+                self.events.emit('task.failed' if completion['error'] else 'task.completed','error' if completion['error'] else 'warning' if warning else 'info',
+                                 message,logger='bt06-'+config['device']['id'],source='history',
+                                 details={'mode':mode,'trigger':completion.get('trigger'),'started_at':completion.get('started_at'),
+                                          'result_kind':result.get('kind'),'result_status':report.get('status'),'count':result.get('count'),
+                                          'resume_error':completion.get('resume_error')})
             if on_complete:
                 # Scheduler persistence failures must not corrupt the finished
                 # transfer or prevent receiver recovery.

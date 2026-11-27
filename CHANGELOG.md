@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.7.1-dev · 2026-11-27
+
+- Dauerhafte monatliche Ereignis-CSV unter data/events mit privater Ablage, Dateisperren und fsync. Dienststart/-ende, Hostempfang, aktuelle/veraltete Aussendungen, empfangener Aufzeichnungsstatus, Speichervollkennzeichnung, Empfangs-/CSV-Fehler und Auftragsergebnisse protokollieren. Keine nachträglich erfundenen Vorgänge.
+- Neue Ereignisseite mit Hostzeit-, Logger-, Stufen- und Typfiltern. Begrenzte Anzeige bis 500 Einträge, vollständiger gefilterter CSV-Export. Echtbetrieb bleibt von der gewählten Messdaten-/Simulationsquelle getrennt.
+- Wiederholte identische Empfangsfehler und unveränderte Advertising-Zustände nicht pro Paket protokollieren. Interne Empfangspausen erzeugen keinen falschen Verlust-/Gerätestoppnachweis. Unbestätigte Startaufträge bleiben Warnungen. Ereignisschreibfehler sind separat sichtbar und verhindern weder primäre Messwertspeicherung noch Auftragserholung; keine automatische Wiederholung von Aktionen.
+- Gesamtsuite mit 163 Tests bestanden, zusätzlich neuer Test für unbestätigte Starts/fehlerhafte Ereignisablage und 11 Ereignistests separat bestanden; Browserprüfung einschließlich mobiler Ereignistabelle erfolgreich. V0.7.0 im Dienst bestätigt. Automatische Klima-/Batterieereignisse und erweiterte Exporte bleiben offen.
+
 ## 0.7.0-dev · 2026-11-27
 
 - Grundstatistik aus Originalzeilen: Min/Max mit Zeitpunkt, Stichprobenmittel, zeitgewichtetes Mittel und Datenabdeckung für Temperatur, relative Feuchte, Taupunkt und absolute Feuchte. Fehlende Werte und Zeiten bleiben je Größe getrennt sichtbar. Keine Statistik aus verdichteten Grafikpunkten.

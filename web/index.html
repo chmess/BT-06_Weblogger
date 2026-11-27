@@ -17,6 +17,7 @@
     <button data-page="history">Klimaverlauf</button>
     <button data-page="climate">Taupunkt / Feuchte</button>
     <button data-page="statistics">Statistik</button>
+    <button data-page="events">Ereignisse</button>
     <button data-page="simulation">Testdaten</button>
     <button data-page="logger">Logger / Bluetooth</button>
     <button data-page="settings">Einstellungen</button>
@@ -65,6 +66,23 @@
           <p class="hint">Die Bestätigung betrifft nur die Zeitzone dieses Datenstands. Datum und Geräteuhr werden nicht als korrekt bestätigt. Originaldateien bleiben erhalten; spätere Messungen werden nicht automatisch mit bestätigt.</p>
         </form>
       </details>
+    </article>
+  </section>
+
+  <section id="page-events" class="page" hidden>
+    <article class="panel"><h2>Dauerhaftes Ereignisprotokoll</h2>
+      <p>Hostzeit des laufenden Programms: Dienst, Hostempfang, Advertising-Zustände und Auftragsergebnisse. Ereignisse sind von Messdaten und Simulation getrennt; frühere Vorgänge werden nicht nachträglich erfunden.</p>
+      <form id="events-form"><div class="settings-grid">
+        <label>Ab (Browser-Ortszeit, optional)<input id="events-start" type="datetime-local" step="any"></label>
+        <label>Bis (Browser-Ortszeit, optional)<input id="events-end" type="datetime-local" step="any"></label>
+        <label>Stufe<select id="events-level"><option value="">Alle</option><option value="info">Information</option><option value="warning">Warnung</option><option value="error">Fehler</option></select></label>
+        <label>Ereignistyp<select id="events-type"><option value="">Alle</option></select></label>
+        <label>Loggerkennung (optional)<input id="events-logger" placeholder="leer = alle Logger"></label>
+        <label>Maximale Anzeige<select id="events-limit"><option>100</option><option>250</option><option>500</option></select></label>
+      </div><div class="button-row"><button type="submit">Ereignisse laden</button><button id="events-selected" type="button" class="secondary">Gewählten Logger einsetzen</button><button id="events-export" type="button" class="secondary" disabled>Alle gefilterten Ereignisse als CSV</button></div></form>
+      <p id="events-status" class="hint" role="status">Noch keine Ereignisse geladen.</p>
+      <div class="table-scroll" tabindex="0" aria-label="Ereignistabelle, bei Bedarf seitlich scrollen"><table id="events-table" hidden><thead><tr><th scope="col">Hostzeit</th><th scope="col">Stufe</th><th scope="col">Typ</th><th scope="col">Logger</th><th scope="col">Nachricht</th></tr></thead><tbody id="events-values"></tbody></table></div>
+      <p class="hint">Anzeige in der Programmzeitzone, Ablage in UTC unter data/events. Neueste Einträge je Monatsdatei zuerst; bei verstellter Hostuhr ist die Ablagefolge kein Beweis der tatsächlichen Zeitfolge. „Advertising veraltet“ bedeutet weder GATT-Trennung noch Gerätestopp. Auftragsmeldung und bestätigter Gerätezustand bleiben getrennt.</p>
     </article>
   </section>
 

@@ -17,6 +17,7 @@ from backend import VERSION
 from backend.common.climate import air_values,calculate
 from backend.common.risk import FIELDS as RISK_FIELDS,options_from_query,analyze
 from backend.common.statistics import summarize
+from backend.common.events import EventStore,FIELDS as EVENT_FIELDS
 from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import chart_data, csv_text, identifier, rows_in_range
@@ -46,6 +47,7 @@ class Application:
         self.simulation = self.root / "simulation"
         self.csrf = secrets.token_urlsafe(32)
         self.started = time.monotonic()
+        self.events=EventStore(self.root/"data/events");self.running=False
         self.public_origins = tuple([public_origin] if isinstance(public_origin, str) else public_origin or [])
         for origin in self.public_origins:
             parsed = urlsplit(origin)
@@ -55,17 +57,20 @@ class Application:
         radio_lock = threading.Lock()
         self.bluetooth = BluetoothJobs(radio_lock)
         self.live_store = LiveStore(self.root / "data")
-        self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock)
+        self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock,self.events)
         self.control_lock = threading.RLock()
         self.history_store = HistoryStore(self.root / "data/history")
         self.device_settings = DeviceSettingsStore(self.root / "data/device-settings")
-        self.sync = HistoryJobs(self.receiver, self.history_store, self.device_settings)
+        self.sync = HistoryJobs(self.receiver, self.history_store, self.device_settings,self.events)
         self.configuration = ConfigurationWorkflow(self.receiver, self.sync, self.device_settings, self.history_store)
         self.recording = RecordingWorkflow(self.receiver,self.sync,self.device_settings,self.history_store,self.configuration)
         self.timezones = HistoryTimezones(self.root / "config/history-timezones.json", self.history_store)
         self.auto_sync = AutoSync(self.root / "config/autosync.json", self.receiver, self.sync, self.bluetooth, self.control_lock)
 
     def resume(self):
+        if not self.running:
+            self.events.emit("application.started","info","Anwendung gestartet.",details={"version":VERSION})
+            self.running=True
         if self.receiver.config["enabled"]:
             self.receiver.start()
         self.auto_sync.start()
@@ -74,6 +79,7 @@ class Application:
         self.auto_sync.close()
         self.sync.close()
         self.receiver.stop(persist=False)
+        if self.running:self.events.emit("application.stopped","info","Anwendung geordnet beendet.");self.running=False
 
     def loggers(self):
         ids = {p.name for p in (self.root / "data").glob("bt06-*") if p.is_dir()}
@@ -88,13 +94,13 @@ class Application:
         live = self.receiver.status()
         sync = self.sync.status()
         syncing = sync["state"] == "running"
-        return {"version": VERSION, "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
+        return {"version": VERSION, "event_log":self.events.status(), "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
                 "ble": {"connected": syncing and sync["phase"] in ("reading_metadata", "reading_settings", "selecting_range", "full_fallback", "receiving", "stopping_logger", "writing_settings", "committing_settings", "verifying_settings", "reading_inventory", "starting_logger", "verifying_recording"),
                         "status": ("Aufzeichnungssteuerung · " if sync.get('mode','').startswith('recording_') else "Gerätekonfiguration · " if sync.get('mode', '').startswith('configuration_') else "Historienlesen · ") + sync["phase"] if syncing else "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
                 "free_bytes": shutil.disk_usage(self.root).free,
                 "local_profiles": (self.root / "private/profiles.json").exists(),
                 "limits": {"max_days": 90, "max_points_per_logger": 80000},
-                "data_notice": "Echte BLE-Empfänge und synthetische Testdaten sind getrennt. Klimabewertung folgt gemäß Roadmap."}
+                "data_notice": "Echte BLE-Empfänge und synthetische Testdaten sind getrennt. Berechnete Klima- und Feuchteindikatoren sind verfügbar; keine Schimmelwahrscheinlichkeit."}
 
 
 def handler_for(app):
@@ -162,6 +168,13 @@ def handler_for(app):
                 elif path == "/api/live":
                     live=app.receiver.status();reading=live.get("latest") or {}
                     self.send(200, {**live,"latest_climate":air_values(reading.get("temperature_c"),reading.get("humidity_pct"))})
+                elif path in ("/api/events","/api/events/export"):
+                    allowed={"start","end","logger","type","level"}|({"limit"} if path=="/api/events" else set())
+                    if set(query)-allowed or any(len(value)!=1 for value in query.values()):raise ValueError("Ungültige Ereignisfilter.")
+                    filters={key:query[key][0] for key in ("start","end","logger","level") if key in query}
+                    if "type" in query:filters['event_type']=query['type'][0]
+                    if path=="/api/events":self.send(200,app.events.query(int(query.get('limit',['100'])[0]),**filters))
+                    else:self.send(200,csv_text(app.events.rows(**filters),EVENT_FIELDS).encode('utf-8-sig'),"text/csv; charset=utf-8","bt06-ereignisse.csv")
                 elif path == "/api/loggers":
                     self.send(200, {"loggers": app.loggers()})
                 elif path == "/api/sync":

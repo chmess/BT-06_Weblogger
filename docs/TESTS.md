@@ -173,3 +173,11 @@ Erweiterte Chromium-Browserprüfung bestanden: Temperatur-/Feuchteachsen mit una
 ## V0.7.0
 
 7 Statistik- und 18 API-Tests sowie Chromium-Browserprüfung bestanden. Referenzfälle für Min/Max, unterschiedliche Stichproben-/Zeitmittel bei unregelmäßiger Abtastung, Lücken, fehlende Kanäle, Modellgrenzen, 0 % rF, leere/Einzelwertbereiche und nicht abgedeckte Ränder. Zeitordnung, UTC-Offsetnormalisierung und endliche laufende Mittelwerte auch bei großen Eingaben geprüft. API behält ungeprüfte Gerätezeit bei, Original-CSV ist vor/nach Auswertung bytegleich. Browser prüft vier Größen, sichtbaren Ausschnitt, zeilengleichen Originalexport, veraltete Antworten und mobile Tabellenbreite. Bestehende Klima-/Phasen-/Diagramm-/Einstellungsprüfungen weiterhin bestanden; keine JavaScript-Fehler oder externen Anfragen. Screenshotanzahl nun aus tatsächlich erstellten Dateien gezählt. Keine Geräteaktion.
+
+## V0.7.1
+
+Gesamtsuite mit 163 Tests bestanden. Anschließend zusätzlicher Test für unbestätigten Startstatus als Warnung und Ereignisschreibfehler ohne blockierten Auftrag/Scheduler-Callback; alle 11 Ereignistests separat bestanden. Keine erneute Gesamtsuite nach dieser reinen Testergänzung.
+
+Geprüft: persistente Monatsdateien/UTC-Grenzen, Filter, private Rechte, parallele unabhängige Storeinstanzen, eindeutige IDs/ein Header, beschädigte Header/Zeilen/unvollständige Enden ohne Reparatur, unbestätigtes fsync ohne automatische Wiederholung. Receiver-Hooks deduplizieren Fehler, melden Erholung und Frische/Veraltung ohne falschen Verlust bei interner Pause. Speicherkennzeichnung nicht als Leerstand interpretiert; fehlerhafte Ereignisablage lässt primäre Messwerte und Empfangswiederaufnahme weiter zu.
+
+API-Filter/Limit, vollständiger gefilterter Export und unveränderte Originaldatei bestätigt. Chromium prüft Ereignisseite, Filter, Export ohne Anzeige-Limit, Verwerfen veralteter Antworten, Trennung von Messdaten-/Simulationsquelle und mobile Breite. Gesamte bestehende Browserprüfung bestanden; keine JavaScript-Fehler oder externen Anfragen. Alle Ereignis-/BLE-Tests synthetisch, keine neuen Gerätebefehle oder realen Verbindungsversuche.
