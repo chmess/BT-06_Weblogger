@@ -10,6 +10,7 @@ const project=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const focusedSites=process.argv.includes('--site-continuity');
 const focusedWarnings=process.argv.includes('--climate-warnings');
 const focusedHistory=process.argv.includes('--history-diagnostics');
+const focusedSimulation=process.argv.includes('--simulation-diagnostics');
 const scratch=await mkdtemp(join(tmpdir(),'bt06-browser-'));
 const artifacts=join(project,'test-results');await mkdir(artifacts,{recursive:true});
 let screenshotCount=0;
@@ -469,7 +470,12 @@ print(json.dumps({'settings':saved,'preview':preview,'record_preview':record_pre
   const report={passed:true,checks:['empty state','generator','three cards','chart canvas','dew point curve and climate calculator with stale response guard','original-row humidity phases, explicit surface assumption and visible-range analysis','original-row statistics, visible range, exact CSV and stale reply guard','persistent event table, filters, full filtered CSV and source separation','selection climate CSV, mandatory provenance and exact export scopes','measuring sites, assignment history and stale draft protection','site-filtered chart, assignment gaps, statistics, original CSV, scoped export and reset','read-only bounded storage diagnostics and visible persistence status','zoom preservation','period presets, previous/next and original-resolution visible CSV','DST fold navigation and fullscreen controls','manual axes, invalid range guard and saved view restored after reload','save settings','load settings preview','load settings save','combined settings/sites preview, cancel, preference-only and edited import','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','25 minute recording draft, full preparation summary, two explicit confirmations, edit invalidation and uncertain write display','parameter verification never guesses recording state from zero summary','alarm limit and activation draft, reset and Fahrenheit guard','no JS exceptions','no external requests'],screenshots:screenshotCount};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
   }
-  if(focusedHistory){
+  if(focusedSimulation){
+    const {runSimulationDiagnostics}=await import('./browser_simulation_diagnostics.mjs');
+    const checks=await runSimulationDiagnostics({evaluate,waitFor,click,screenshot,send,scratch});
+    assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
+    const report={passed:true,scope:'simulation-diagnostics',checks,screenshots:screenshotCount};await writeFile(join(artifacts,'browser-simulation-diagnostics.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+  }else if(focusedHistory){
     const {runHistoryDiagnostics}=await import('./browser_history_diagnostics.mjs');
     const checks=await runHistoryDiagnostics({evaluate,waitFor,click,screenshot,send,scratch});
     assert.deepEqual(errors,[]);assert.deepEqual(external,[]);

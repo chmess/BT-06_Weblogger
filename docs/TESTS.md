@@ -261,3 +261,16 @@ python3 -m unittest discover -s tests -p test_history_diagnostics.py -q
 PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_history_diagnostics_validates_scope_lock_and_corruption_without_bluetooth -q
 node tools/browser_smoke.mjs --history-diagnostics
 ```
+
+
+## V0.8.7 · gezielte Prüfung
+
+Fünf neue Strukturdiagnose-Kerntests und ein API-Test bestanden. Geprüft: unveränderte Originalbytes/mtime, normale und absichtlich lückenhafte Testläufe über die Herbst-Zeitumstellung, Quellen-/Datensatzkennung, falsches Zeitraster, nicht endliche Temperatur/ungültige Feuchte, fehlende Zeilen, kaputter Dateischluss, ungültige Manifest-Zeit/JSON, Datei-/Byte-/Zeit-/Zeilengrenzen, symbolische Pfade, unerwarteter Laufinhalt und Pfadmanipulation. Referenz-Prüfsummen bleiben ausdrücklich nicht verfügbar. API prüft Auswahl, Parameterabwehr, gemeinsame Auftragssperre, beschädigte Originale ohne Reparatur und fehlende Empfängeraktivierung.
+
+Fokussierter Browserlauf erzeugt im temporären Testaufbau einen Lückentestlauf und prüft Auswahl, drei vollständig geprüfte Testmessstellen, sichtbare Prüfsummengrenze, mobile Breite und Fehleranzeige bei künstlich beschädigter Test-CSV. Die App repariert nichts; erst das Browserwerkzeug stellt sein Testoriginal wieder her und prüft erneut erfolgreich. Ohne Testlauf ist die Aktion deaktiviert. Ein Screenshot, Bericht `test-results/browser-simulation-diagnostics.json`, keine JavaScript-Ausnahmen oder externen Anfragen. Keine Gesamt-Test-/Browserstrecke wiederholt, keine echten Messdaten berührt.
+
+```sh
+python3 -m unittest discover -s tests -p test_simulation_diagnostics.py -q
+PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_simulation_diagnostics_validates_run_scope_lock_and_damage -q
+node tools/browser_smoke.mjs --simulation-diagnostics
+```

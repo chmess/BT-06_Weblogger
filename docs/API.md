@@ -1,4 +1,4 @@
-# HTTP-API · V0.8.6-dev
+# HTTP-API · V0.8.7-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
@@ -248,3 +248,16 @@ Vorab: Historienablage ohne Warten sperren, höchstens 32 Kettenglieder, 100 Dat
 Zeitbudget etwa fünf Sekunden: Vorabprüfungen werden begrenzt, eine bereits laufende Inhaltsprüfung wird nicht hart unterbrochen. Ein Zeitüberzug bleibt ausdrücklich `partial`; Betriebssystemzugriffe können länger blockieren. Erreichte Ressourcenlimits und belegte Historienablage sind Teilprüfungen. Vollständige Zähler werden erst nach erfolgreicher Inhaltsprüfung gesetzt; bei einem Fehler davor sind null Zähler keine Aussage über einen leeren Archivbestand. Der Dateizähler umfasst validierte Manifeste und referenzierte Dateien; Zeilenzähler bezeichnet den rekonstruierten gewählten Gesamtstand.
 
 Ein Integritätsergebnis bestätigt weder die reale Geräteuhr noch eine metrologische Kalibrierung oder Vollständigkeit des aktuell noch im Logger befindlichen Bestands. Eine ausdrücklich bestätigte historische Zeitzonenzuordnung bleibt davon getrennt.
+
+
+## Testlauf-Strukturdiagnose V0.8.7
+
+`GET /api/diagnostics/simulation?run=demo-<12 Hexzeichen>` verlangt genau einen `run`-Parameter. Ungültige Kennung, zusätzliche/mehrfache Parameter: 400. Gemeinsame Empfangs-/Historien-/Testlauf-Diagnosesperre: 409 bei laufendem Auftrag. Bestehender Hostschutz. Rein lesend, keine Regeneration, Reparatur, Änderung realer Daten oder Bluetooth-Kommunikation. Die UI ruft die Prüfung nur auf Klick auf.
+
+Antwort: `scope=selected_simulation_run`, `run`, Host-`checked_at`, `state` (`ok`, `partial`, `error`), `complete`, stets `checksums_available=false`, `loggers_checked`, `files_checked`, `rows_checked`, `bytes_checked`, `elapsed_seconds`, `reason` und `limits`. Dateizähler enthält das validierte Manifest. Zeilen-/Dateizähler zeigen den erfolgreich geprüften Teil, vollständige Testmessstellen zählen erst nach passender Zeilenzahl und vollständiger Zeitfolge. Fehler im Bestand ergeben HTTP 200 mit `state=error`, keinen Erfolgsnachweis. Keine Rohwerte oder absoluten Hostpfade in Fehlerberichten.
+
+Prüft Schema 1, passende Laufkennung/Quelle, kanonische Generatoroptionen, gültige Testmessstellen, reguläre erwartete Verzeichnisse/Dateien ohne symbolische Links, CSV-Kopf/Spaltenzahl/Dateischluss, endliche Temperatur und Feuchte 1–100 %, leere Batterie/RSSI, Kennzeichnung `Simulation`/`SYNTHETISCH`, deterministische Datensatzkennung und genaue chronologische Folge der erwarteten UTC-Zeitpunkte. Für das Lückenszenario werden wie im Generator die lokalen Stunden 11–14 in Europe/Berlin ausgelassen; Zeitumstellung bleibt durch UTC-Schritte eindeutig. Monats-/Jahresablage und Zeilenanzahlen müssen passen.
+
+Grenzen: 100 Dateien, 32 MiB Dateiumfang, 256 KiB Manifest, 250.000 Zeilen, 10.000 Verzeichniseinträge, etwa fünf Sekunden. Erreichte Grenzen sind ausdrücklich Teilprüfung; blockierende Betriebssystemzugriffe können länger dauern. Nur der gewählte veröffentlichte Testlauf wird geprüft, keine versteckten Generator-Zwischenstände oder anderen Datenquellen.
+
+Das unveränderte Testdatenformat besitzt keine gespeicherten Referenz-Prüfsummen. Eine erfolgreiche Strukturprüfung ist daher kein Nachweis unveränderter Temperatur-/Feuchtewerte, keine bitgleiche Reproduktion privater Vorlagen und keine Messrichtigkeitsprüfung. Diese Grenze bleibt im Ergebnis und in der Oberfläche sichtbar.

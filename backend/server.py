@@ -23,6 +23,7 @@ from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
 from backend.common.climate_warnings import ClimateWarnings
+from backend.common.simulation_diagnostics import inspect_simulation
 from backend.common.history_diagnostics import inspect_history
 from backend.common.storage_diagnostics import inspect_live
 from backend.common.site_selection import select_site,select_all_loggers
@@ -177,6 +178,13 @@ def handler_for(app):
                     if not app.diagnostics_lock.acquire(blocking=False):
                         self.send(409,{"error":"Eine Dateiprüfung läuft bereits."});return
                     try:result=inspect_history(app.history_store,query["logger"][0],query["snapshot"][0])
+                    finally:app.diagnostics_lock.release()
+                    self.send(200,result)
+                elif path == "/api/diagnostics/simulation":
+                    if set(query)!={"run"} or len(query["run"])!=1:raise ValueError("Testlaufprüfung benötigt genau run.")
+                    if not app.diagnostics_lock.acquire(blocking=False):
+                        self.send(409,{"error":"Eine Dateiprüfung läuft bereits."});return
+                    try:result=inspect_simulation(app.simulation,query["run"][0])
                     finally:app.diagnostics_lock.release()
                     self.send(200,result)
                 elif path == "/api/session":

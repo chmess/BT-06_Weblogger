@@ -284,6 +284,24 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/klima/api/settings", DEFAULTS,
                                       {"Host": "deskpi.test", "Origin": "http://not-approved.test", "X-CSRF-Token": self.app.csrf})[0], 403)
 
+    def test_simulation_diagnostics_validates_run_scope_lock_and_damage(self):
+        from backend.common.simulation import generate
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);meta=generate(root,{'days':1,'interval_minutes':60,'end':'2026-11-01T00:00:00+00:00'})
+            query='?run='+meta['id']
+            with patch.object(self.app,'simulation',root),patch.object(self.app.receiver,'start') as start:
+                code,_,body=self.request('/klima/api/diagnostics/simulation'+query)
+                self.assertEqual(code,200);result=json.loads(body);self.assertEqual(result['state'],'ok');self.assertFalse(result['checksums_available'])
+                for suffix in ('',query+'&repair=1',query+'&run=another','?run=../private'):
+                    self.assertEqual(self.request('/klima/api/diagnostics/simulation'+suffix)[0],400)
+                self.app.diagnostics_lock.acquire()
+                try:self.assertEqual(self.request('/klima/api/diagnostics/simulation'+query)[0],409)
+                finally:self.app.diagnostics_lock.release()
+                path=next((root/meta['id']/meta['loggers'][0]['id']).glob('*/*.csv'));damaged=path.read_bytes()+b'bad';path.write_bytes(damaged)
+                code,_,body=self.request('/klima/api/diagnostics/simulation'+query)
+                self.assertEqual(code,200);self.assertEqual(json.loads(body)['state'],'error');self.assertEqual(path.read_bytes(),damaged)
+                start.assert_not_called()
+
     def test_history_diagnostics_validates_scope_lock_and_corruption_without_bluetooth(self):
         from backend.common.history_store import HistoryStore
         from backend.common.history_capture import decode_capture

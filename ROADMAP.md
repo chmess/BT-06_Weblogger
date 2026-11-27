@@ -51,6 +51,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.8.5 im Dienst fehlerfrei bestätigt. V0.8.6 vorbereitet: begrenzte rein lesende Diagnose ausgewählter Historienstände einschließlich Nachladebasis, Prüfsummen, Sequenzen, Anzahlen und Inhaltskennungen. Sieben gezielte Tests und mobile Browserprüfung bestanden; neuester echter Archivstand ohne Befund geprüft. Weiter offen: Simulationsdiagnose, Batterieereignisse ohne geratene Warnschwelle, Dauerbetriebs-/Performanceabnahme und weitere belegbare Gerätefunktionen.
 
+- V0.8.6 im Dienst fehlerfrei bestätigt. V0.8.7 vorbereitet: begrenzte rein lesende Strukturdiagnose synthetischer Testläufe mit Kennzeichnung, Zeitraster/Szenario-Lücken und Vollständigkeit; fehlende Referenz-Prüfsummen ausdrücklich ausgewiesen. Sechs gezielte Tests und mobile Browserprüfung bestanden. Als nächster größerer Abschnitt folgen Dauerbetrieb, Ressourcen-/Performanceabnahme und portable Betriebsabläufe; Batterieereignisse und weitere Gerätefunktionen bleiben an Belege gebunden.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

@@ -21,7 +21,7 @@ function go(page) {
   if(location.hash!==`#${page}`) history.replaceState(null,'',`#${page}`);
   $('.source-strip').hidden=['events','sites'].includes(page);$('#source-notice').hidden=['events','sites'].includes(page);
   if(page==='sites')loadSites().catch(error=>notice(error.message,true));
-  if(page==='diagnostics')historyCheckOptions();
+  if(page==='diagnostics'){historyCheckOptions();simulationCheckOptions();}
   if(page==='events')loadEvents().catch(error=>notice(error.message,true));
   if(page==='history') { if(!state.chart) initChart(); state.chart?.resize(); }
 }
@@ -85,7 +85,7 @@ function applySettings() {
 }
 function addOption(select, value, text) { const option=element('option',text); option.value=value; select.append(option); }
 async function refreshRuns(preferRun) {
-  state.runs=(await api('runs')).runs;
+  state.runs=(await api('runs')).runs;simulationCheckOptions();
   state.run=state.runs.find(r=>r.id===(preferRun||state.run?.id))||state.runs[0]||null;
   const select=$('#run-select'); select.replaceChildren();
   for(const run of state.runs) addOption(select,run.id,`${date(run.created_at)} · ${run.options.days} Tage · ${scenarios[run.options.scenario]||run.options.scenario}`);
@@ -472,6 +472,20 @@ async function checkStorage(){
     for(const item of [...data.errors,...data.skipped])$('#storage-check-details').append(element('li',item.file+': '+item.reason));
   }catch(error){$('#storage-check-status').textContent='Prüfung fehlgeschlagen; kein Integritätsnachweis.';throw error;}finally{button.disabled=false;}
 }
+let simulationCheckBusy=false;
+function simulationCheckOptions(){
+  if(simulationCheckBusy)return;const select=$('#simulation-check-select'),previous=select.value;select.replaceChildren();
+  for(const run of state.runs)addOption(select,run.id,`${date(run.created_at)} · ${scenarios[run.options.scenario]||run.options.scenario} · ${run.id}`);
+  if(state.runs.some(run=>run.id===previous))select.value=previous;$('#simulation-check').disabled=!select.value;
+}
+async function checkSimulation(){
+  const run=$('#simulation-check-select').value;if(!state.runs.some(item=>item.id===run))throw new Error('Zuerst einen vorhandenen Testlauf wählen.');
+  simulationCheckBusy=true;$('#simulation-check').disabled=true;$('#simulation-check-select').disabled=true;$('#simulation-check-summary').replaceChildren();$('#simulation-check-status').textContent='Synthetischer Testlauf wird rein lesend geprüft …';
+  try{const data=await api('diagnostics/simulation?'+new URLSearchParams({run}));
+    $('#simulation-check-status').textContent=({ok:'Strukturprüfung ohne Befund. ',partial:'Nur teilweise geprüft. ',error:'Fehler gefunden. '})[data.state]+data.reason;
+    for(const [key,value] of [['Testlauf',data.run],['Vollständig geprüfte Testmessstellen',data.loggers_checked],['Vollständig geprüfte Dateien',data.files_checked],['Geprüfte Zeilen',data.rows_checked],['Prüfdauer',number(data.elapsed_seconds)+' s'],['Stand der Prüfung',date(data.checked_at)],['Referenz-Prüfsummen','Nicht vorhanden; Strukturprüfung']])$('#simulation-check-summary').append(element('dt',key),element('dd',String(value)));
+  }catch(error){$('#simulation-check-status').textContent='Prüfung fehlgeschlagen; kein Integritätsnachweis.';throw error;}finally{simulationCheckBusy=false;$('#simulation-check-select').disabled=false;simulationCheckOptions();}
+}
 let historyCheckBusy=false;
 function historyCheckOptions(){
   if(historyCheckBusy)return;const select=$('#history-check-select'),previous=select.value;select.replaceChildren();
@@ -773,6 +787,8 @@ async function main() {
   $('#run-select').addEventListener('change',guard(async()=>{if(state.source==='device')state.snapshot=state.snapshots.find(s=>s.id===$('#run-select').value);else state.run=state.runs.find(r=>r.id===$('#run-select').value);chooseLogger();await loadHistory();}));
   $('#storage-check').addEventListener('click',guard(checkStorage));
   $('#history-check').addEventListener('click',guard(checkHistory));
+  $('#simulation-check').addEventListener('click',guard(checkSimulation));
+  $('#simulation-check-select').addEventListener('change',()=>{$('#simulation-check-status').textContent='Auswahl geändert; angezeigter Bericht gehört weiterhin zum genannten Testlauf.';});
   $('#history-check-select').addEventListener('change',()=>{$('#history-check-status').textContent='Auswahl geändert; angezeigter Bericht gehört weiterhin zum genannten Stand.';});
   $('#history-site').addEventListener('change',guard(async()=>{updateHistorySites();chooseLogger();markRiskStale();markStatisticsStale();invalidateExport();await loadHistory();}));
   $('#logger-select').addEventListener('change',guard(async()=>{state.logger=$('#logger-select').value;await loadHistory();}));

@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.7-dev · 2026-11-27
+
+- Manuelle Strukturdiagnose abgeschlossener synthetischer Testläufe: Manifest, CSV-Schema, Quellen-/Testkennzeichnung, Messstellen-/Datensatzkennung, UTC-Monatsablage, erwartetes Zeitraster einschließlich Szenario-Lücken und Zeilenanzahlen. Keine Neuerzeugung, Reparatur oder Geräteaktion.
+- Grenze ausdrücklich sichtbar: Das bestehende Testdatenformat enthält keine Referenz-Prüfsummen. Die Strukturprüfung bestätigt keine unveränderten Klimawerte oder exakte Reproduktion privater Vorlagen.
+- Neue Testlaufauswahl auf der Diagnoseseite; Prüfung nur auf Klick. Gemeinsame Auftragssperre, begrenzt auf 100 Dateien, 32 MiB, 250.000 Zeilen, 10.000 Verzeichniseinträge und etwa fünf Sekunden. Fehler, Teilprüfung und vollständige Strukturprüfung getrennt.
+- Fünf Kerntests, ein API-Test und fokussierte mobile Browserprüfung bestanden. V0.8.6 im Dienst fehlerfrei bestätigt; keine echten Messdaten oder Geräteparameter verändert.
+
 ## 0.8.6-dev · 2026-11-27
 
 - Manuelle Diagnose eines gespeicherten Loggerhistorienstands einschließlich benötigter Nachladebasis. Prüft CSV-/Rohbeleg-Prüfsummen, Sequenzen, Anzahlen, Inhaltskennungen und Kettentiefe über den vorhandenen Historienverifizierer. Keine Reparatur, Loggerverbindung, Uhrkorrektur oder Messdatenänderung.
