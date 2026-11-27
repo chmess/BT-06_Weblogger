@@ -172,3 +172,13 @@ Die Ereignisseite verwendet ausschließlich Hostzeitfilter und ist von der globa
 `GET /api/export` ergänzt optional `fields` als kommaseparierte Spaltennamen und `climate=1`. Andere climate-Werte, unbekannte/doppelte/leere Spaltennamen und berechnete Spalten ohne Klimamodus werden abgewiesen. Ohne fields im Klimamodus: alle Originalspalten und berechneten Größen. Mit fields: gewählte Spalten plus verpflichtende Metadaten; mindestens eine berechnete Größe bei climate=1. Bestehende Originalexports ohne diese Parameter bleiben bytegleich. Details der Spalten und Kennzeichnung: [CSV.md](CSV.md).
 
 Die neue Exportseite verwendet gewählten Zeitraum, sichtbaren Ausschnitt oder exakt die Abfrage des Statistikberichts. Abweichende Quellen-/Loggerauswahl verlangt neue Vorbereitung. Das vorbereitete Zeitfenster bleibt fest; zusätzliche Klimagrößen werden bewusst gewählt. Downloads werden per gleicher Origin abgerufen, Fehler als Meldung behandelt und erfolgreiche Antworten als lokale Browser-Blobs heruntergeladen. Die bestehende Sicherheitsrichtlinie wurde dafür nicht erweitert.
+
+## V0.8.0: Messstellen
+
+`GET /api/sites`: Revision, aktuelle Messstellen, aktive Zuordnungen, gesamte Intervallanzahl und bekannte Logger. Keine Filter. `GET /api/sites/assignments`: optionale Filter `logger`, `site_id`, `limit` (1–500, Standard 100), neueste Intervalle zuerst mit `truncated`-Hinweis.
+
+`POST /api/sites/save`: exakt `{revision,id,values}`; id `null` für neue Messstelle, sonst vorhandene stabile ID. values enthält exakt `name`, `room`, `description`, `criteria`. Kriterien entsprechen den sechs Feldern der Feuchteauswertung. Namen bis 80, Raum bis 80, Beschreibung bis 2.000 Zeichen. Keine äußeren Leerzeichen/Steuerzeichen; Beschreibung darf interne Zeilenumbrüche enthalten.
+
+`POST /api/sites/assign`: exakt `{revision,logger,site_id}`. Logger muss verifiziert bekannt sein; site_id ist vorhandene Messstelle oder `null` zum Beenden. Keine rückdatierbaren Zeitparameter. Änderungen gelten ab erzeugter Hostzeit; bestehende Belegungen von Logger/Zielmessstelle werden geschlossen, historische Snapshots bleiben bestehen. Beide POSTs erfordern gleiche Origin und Sitzungstoken; keine Bluetooth-Steuerung.
+
+Konfigurationsschema, Integrität und aktuelle Auswertungsgrenzen: [MESSSTELLEN.md](MESSSTELLEN.md). Betriebsereignisse ergänzen `site.created`, `site.updated`, `site.assigned`, `site.unassigned`.

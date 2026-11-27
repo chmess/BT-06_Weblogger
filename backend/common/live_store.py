@@ -14,18 +14,20 @@ LIVE_FIELDS = FIELDS + ["Batteriespannung", "Firmware", "Zeitbasis", "Aufzeichnu
 
 
 class LiveStore:
-    def __init__(self, root):
+    def __init__(self, root, sites=None):
         self.root = Path(root)
+        self.sites=sites
         self.lock = threading.RLock()
 
     def append(self, reading, rssi, received_at):
         stamp = parse_time(received_at).astimezone(timezone.utc)
         logger = identifier("bt06-" + reading["device_id"])
         folder = self.root / logger / stamp.strftime("%Y")
+        assignment=self.sites.resolve(logger,stamp.isoformat()) if self.sites else None
         row = {"Schema": "2", "DatensatzID": uuid.uuid4().hex, "Zeitstempel": stamp.isoformat(),
                "Temperatur": decimal(reading["temperature_c"]) if reading["temperature_c"] is not None else "",
                "Feuchte": decimal(reading["humidity_pct"]) if reading["humidity_pct"] is not None else "",
-               "Batterie": "", "RSSI": str(rssi), "Quelle": "BLE-Advertising", "Messstelle": logger,
+               "Batterie": "", "RSSI": str(rssi), "Quelle": "BLE-Advertising", "Messstelle": assignment["site_id"] if assignment else logger,
                "Qualitaet": reading["quality"], "Batteriespannung": decimal(reading["voltage_v"]),
                "Firmware": reading["firmware"], "Zeitbasis": "Host-Empfang",
                "Aufzeichnungsstatus": reading["recording"], "SpeicherVoll": "1" if reading["memory_full"] else "0"}

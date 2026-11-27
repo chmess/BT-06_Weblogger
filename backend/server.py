@@ -22,6 +22,7 @@ from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
+from backend.common.sites import SiteStore
 from backend.linux.ble_jobs import BluetoothJobs, BusyError
 from backend.linux.receiver import Receiver
 from backend.common.live_store import LiveStore, LIVE_FIELDS
@@ -57,7 +58,8 @@ class Application:
         self.generation_lock = threading.Lock()
         radio_lock = threading.Lock()
         self.bluetooth = BluetoothJobs(radio_lock)
-        self.live_store = LiveStore(self.root / "data")
+        self.sites=SiteStore(self.root/"config/sites.json",self.events)
+        self.live_store = LiveStore(self.root / "data",self.sites)
         self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock,self.events)
         self.control_lock = threading.RLock()
         self.history_store = HistoryStore(self.root / "data/history")
@@ -169,6 +171,13 @@ def handler_for(app):
                 elif path == "/api/live":
                     live=app.receiver.status();reading=live.get("latest") or {}
                     self.send(200, {**live,"latest_climate":air_values(reading.get("temperature_c"),reading.get("humidity_pct"))})
+                elif path=="/api/sites":
+                    if query:raise ValueError("Messstellenliste benötigt keine Filter.")
+                    result=app.sites.snapshot();loggers={item['id'] for item in app.loggers()}|{item['logger'] for item in app.history_store.snapshots()}|{item['logger'] for item in result['active_assignments']}
+                    self.send(200,{**result,"available_loggers":sorted(loggers)})
+                elif path=="/api/sites/assignments":
+                    if set(query)-{"logger","site_id","limit"} or any(len(value)!=1 for value in query.values()):raise ValueError("Ungültige Zuordnungsfilter.")
+                    self.send(200,app.sites.history(logger=query.get('logger',[None])[0],site_id=query.get('site_id',[None])[0],limit=int(query.get('limit',['100'])[0])))
                 elif path in ("/api/events","/api/events/export"):
                     allowed={"start","end","logger","type","level"}|({"limit"} if path=="/api/events" else set())
                     if set(query)-allowed or any(len(value)!=1 for value in query.values()):raise ValueError("Ungültige Ereignisfilter.")
@@ -309,6 +318,12 @@ def handler_for(app):
                         raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
                     if path == "/api/settings":
                         self.send(200, app.settings.save(value))
+                    elif path=="/api/sites/save":
+                        self.send(200,app.sites.save(value))
+                    elif path=="/api/sites/assign":
+                        known={item['id'] for item in app.loggers()}|{item['logger'] for item in app.history_store.snapshots()}|{item['logger'] for item in app.sites.snapshot()['active_assignments']}
+                        if not isinstance(value,dict) or value.get('logger') not in known:raise ValueError("Logger zuerst verifiziert auswählen oder auslesen.")
+                        self.send(200,app.sites.assign(value))
                     elif path == "/api/climate/calculate":
                         self.send(200,calculate(value))
                     elif path == "/api/autosync":

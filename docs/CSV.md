@@ -85,3 +85,7 @@ Quellen-/Zeit-/Qualitätskennzeichnungen sind Pflicht: ursprüngliche Schema-/Da
 Optionale berechnete Spalten: `Taupunkt_C`, `AbsoluteFeuchte_g_m3`, `Saettigungsdampfdruck_hPa`, `WasserdampfPartialdruck_hPa`. Vier Nachkommastellen mit Dezimalkomma. Mindestens eine berechnete Spalte bei aktiviertem Klimamodus; `Berechnungsmodell` und `Berechnungsstatus` werden dann immer ergänzt. Ergebnis unbekannt/außerhalb Modell: leeres Zahlenfeld statt Null. Bei gültiger 0-%-Feuchte sind absolute Feuchte und Partialdruck tatsächlich null; Taupunkt bleibt leer. Quellen und Modellgrenzen: [KLIMA.md](KLIMA.md).
 
 Originalwerte bleiben in Originalauflösung und ursprünglicher Textdarstellung. Berechnung erfolgt aus jedem vollständigen Originalpaar, auch wenn die Eingabespalten selbst abgewählt wurden. Keine Ablage der Kopie im Messdatenbestand. Automatische Dateinamen enden auf `_auswahl.csv` bzw. `_klima.csv`.
+
+## Messstellen-ID in neuen Hostwerten V0.8.0
+
+Die bestehende Spalte `Messstelle` enthält für neue, ab Hostzeit zugeordnete BLE-Empfänge die stabile Messstellen-ID. Ohne passende Zuordnung bleibt die bisherige Loggerkennung erhalten. Dateipfad, Zeilen-ID, Empfangszeit und übriges Quellschema unverändert. Bestehende Originaldateien werden nicht rückwirkend umgeschrieben. Historische Namens-/Kriterienauflösung liegt in den Intervallsnapshots unter config/sites.json. Ungeprüfte Gerätehistorie und Simulation werden nicht aus einer aktuellen Hostzuordnung abgeleitet.

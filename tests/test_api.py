@@ -134,6 +134,29 @@ class ApiTests(unittest.TestCase):
                 self.assertTrue(mapped[0]['ZugeordneteZeit']);self.assertIn('DATUM_UNGEPRUEFT',mapped[0]['Zeitzuordnung'])
                 self.assertEqual(mapped[0]['Zeitstempel'],'')
 
+    def test_sites_are_session_protected_revision_bound_and_do_not_control_bluetooth(self):
+        from backend.common.sites import SiteStore
+        self.assertIs(self.app.live_store.sites,self.app.sites)
+        with tempfile.TemporaryDirectory() as folder:
+            store=SiteStore(Path(folder)/'sites.json')
+            values={'name':'Testort','room':'Testraum','description':'Nur Testdaten','criteria':{'air_threshold':70,'surface_threshold':80,'hysteresis':2,'minimum_minutes':60,'surface_mode':'none','surface_value':None}}
+            with patch.object(self.app,'sites',store),patch.object(self.app,'loggers',return_value=[{'id':'bt06-12345678','name':'Synthetic logger'}]),patch.object(self.app.receiver,'start',side_effect=AssertionError('No BLE action')):
+                self.assertEqual(self.request('/klima/api/sites/save',{'revision':0,'id':None,'values':values})[0],403)
+                status,_,raw=self.request('/klima/api/sites/save',{'revision':0,'id':None,'values':values},headers=self.auth())
+                self.assertEqual(status,200);result=json.loads(raw);site_id=result['site']['id']
+                self.assertEqual(self.request('/klima/api/sites/save',{'revision':0,'id':None,'values':values},headers=self.auth())[0],400)
+                payload={'revision':result['revision'],'logger':'bt06-12345678','site_id':site_id}
+                self.assertEqual(self.request('/klima/api/sites/assign',{**payload,'logger':'bt06-99999999'},headers=self.auth())[0],400)
+                self.assertEqual(self.request('/klima/api/sites/assign',{**payload,'start':'2020-01-01T00:00:00Z'},headers=self.auth())[0],400)
+                status,_,raw=self.request('/klima/api/sites/assign',payload,headers=self.auth());self.assertEqual(status,200)
+                latest=json.loads(raw);self.assertEqual(len(latest['active_assignments']),1)
+                history=json.loads(self.request('/klima/api/sites/assignments?logger=bt06-12345678')[2])
+                self.assertEqual(history['assignments'][0]['site_snapshot']['name'],'Testort')
+                payload.update(revision=latest['revision'],site_id=None)
+                self.assertEqual(self.request('/klima/api/sites/assign',payload,headers=self.auth())[0],200)
+                self.assertEqual(self.request('/klima/api/sites/assignments?limit=501')[0],400)
+                self.assertEqual(self.request('/klima/api/sites?unknown=1')[0],400)
+
     def test_climate_calculator_is_read_only_validated_and_session_protected(self):
         value={'temperature_c':20,'humidity_pct':50,'surface_temperature_c':10}
         self.assertEqual(self.request('/klima/api/climate/calculate',value)[0],403)

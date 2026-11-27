@@ -13,7 +13,7 @@ from pathlib import Path
 from .storage import csv_text,identifier,parse_time
 
 FIELDS=['Schema','EreignisID','Zeitstempel','Typ','Stufe','Logger','Quelle','Nachricht','DetailsJSON']
-TYPES={'application.started':'Dienst gestartet','application.stopped':'Dienst beendet',
+TYPES={'site.created':'Messstelle angelegt','site.updated':'Messstelle geändert','site.assigned':'Logger zugeordnet','site.unassigned':'Zuordnung beendet','application.started':'Dienst gestartet','application.stopped':'Dienst beendet',
        'receiver.started':'Hostempfang gestartet','receiver.stopped':'Hostempfang pausiert',
        'receiver.fresh':'Aktuelles Advertising','receiver.stale':'Advertising veraltet',
        'receiver.error':'Empfangs-/CSV-Fehler','receiver.recovered':'Empfangsfehler behoben',

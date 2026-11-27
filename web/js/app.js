@@ -1,7 +1,7 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
 const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null, autoSync:null, timeAssignment:null};
-const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', statistics:'Statistik', events:'Ereignisse', export:'Export', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
+const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', statistics:'Statistik', events:'Ereignisse', export:'Export', sites:'Messstellen', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
 function notice(message, error=false) { const box=$('#notice'); box.textContent=message; box.hidden=false; box.classList.toggle('error', error); }
@@ -19,7 +19,8 @@ function go(page) {
   for(const button of document.querySelectorAll('[data-page]')) { if(button.dataset.page===page) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current'); }
   $('#page-title').textContent=titles[page];
   if(location.hash!==`#${page}`) history.replaceState(null,'',`#${page}`);
-  $('.source-strip').hidden=page==='events';$('#source-notice').hidden=page==='events';
+  $('.source-strip').hidden=['events','sites'].includes(page);$('#source-notice').hidden=['events','sites'].includes(page);
+  if(page==='sites')loadSites().catch(error=>notice(error.message,true));
   if(page==='events')loadEvents().catch(error=>notice(error.message,true));
   if(page==='history') { if(!state.chart) initChart(); state.chart?.resize(); }
 }
@@ -218,6 +219,48 @@ async function downloadPreparedExport(){
     const link=document.createElement('a'),match=/filename="([^"]+)"/.exec(response.headers.get('Content-Disposition')||'');link.href=URL.createObjectURL(blob);link.download=match?.[1]||'bt06-auswahl.csv';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);
     $('#export-status').textContent='CSV erstellt und Download gestartet.';
   }catch(error){$('#export-status').textContent='Export fehlgeschlagen; keine erfolgreiche Datei bestätigt.';throw error;}finally{exportControls();}
+}
+let sitesData=null,siteEditing=null,siteDraftRevision=null,siteDraftDirty=false,siteBusy=false,sitesRequest=0;
+function siteDefaults(){return {name:'',room:'',description:'',criteria:{air_threshold:70,surface_threshold:80,hysteresis:2,minimum_minutes:60,surface_mode:'none',surface_value:null}};}
+function siteCriteria(){const criteria={surface_mode:$('#site-mode').value,surface_value:$('#site-mode').value==='none'?null:Number($('#site-value').value)};for(const [key,id] of [['air_threshold','#site-air'],['surface_threshold','#site-surface'],['hysteresis','#site-hysteresis'],['minimum_minutes','#site-minimum']]){if($(id).value==='')throw new Error('Alle Auswertekriterien angeben.');criteria[key]=Number($(id).value);}if(criteria.surface_mode!=='none'&&$('#site-value').value==='')throw new Error('Oberflächenannahme vollständig angeben.');return criteria;}
+function siteControls(){
+  for(const input of document.querySelectorAll('#page-sites input,#page-sites select,#page-sites textarea,#page-sites button'))input.disabled=siteBusy;
+  const mode=$('#site-mode').value;$('#site-value').disabled=siteBusy||mode==='none';$('#site-value').required=mode!=='none';$('#site-value').min=mode==='fixed'?-45:0;$('#site-value').max=mode==='fixed'?60:50;
+  $('#site-save').disabled=siteBusy||!sitesData||siteDraftRevision!==sitesData.revision;
+  const logger=$('#assignment-logger').value,site=$('#assignment-site').value,active=sitesData?.active_assignments||[],current=active.find(item=>item.logger===logger),occupied=active.find(item=>item.site_id===site&&item.logger!==logger);
+  $('#site-assign').disabled=siteBusy||!logger||!site||current?.site_id===site;$('#site-unassign').disabled=siteBusy||!current;
+  $('#assignment-preview').textContent=!logger?'Bekannten Logger wählen.':`Aktuell: ${current?current.site_snapshot.name:'keine Messstelle'}. ${site?'Ziel: '+(sitesData.sites.find(item=>item.id===site)?.name||'unbekannt')+'.':'Zielmessstelle wählen.'}${occupied?' Die bisherige Zuordnung des Zielortes zu '+occupied.logger+' endet dabei.':''}`;
+}
+function editSite(id,internal=false){
+  if(siteBusy&&!internal)return;const site=id?sitesData?.sites.find(item=>item.id===id):siteDefaults();if(!site)return;
+  siteEditing=id;for(const field of ['name','room','description'])$(`#site-${field}`).value=site[field];
+  for(const [key,id] of [['air_threshold','#site-air'],['surface_threshold','#site-surface'],['hysteresis','#site-hysteresis'],['minimum_minutes','#site-minimum'],['surface_mode','#site-mode'],['surface_value','#site-value']])$(id).value=site.criteria[key]??'';
+  siteDraftRevision=sitesData?.revision??null;siteDraftDirty=false;$('#site-form-title').textContent=id?'Messstelle bearbeiten':'Neue Messstelle';$('#site-draft-status').textContent='Entwurf zum aktuellen Messstellenstand. Noch nicht gespeichert.';siteControls();
+}
+function useSiteCriteria(site){
+  if(siteBusy)return;for(const [key,id] of [['air_threshold','#risk-air'],['surface_threshold','#risk-surface'],['hysteresis','#risk-hysteresis'],['minimum_minutes','#risk-minimum'],['surface_mode','#risk-mode'],['surface_value','#risk-value']])$(id).value=site.criteria[key]??'';
+  updateRiskControls();clearRisk();go('climate');$('#risk-status').textContent='Kriterien von '+site.name+' übernommen. Datenquelle und Zeitraum vor dem Auswerten prüfen.';
+}
+async function loadSites(force=false){
+  const request=++sitesRequest;const [data,history]=await Promise.all([api('sites'),api('sites/assignments?limit=100')]);if(request!==sitesRequest)return;
+  sitesData=data;if(siteDraftRevision===null&&siteEditing===null)siteDraftRevision=data.revision;const target=$('#site-list');target.replaceChildren();
+  if(!data.sites.length)target.append(element('p','Noch keine Messstelle angelegt. Name und Kriterien unten eingeben.','hint'));
+  for(const site of data.sites){const panel=element('article',null,'panel'),active=data.active_assignments.find(item=>item.site_id===site.id);panel.append(element('h3',site.name),element('p',`Raum: ${site.room||'–'} · aktuell zugeordnet: ${active?.logger||'kein Logger'}`),element('p',site.description||'Keine Beschreibung.','hint'),element('p','Stabile ID: '+site.id,'hint'));const buttons=element('div',null,'button-row'),edit=element('button','Diesen Stand bearbeiten','secondary'),criteria=element('button','Auswertekriterien übernehmen','secondary');edit.addEventListener('click',()=>editSite(site.id));criteria.addEventListener('click',()=>useSiteCriteria(site));buttons.append(edit,criteria);panel.append(buttons);target.append(panel);}
+  const logger=$('#assignment-logger').value,site=$('#assignment-site').value;$('#assignment-logger').replaceChildren();addOption($('#assignment-logger'),'','Logger wählen');for(const id of data.available_loggers)addOption($('#assignment-logger'),id,id);$('#assignment-logger').value=logger;
+  $('#assignment-site').replaceChildren();addOption($('#assignment-site'),'','Messstelle wählen');for(const item of data.sites)addOption($('#assignment-site'),item.id,item.name+(item.room?' · '+item.room:'')+' · '+item.id.slice(-6));$('#assignment-site').value=site;
+  const rows=$('#site-history');rows.replaceChildren();for(const item of history.assignments){const row=element('tr');for(const value of [item.logger,item.site_snapshot.name,item.site_snapshot.room||'–',date(item.start),item.end?date(item.end):'laufend'])row.append(element('td',value));rows.append(row);}
+  $('#sites-status').textContent=`${data.sites.length} Messstellen · ${data.assignment_count} Zuordnungsintervalle${history.truncated?' · Historientabelle auf 100 begrenzt':''}.`;
+  if(force||!siteDraftDirty)editSite(siteEditing,true);else if(siteDraftRevision!==data.revision)$('#site-draft-status').textContent='Messstellenstand ersetzt; Entwurf bleibt erhalten. Vor dem Speichern aktuellen Stand übernehmen.';
+  siteControls();
+}
+async function saveSite(event){
+  event.preventDefault();if(!sitesData||siteDraftRevision!==sitesData.revision)throw new Error('Aktuellen Messstellenstand zuerst übernehmen.');
+  const values={name:$('#site-name').value.trim(),room:$('#site-room').value.trim(),description:$('#site-description').value.trim(),criteria:siteCriteria()};siteBusy=true;siteControls();
+  try{const result=await post('sites/save',{revision:siteDraftRevision,id:siteEditing,values});siteEditing=result.site.id;siteDraftDirty=false;await loadSites(true);$('#site-draft-status').textContent='Messstelle lokal gespeichert.';}finally{siteBusy=false;siteControls();}
+}
+async function assignSite(end=false){
+  if(!sitesData)throw new Error('Messstellen zuerst laden.');const logger=$('#assignment-logger').value,site_id=end?null:$('#assignment-site').value;if(!logger||!end&&!site_id)throw new Error('Logger und Messstelle wählen.');siteBusy=true;siteControls();
+  try{await post('sites/assign',{revision:sitesData.revision,logger,site_id});await loadSites();$('#sites-status').textContent='Zuordnung ab Hostzeit gespeichert; historische Intervalle erhalten.';}finally{siteBusy=false;siteControls();}
 }
 async function renderCards() {
   if(state.source==='live')return renderLiveCards();
@@ -693,6 +736,15 @@ async function main() {
   $('#source-select').addEventListener('change',guard(async()=>{setSource($('#source-select').value);await renderCards();await loadHistory();}));
   $('#live-follow').addEventListener('change',guard(async()=>{state.follow=$('#live-follow').checked;if(state.follow)await loadHistory();}));
   $('#overview-export').addEventListener('click',guard(async()=>{await loadHistory();exportCSV();}));
+  $('#sites-reload').addEventListener('click',guard(()=>loadSites()));
+  $('#site-form').addEventListener('submit',guard(saveSite));
+  $('#site-form').addEventListener('input',()=>{siteDraftDirty=true;$('#site-draft-status').textContent='Ungespeicherter Entwurf.';siteControls();});
+  $('#site-mode').addEventListener('change',siteControls);
+  $('#site-new').addEventListener('click',()=>editSite(null));
+  $('#site-reset').addEventListener('click',()=>editSite(siteEditing));
+  for(const id of ['#assignment-logger','#assignment-site'])$(id).addEventListener('change',siteControls);
+  $('#site-assign').addEventListener('click',guard(()=>assignSite()));
+  $('#site-unassign').addEventListener('click',guard(()=>assignSite(true)));
   $('#export-prepare').addEventListener('click',guard(prepareExport));
   $('#export-scope').addEventListener('change',invalidateExport);
   $('#export-choices').addEventListener('input',exportControls);

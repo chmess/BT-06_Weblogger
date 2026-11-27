@@ -37,6 +37,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.7.1 im Dienst und erste echte Ereignisablage bestätigt. V0.7.2 vorbereitet: zusätzliche CSV-Spaltenauswahl mit optionalen Klimagrößen, Originalauflösung und verpflichtender Zeit-/Qualitäts-/Modellkennzeichnung; gewählter Zeitraum, sichtbarer Ausschnitt oder Statistikbericht. 25 gezielte Python-Tests und Browserprüfung bestanden. Automatische Klima-/Batterieereignisse sowie weitere V0.8-/V0.9-Arbeiten bleiben offen.
 
+- V0.7.2 im Dienst bestätigt. V0.8.0 vorbereitet: Messstellen mit stabiler ID, Raum/Beschreibung/Kriterien, Zuordnung ab Hostzeit und unveränderlicher früherer Intervallbedeutung. Neue Live-CSV nutzt die Messstellen-ID; Loggerhistorie bleibt ohne sichere Zeitzuordnung unberührt. Gesamtsuite 179 Tests und Browserprüfung bestanden. Nächste V0.8-Schritte: gemeinsames Save/Load und messstellenbezogene Auswahl/Auswertung; automatische Warnungen weiterhin offen.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

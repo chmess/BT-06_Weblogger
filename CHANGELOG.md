@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.0-dev · 2026-11-27
+
+- Messstellenverwaltung mit stabiler ID, Name, Raum, Beschreibung, individuellen Feuchte-/Dauerkriterien und optionaler Oberflächenannahme. Kriterien bewusst in die manuelle Auswertung übernehmbar; kein neuer automatischer Alarmdienst.
+- Loggerzuordnung ab Hostzeit mit historisierten Intervallen und damaligen Angaben. Standort-/Loggerwechsel schließen alte Intervalle, Änderungen aktiver Messstellen versionieren Angaben/Kriterien ohne rückwirkende Umbenennung. Veraltete Entwürfe/Revisionen und rückwärts laufende Hostzeit blockieren Änderungen.
+- Künftig gespeicherte Host-Empfänge tragen die stabile Messstellen-ID. Originalzeilen und ungeprüfte Gerätehistorien werden nicht rückwirkend geändert oder anhand ihres Datums geraten zugeordnet. Simulation bleibt getrennt.
+- 179 Tests der Gesamtsuite sowie Browserprüfung bestanden. V0.7.2 im Dienst bestätigt. Gemeinsames Save/Load und messstellenbezogene Auswahl/Auswertung folgen; aktuelle Diagramme bleiben loggerbezogen.
+
 ## 0.7.2-dev · 2026-11-27
 
 - Zusätzlicher Auswahl-CSV-Export mit Originalspalten und optional Taupunkt, absoluter Feuchte sowie Sättigungs-/Partialdruck. Originalauflösung; Standard-Originalexport bleibt bytegleich. Quellen-, Zeit-, Qualitäts- und Exportkennzeichnung sind Pflichtspalten.
