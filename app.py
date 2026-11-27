@@ -20,10 +20,12 @@ def main():
     parser.add_argument("--root", type=Path, default=ROOT, help="Separates Daten-/Konfigurationsverzeichnis")
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve")
+    serve.add_argument("--root",type=Path,default=argparse.SUPPRESS,help="Separates Daten-/Konfigurationsverzeichnis")
     serve.add_argument("--port", type=int, default=8766)
     serve.add_argument("--base-path", default="")
     serve.add_argument("--public-origin", action="append", help="Explizite Origin des authentifizierenden Reverse Proxy; für mehrere Zugangsadressen wiederholen")
     demo = commands.add_parser("generate")
+    demo.add_argument("--root",type=Path,default=argparse.SUPPRESS,help="Separates Daten-/Konfigurationsverzeichnis")
     demo.add_argument("--days", type=int, default=7)
     demo.add_argument("--interval-minutes", type=int, default=5)
     demo.add_argument("--seed", type=int, default=42)
@@ -31,7 +33,8 @@ def main():
     demo.add_argument("--end", help="Festes Ende mit UTC-Offset für reproduzierbare Läufe")
     args = parser.parse_args()
     try:
-        with InstanceLock(args.root / "runtime/app.lock"):
+        args.root=args.root.resolve()
+        with InstanceLock(args.root / "runtime/app.lock",metadata={"command":args.command,"code_root":str(ROOT),"data_root":str(args.root)}):
             if args.command == "generate":
                 options = {k: getattr(args, k) for k in ("days", "interval_minutes", "seed", "scenario")}
                 if args.end:

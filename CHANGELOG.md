@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.9.2-dev · 2026-11-27
+
+- Portable Start-/Status-/Stop-Aufrufe unterstützen dasselbe separate Datenverzeichnis per --root; serve/generate akzeptieren die Option auch hinter dem Unterbefehl. Status-/Stop-Skripte reichen Argumente weiter. Tests verwenden eine temporäre Programmkopie und Pfade mit Leerzeichen.
+- Private Prozesssperre mit PID, Linux-Startzeit, Programm-/Datenpfad und Betriebsart. Fehler beim Schreiben geben die Sperre sofort frei; symbolische Sperrdateien werden nicht verfolgt. Alte PID-only-Belege bleiben bei nachgewiesenem tatsächlichem Sperrbesitzer nutzbar.
+- Status/Stop prüfen den tatsächlichen Kernel-Flock-Besitzer, den Skriptaufruf, Datenpfad und neuen Fingerabdruck. Stop nur für den nachgewiesenen Server per pidfd; gefälschte/stale Angaben, bloßes app.py in anderen Python-Argumenten und laufende Generator-CLI werden nicht signalisiert. Systemd-Hauptprozesse bleiben über systemctl zu verwalten; portable Kinder innerhalb einer anderen Service-Cgroup werden unterschieden.
+- Bestehende Update-Vorprüfung erkennt sichtbare eigene Skriptinstanzen desselben Programmverzeichnisses auch mit anderen Datenverzeichnissen. Kein automatisches Update oder Stoppen des realen Dienstes; keine globale atomare Updatesperre.
+- Sechs gezielte Betriebsprüfungen bestanden: geordnetes Stoppen/Wiederanlauf, Original-/Einstellungserhalt, doppelte Instanz, falsche PID/Startzeit/Pfade/Belegformate, zwei Datenwurzeln, Dienstzuordnung und Fehler-/Symlinkschutz. Nach den letzten Sperr-/Formatkorrekturen nur betroffene Prüfungen wiederholt. V0.9.1 im realen Dienst bestätigt; keine Logger-/Systemänderung.
+
 ## 0.9.1-dev · 2026-11-27
 
 - CSV-Downloads werden vollständig in einer privaten, automatisch entfernten temporären Datei unter runtime vorbereitet und danach in 64-KiB-Blöcken übertragen. Original-/Auswahl-/Klima-/Zeitzuordnungs-/Messstellen- und Ereignis-CSV behalten ihre Bytes einschließlich UTF-8-BOM, Dateinamen, Schutzheader und genaue Content-Length.

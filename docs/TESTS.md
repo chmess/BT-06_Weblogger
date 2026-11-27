@@ -305,3 +305,17 @@ python3 -m unittest discover -s tests -p test_csv_download.py -q
 PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_csv_preparation_failure_and_concurrency_never_return_partial_success test_api.ApiTests.test_csv_transport_failure_closes_connection_without_appended_error_json test_api.ApiTests.test_selection_and_climate_export_preserve_original_and_unverified_time test_api.ApiTests.test_events_filters_limits_export_and_private_storage test_api.ApiTests.test_time_assignment_export_is_explicit_and_preserves_originals test_api.ApiTests.test_statistics_retains_original_device_time_and_export_bytes test_api.ApiTests.test_real_source_export_is_separate_and_requires_known_logger test_site_selection test_export -q
 node tools/browser_smoke.mjs --site-continuity
 ```
+
+
+## V0.9.2 · gezielte Betriebsprüfung
+
+Sechs neue Betriebsprüfungen bestanden (6,7 s im ersten Lauf). Tests kopieren nur öffentlichen Code/Webassets und Wrapper in eine temporäre Programmkopie mit Leerzeichen und starten dort isolierte Server mit separaten Datenverzeichnissen. Tatsächliche HTTP-Bereitschaft, CSRF-Einstellungsspeicherung, geordnetes Stoppen/Wiederanlauf, unveränderte Originaldatei und Konfiguration, Status nach Ende, doppelte Instanz und zwei Datenwurzeln geprüft. Der Update-Guard blockiert auch bei einer unbenutzten ausgewählten Datenwurzel, solange eine andere dokumentierte Skriptinstanz derselben Codekopie läuft. Kein git pull/Installer ausgeführt.
+
+Manipulierte PID, Startzeit, Datenpfad, Belegform/-version und ungültiger Fingerabdruck werden ohne Signal abgewiesen. Alte PID-only-Belege bleiben bei verifizierter tatsächlicher Flock-/Skriptzuordnung nutzbar. Ein fremder Python-c-Aufruf mit bloßem app.py-Argument wird nicht als Server akzeptiert. Systemd-MainPID-Zuordnung wird rein simuliert unterschieden; ein normaler portabler Kindprozess im vorhandenen Service-Cgroup bleibt kontrollierbar.
+
+Fehlgeschlagenes Sperrbelegschreiben gibt den Flock sofort frei; private Dateirechte und Symlinkschutz erhalten synthetische Originalbytes. Nach diesen Ergänzungen nur zwei zugehörige Tests wiederholt, nach strikterer Belegformatprüfung nur den betroffenen Identitätstest. Python-/Shellsyntax geprüft. Keine Gesamt-/Browserstrecke wiederholt. Kein tatsächlicher Dienst-/Loggerstopp oder Geräteeingriff. Unerwartete Beendigung/Stromausfall und laufende Hardwareaufträge sind damit nicht abgenommen.
+
+```sh
+python3 -m unittest discover -s tests -p test_lifecycle.py -q
+bash -n start.sh stop.sh status.sh update.sh
+```
