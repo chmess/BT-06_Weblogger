@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.7.2-dev · 2026-11-27
+
+- Zusätzlicher Auswahl-CSV-Export mit Originalspalten und optional Taupunkt, absoluter Feuchte sowie Sättigungs-/Partialdruck. Originalauflösung; Standard-Originalexport bleibt bytegleich. Quellen-, Zeit-, Qualitäts- und Exportkennzeichnung sind Pflichtspalten.
+- Berechnete Werte mit vier Nachkommastellen/Dezimalkomma und verpflichtendem Modell-/Statusfeld. Fehlende oder nicht vom Modell abgedeckte Ergebnisse bleiben leer; ungeprüfte Gerätezeit und getrennte zugeordnete Zeitfelder bleiben erhalten.
+- Neue Exportseite für gewählten Zeitraum, sichtbaren Ausschnitt oder Statistikbericht. Vorbereitung bindet die Auswahl an Quelle/Logger/Zeitfenster; späte oder nicht passende Vorbereitungen werden verworfen. Downloadfehler bleiben in der Oberfläche, kein versehentlicher Wechsel zur Fehler-JSON.
+- 5 Export- und 20 API-Tests sowie Browserprüfung bestanden. V0.7.1 läuft; erste echte Betriebsereignisse ohne Protokollfehler geprüft. Keine Geräteänderung.
+
 ## 0.7.1-dev · 2026-11-27
 
 - Dauerhafte monatliche Ereignis-CSV unter data/events mit privater Ablage, Dateisperren und fsync. Dienststart/-ende, Hostempfang, aktuelle/veraltete Aussendungen, empfangener Aufzeichnungsstatus, Speichervollkennzeichnung, Empfangs-/CSV-Fehler und Auftragsergebnisse protokollieren. Keine nachträglich erfundenen Vorgänge.

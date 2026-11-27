@@ -101,6 +101,39 @@ class ApiTests(unittest.TestCase):
                     self.assertEqual(self.request('/klima/api/events?'+query)[0],400)
                 self.assertEqual(self.request('/klima/api/events/export?limit=1')[0],400)
 
+    def test_selection_and_climate_export_preserve_original_and_unverified_time(self):
+        from backend.common.history_store import HistoryStore
+        from backend.common.history_capture import decode_capture
+        from backend.common.history_timezones import HistoryTimezones
+        from history_fixture import capture
+        import csv,io
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);store=HistoryStore(root/'history');snapshot=store.publish('12345678',**decode_capture(capture()))
+            timezones=HistoryTimezones(root/'timezones.json',store)
+            query=f"source=device&logger={snapshot['logger']}&snapshot={snapshot['id']}"
+            with patch.object(self.app,'history_store',store),patch.object(self.app,'timezones',timezones):
+                original=self.request('/klima/api/export?'+query)[2]
+                status,_,payload=self.request('/klima/api/export/options?'+query)
+                self.assertEqual(status,200);self.assertIn('GeraeteSekunden',json.loads(payload)['required_fields'])
+                status,headers,payload=self.request('/klima/api/export?'+query+'&climate=1&fields=Taupunkt_C,AbsoluteFeuchte_g_m3')
+                self.assertEqual(status,200);self.assertIn('_klima.csv',headers['Content-Disposition'])
+                data=list(csv.DictReader(io.StringIO(payload.decode('utf-8-sig')),delimiter=';'))
+                self.assertEqual(len(data),3);self.assertEqual(data[0]['Zeitstempel'],'')
+                self.assertTrue(data[0]['Geraetekalender']);self.assertIn('Berechnungsstatus',data[0])
+                self.assertEqual(data[0]['Exporttyp'],'AbgeleitetesKlima')
+                self.assertEqual(self.request('/klima/api/export?'+query)[2],original)
+                for extra in ('&climate=0','&fields=','&fields=unknown','&fields=Temperatur,Temperatur','&fields=Taupunkt_C'):
+                    self.assertEqual(self.request('/klima/api/export?'+query+extra)[0],400)
+                self.assertEqual(self.request('/klima/api/history?'+query+'&climate=1')[0],400)
+                self.assertEqual(self.request('/klima/api/export/options?'+query+'&start=bad')[0],400)
+                self.assertEqual(self.request('/klima/api/export/options?'+query+'&time_basis=assigned')[0],400)
+                timezones.assign({'logger':snapshot['logger'],'snapshot':snapshot['id'],'timezone':'Europe/Berlin','timezone_confirmed':True})
+                status,_,payload=self.request('/klima/api/export?'+query+'&time_basis=assigned&fields=Taupunkt_C&climate=1')
+                self.assertEqual(status,200)
+                mapped=list(csv.DictReader(io.StringIO(payload.decode('utf-8-sig')),delimiter=';'))
+                self.assertTrue(mapped[0]['ZugeordneteZeit']);self.assertIn('DATUM_UNGEPRUEFT',mapped[0]['Zeitzuordnung'])
+                self.assertEqual(mapped[0]['Zeitstempel'],'')
+
     def test_climate_calculator_is_read_only_validated_and_session_protected(self):
         value={'temperature_c':20,'humidity_pct':50,'surface_temperature_c':10}
         self.assertEqual(self.request('/klima/api/climate/calculate',value)[0],403)

@@ -75,3 +75,13 @@ Ablage `data/events/YYYY/YYYY-MM.csv`, UTF-8, Semikolon, Schema 1. Bewusst inner
 Append mit Prozess-/Dateisperre, Header-/Endprüfung, flush/fsync und Verzeichnissynchronisation bei Neuanlage. Leser prüfen Schema und Datensätze. Beschädigte Header, Zeilen oder unvollständige Enden werden nicht still repariert, überschrieben oder übersprungen. Ereignisfehler beeinflussen keine Wiederholung von Geräteaktionen. Fehler beim dauerhaften Bestätigen bleiben in Sitzungsdiagnose und Ereignisanzeige sichtbar; ein fehlgeschlagenes fsync bedeutet nicht zwingend, dass keine Bytes geschrieben wurden. Keine automatische Wiederholung unbestätigter Ereignisse.
 
 Die Anzeige zeigt bis zu 500 neueste passende Einträge je Monatsablage, der CSV-Export alle passenden Originalereignisse in Monats-/Ablagefolge. Bei Hostuhrkorrekturen ist diese Reihenfolge kein Beweis tatsächlicher zeitlicher Reihenfolge. Historische Vorgänge vor Einführung des Protokolls werden nicht rekonstruiert. Kein zusätzliches Backup-System, keine Datenbank, keine automatische Löschung.
+
+## Auswahl- und Klimaexport V0.7.2
+
+Zusätzliche CSV-Kopie, UTF-8-BOM, Semikolon. Der Standardexport ohne neue Parameter bleibt unverändert. Auswahl-Exporte erhalten `ExportSchema=1` und `Exporttyp=Spaltenauswahl` bzw. `AbgeleitetesKlima`; die ursprüngliche Schemaangabe bleibt separat erhalten. Kein Ersatz einer Originaldatei und kein neues Originalmessdatenformat. Reihenfolge der Spalten ist kanonisch nach Quellschema, Exportmetadaten und Berechnungsfeldern.
+
+Quellen-/Zeit-/Qualitätskennzeichnungen sind Pflicht: ursprüngliche Schema-/Datensatzkennung, Zeitstempel, Quelle, Messstelle und Qualität; soweit in der Quelle vorhanden auch Geräte-Sekunden, Gerätekalender, Zeitbasis, Firmware und sämtliche zusätzlichen Zeitzuordnungsfelder. Insbesondere bleibt ein unbekannter UTC-Zeitstempel leer. Ein bestätigter Zeitzonenbezug bestätigt weiterhin kein Gerätedatum.
+
+Optionale berechnete Spalten: `Taupunkt_C`, `AbsoluteFeuchte_g_m3`, `Saettigungsdampfdruck_hPa`, `WasserdampfPartialdruck_hPa`. Vier Nachkommastellen mit Dezimalkomma. Mindestens eine berechnete Spalte bei aktiviertem Klimamodus; `Berechnungsmodell` und `Berechnungsstatus` werden dann immer ergänzt. Ergebnis unbekannt/außerhalb Modell: leeres Zahlenfeld statt Null. Bei gültiger 0-%-Feuchte sind absolute Feuchte und Partialdruck tatsächlich null; Taupunkt bleibt leer. Quellen und Modellgrenzen: [KLIMA.md](KLIMA.md).
+
+Originalwerte bleiben in Originalauflösung und ursprünglicher Textdarstellung. Berechnung erfolgt aus jedem vollständigen Originalpaar, auch wenn die Eingabespalten selbst abgewählt wurden. Keine Ablage der Kopie im Messdatenbestand. Automatische Dateinamen enden auf `_auswahl.csv` bzw. `_klima.csv`.

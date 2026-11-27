@@ -20,7 +20,8 @@ from backend.common.statistics import summarize
 from backend.common.events import EventStore,FIELDS as EVENT_FIELDS
 from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
-from backend.common.storage import chart_data, csv_text, identifier, rows_in_range
+from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
+from backend.common.export import options as export_options,selected_fields,project_rows
 from backend.linux.ble_jobs import BluetoothJobs, BusyError
 from backend.linux.receiver import Receiver
 from backend.common.live_store import LiveStore, LIVE_FIELDS
@@ -199,15 +200,16 @@ def handler_for(app):
                     if set(query) != {"logger", "snapshot"} or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Zeitzuordnung benötigt genau logger und snapshot.")
                     self.send(200, app.timezones.info(query["logger"][0], query["snapshot"][0]))
-                elif path in ("/api/history", "/api/export", "/api/risk", "/api/statistics"):
+                elif path in ("/api/history", "/api/export", "/api/export/options", "/api/risk", "/api/statistics"):
                     allowed = {"source", "run", "logger", "start", "end", "snapshot", "time_basis"}
                     if path=="/api/risk":allowed|=RISK_FIELDS
+                    if path=="/api/export":allowed|={"fields","climate"}
                     if set(query) - allowed or any(len(v) != 1 for v in query.values()):
                         raise ValueError("Ungültige Abfrageparameter.")
                     risk_options=options_from_query(query) if path=="/api/risk" else None
                     source = query.get("source", ["simulation"])[0]
                     basis = query.get("time_basis", ["original"])[0]
-                    if basis not in ("original", "assigned") or "time_basis" in query and (source != "device" or path != "/api/export"):
+                    if basis not in ("original", "assigned") or "time_basis" in query and (source != "device" or path not in ("/api/export","/api/export/options")):
                         raise ValueError("Zeitzuordnung ist nur für den zusätzlichen Historien-CSV-Export verfügbar.")
                     logger = identifier(query.get("logger", [""])[0])
                     start, end = query.get("start", [None])[0], query.get("end", [None])[0]
@@ -235,7 +237,7 @@ def handler_for(app):
                         meta = app.history_store.metadata(logger, snapshot)
                         run = snapshot[:16]
                         interval = meta["interval_seconds"] / 60
-                        rows = (app.history_store.filtered_rows(logger, snapshot, start, end) if path == "/api/export"
+                        rows = (app.history_store.filtered_rows(logger, snapshot, start, end) if path in ("/api/export","/api/export/options")
                                 else app.history_store.chart_rows(logger, snapshot, start, end))
                         fields, label = HISTORY_FIELDS, "BT06-Historie"
                         if basis == "assigned":
@@ -243,9 +245,21 @@ def handler_for(app):
                             fields = HISTORY_FIELDS + ASSIGNED_FIELDS
                     else:
                         raise ValueError("Unbekannte Datenquelle.")
-                    if path == "/api/export":
-                        export = csv_text(rows, fields) if fields else csv_text(rows)
-                        self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}.csv")
+                    if path=="/api/export/options":
+                        begin=parse_time(start) if start else None;finish=parse_time(end) if end else None
+                        if begin and finish and begin>finish:raise ValueError("Beginn liegt nach dem Ende.")
+                        if basis=="assigned" and not app.timezones.info(logger,snapshot)["timezone_confirmed"]:raise ValueError("Keine passende Zeitzone bestätigt.")
+                        self.send(200,export_options(fields or FIELDS))
+                    elif path == "/api/export":
+                        custom='fields' in query or 'climate' in query
+                        if 'climate' in query and query['climate']!=['1']:raise ValueError('Berechnungen mit climate=1 aktivieren oder Parameter weglassen.')
+                        climate='climate' in query
+                        if custom:
+                            selected=selected_fields(fields or FIELDS,query.get('fields',[None])[0],climate)
+                            export=csv_text(project_rows(rows,selected,climate),selected)
+                        else:export = csv_text(rows, fields) if fields else csv_text(rows)
+                        suffix='_klima' if climate else '_auswahl' if custom else ''
+                        self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}{suffix}.csv")
                     elif path=="/api/statistics":
                         self.send(200,{"source":label,"clock_verified":source!="device","axis_basis":"device_calendar" if source=="device" else "timestamp",**summarize(rows,interval,start,end)})
                     elif path=="/api/risk":

@@ -1,7 +1,7 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
 const state = {settings: null, saved: null, csrf: '', runs: [], run: null, logger: null, chart: null, chartData: null, selection: {}, query: null, loading: 0, source:'simulation', live:null, liveLoggers:[], follow:true, snapshots:[], series:[], snapshot:null, sync:null, autoSync:null, timeAssignment:null};
-const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', statistics:'Statistik', events:'Ereignisse', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
+const titles = {overview:'Übersicht', history:'Klimaverlauf', simulation:'Testdaten', climate:'Taupunkt / Feuchte', statistics:'Statistik', events:'Ereignisse', export:'Export', logger:'Logger / Bluetooth', settings:'Einstellungen', diagnostics:'Diagnose'};
 const scenarios = {daily:'Tagesgang',humidity:'Feuchtespitzen',ventilation:'Lüftung',gaps:'Datenlücken'};
 const number = (value, digits=1) => value == null ? '–' : new Intl.NumberFormat('de-DE', {maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value);
 function notice(message, error=false) { const box=$('#notice'); box.textContent=message; box.hidden=false; box.classList.toggle('error', error); }
@@ -180,6 +180,45 @@ async function loadEvents(){
   $('#events-status').textContent=`${result.events.length} Ereignisse geladen${result.truncated?' · weitere Treffer vorhanden; CSV enthält alle passenden Einträge':''}.${result.log_status.failed_this_session?' '+result.log_status.failed_this_session+' Ereignisse in dieser Sitzung nicht dauerhaft bestätigt.':''}${result.log_status.error?' '+result.log_status.error:''}`;
 }
 function exportEvents(){if(!state.eventsQuery)throw new Error('Zuerst Ereignisse laden.');const query=new URLSearchParams(state.eventsQuery);query.delete('limit');const link=document.createElement('a');link.href='api/events/export?'+query;link.click();}
+let exportRevision=0;
+function exportSignature(){return selectionSignature()+'|'+$('#export-scope').value+'|'+($('#export-scope').value==='statistics'?state.statisticsQuery?.toString():'');}
+function invalidateExport(){exportRevision++;state.exportBase=null;state.exportOptions=null;$('#export-choices').hidden=true;$('#export-download').disabled=true;$('#export-context').textContent='';$('#export-status').textContent='Auswahl geändert; Spaltenauswahl erneut vorbereiten.';}
+function exportControls(){
+  const climate=$('#export-climate').checked;$('#export-calculated-group').hidden=!climate;
+  $('#export-download').disabled=!state.exportBase||exportSignature()!==state.exportSignature||(climate&&!$('#export-calculated-fields input:checked'));
+  const options=state.exportOptions;if(options)$('#export-required').textContent='Automatisch erhalten: '+[...options.required_fields,...options.export_metadata,...(climate?options.calculated_metadata:[])].join(', ')+'.';
+}
+async function prepareExport(){
+  const signature=exportSignature(),revision=++exportRevision,scope=$('#export-scope').value;
+  let query;
+  if(scope==='statistics'){
+    if(!state.statisticsQuery)throw new Error('Zuerst einen Statistikbericht berechnen.');
+    query=new URLSearchParams(state.statisticsQuery);
+    const source=query.get('source')||'simulation',key=JSON.stringify([source,query.get('logger'),source==='simulation'?query.get('run'):null,source==='device'?query.get('snapshot'):null]);
+    if(key!==rangeIdentity())throw new Error('Der Statistikbericht gehört zu einer anderen Datenquelle oder Loggerauswahl. Passende Auswahl im Klimaverlauf wählen.');
+  }else query=analysisQuery(scope==='visible');
+  $('#export-download').disabled=true;$('#export-status').textContent='Exportspalten werden vorbereitet …';
+  let options;try{options=await api('export/options?'+query);}catch(error){if(revision===exportRevision)$('#export-status').textContent='Vorbereitung fehlgeschlagen.';throw error;}
+  if(revision!==exportRevision)return;if(signature!==exportSignature()){$('#export-status').textContent='Auswahl geändert; erneut vorbereiten.';return;}
+  state.exportBase=query;state.exportOptions=options;state.exportSignature=signature;
+  const original=$('#export-original-fields'),calculated=$('#export-calculated-fields');original.replaceChildren();calculated.replaceChildren();
+  for(const [fields,target,kind] of [[options.original_fields,original,'original'],[options.calculated_fields,calculated,'calculated']])for(const field of fields){const label=element('label',null,'inline-check'),input=element('input');input.type='checkbox';input.value=field;input.checked=true;input.dataset.exportField=kind;input.disabled=kind==='original'&&options.required_fields.includes(field);label.append(input,document.createTextNode(options.labels[field]||field));target.append(label);}
+  $('#export-climate').checked=false;$('#export-choices').hidden=false;
+  $('#export-context').textContent=`${({simulation:'Synthetische Testdaten',live:'BLE-Empfänge',device:'Loggerhistorie'})[query.get('source')]} · ${query.get('logger')} · ${query.has('start')?chartDate(query.get('start')):'Anfang'} bis ${query.has('end')?chartDate(query.get('end')):'Ende'}${query.get('source')==='device'?' · ungeprüfter Gerätekalender':''}`;
+  $('#export-status').textContent='Spaltenauswahl vorbereitet. Der angezeigte Zeitraum bleibt für diesen Export fest.';exportControls();
+}
+async function downloadPreparedExport(){
+  if(!state.exportBase||exportSignature()!==state.exportSignature)throw new Error('Auswahl zuerst erneut vorbereiten.');
+  const query=new URLSearchParams(state.exportBase),fields=[...document.querySelectorAll('#export-original-fields input:checked')].map(input=>input.value);
+  if($('#export-climate').checked){const derived=[...document.querySelectorAll('#export-calculated-fields input:checked')].map(input=>input.value);if(!derived.length)throw new Error('Mindestens eine berechnete Größe auswählen.');fields.push(...derived);query.set('climate','1');}
+  query.set('fields',fields.join(','));const revision=exportRevision,signature=state.exportSignature;$('#export-download').disabled=true;$('#export-status').textContent='CSV aus Originalwerten wird erstellt …';
+  try{
+    const response=await fetch('api/export?'+query);if(!response.ok){const error=await response.json();throw new Error(error.error||'Export fehlgeschlagen.');}
+    const blob=await response.blob();if(revision!==exportRevision||signature!==exportSignature()){$('#export-status').textContent='Auswahl während des Exports geändert; Download nicht ausgelöst.';return;}
+    const link=document.createElement('a'),match=/filename="([^"]+)"/.exec(response.headers.get('Content-Disposition')||'');link.href=URL.createObjectURL(blob);link.download=match?.[1]||'bt06-auswahl.csv';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+    $('#export-status').textContent='CSV erstellt und Download gestartet.';
+  }catch(error){$('#export-status').textContent='Export fehlgeschlagen; keine erfolgreiche Datei bestätigt.';throw error;}finally{exportControls();}
+}
 async function renderCards() {
   if(state.source==='live')return renderLiveCards();
   if(state.source==='device')return renderDeviceCards();
@@ -293,6 +332,7 @@ async function loadHistory(refresh=false) {
   const assignment=query.get('source')==='device'?await api(`time-assignment?${new URLSearchParams({logger:query.get('logger'),snapshot:query.get('snapshot')})}`):null;if(request!==state.loading)return false;state.timeAssignment=assignment;
   $('#chart-export-assigned').hidden=!assignment;$('#chart-export-assigned').disabled=!assignment?.timezone_confirmed;$('#timezone-panel').hidden=!assignment;
   if(assignment){$('#timezone-status').textContent=assignment.timezone_confirmed?`${assignment.timezone} bestätigt · ${assignment.assigned_count} Werte zugeordnet · ${assignment.unassigned_count} spätere/unbestätigte Werte · Datum weiterhin ungeprüft`:'Zeitzone dieses Historienstands noch nicht bestätigt.';if(assignment.timezone)$('#history-timezone').value=assignment.timezone;}
+  if(state.exportBase&&exportSignature()!==state.exportSignature)invalidateExport();
   const changed=state.query?.toString()!==query.toString();if(changed&&state.riskReport)markRiskStale();if(changed&&state.statisticsReport)markStatisticsStale();
   const reset=!refresh&&changed;state.query=query;state.chartData=data;state.chartContext=rangeIdentity();
   $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}${data.climate?' · Taupunkt berechnet (Magnus über Wasser)':''}`;
@@ -352,7 +392,7 @@ function populateSnapshots() {
 }
 function setSource(source) {
   if(!['live','device','simulation'].includes(source))source='simulation';
-  markRiskStale();markStatisticsStale();state.loading++;state.chartData=null;state.query=null;state.chartContext=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
+  markRiskStale();markStatisticsStale();invalidateExport();state.loading++;state.chartData=null;state.query=null;state.chartContext=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
   state.source=source;localStorage.setItem('bt06-source',source);$('#source-select').value=source;
   const live=source==='live',device=source==='device';$('#run-label').hidden=live;$('#live-follow-label').hidden=!live;
   $('#run-title').textContent=device?'Historienstand':'Testlauf';
@@ -653,6 +693,10 @@ async function main() {
   $('#source-select').addEventListener('change',guard(async()=>{setSource($('#source-select').value);await renderCards();await loadHistory();}));
   $('#live-follow').addEventListener('change',guard(async()=>{state.follow=$('#live-follow').checked;if(state.follow)await loadHistory();}));
   $('#overview-export').addEventListener('click',guard(async()=>{await loadHistory();exportCSV();}));
+  $('#export-prepare').addEventListener('click',guard(prepareExport));
+  $('#export-scope').addEventListener('change',invalidateExport);
+  $('#export-choices').addEventListener('input',exportControls);
+  $('#export-download').addEventListener('click',guard(downloadPreparedExport));
   $('#events-form').addEventListener('submit',guard(async event=>{event.preventDefault();await loadEvents();}));
   $('#events-form').addEventListener('input',invalidateEvents);
   $('#events-export').addEventListener('click',guard(exportEvents));

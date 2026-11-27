@@ -9,3 +9,5 @@
 #chart-panel:fullscreen{height:100vh;overflow:auto;border-radius:0;background:var(--panel);padding:20px}#chart-panel:fullscreen #chart{height:max(300px,calc(100vh - 290px))}#chart-visible-range{overflow-wrap:anywhere}
 
 .table-scroll{max-width:100%;overflow-x:auto;margin:18px 0}.table-scroll table{width:100%;min-width:850px;border-collapse:collapse}.table-scroll th,.table-scroll td{text-align:left;padding:12px;border-bottom:1px solid var(--border);vertical-align:top}.table-scroll th{font-size:.8rem;color:var(--muted)}.table-scroll td{font-size:.85rem}
+
+#export-choices fieldset{border:1px solid var(--border);border-radius:8px;margin:16px 0;padding:16px;min-width:0}#export-choices legend{padding:0 8px;color:var(--muted)}#export-choices .inline-check{overflow-wrap:anywhere;min-width:0}#export-choices .inline-check input{flex:0 0 18px}
