@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.2-dev · 2026-11-27
+
+- Messstellenfilter im Klimaverlauf für echte Host-Empfänge innerhalb des gewählten Loggers. Dieselbe Auswahl gilt für Statistik, Feuchteauswertung, sichtbaren Ausschnitt und Original-/Auswahl-/Klima-CSV; Dateinamen tragen die stabile Messstellen-ID.
+- Nur Originalzeilen mit gespeicherter Messstellen-ID und passendem damaligem Host-Zuordnungsintervall zählen. Keine rückwirkende Zuordnung alter Zeilen oder ungeprüfter Gerätezeit. Zuordnungsgrenzen bleiben auch bei Grafikverdichtung sichtbar und unterbrechen Zeitmittel/Feuchtephasen.
+- Berichte zeigen stabile ID, Logger und ausdrücklich aktuellen Namen. Formular-Kriterien bleiben bewusst manuell; gespeicherte Ansichten unterscheiden Messstellen, überholte Berichte/Exporte werden bei Auswahlwechsel ungültig.
+- Gesamtsuite 198 Tests und vollständige Chromium-Prüfung bestanden, einschließlich mobiler Messstellenwahl, Kurvenunterbrechung, Statistik, Original-CSV, Statistikexport und Filteraufhebung. V0.8.1 im Dienst fehlerfrei bestätigt. Keine reale Messstelle oder Geräteänderung.
+
 ## 0.8.1-dev · 2026-11-27
 
 - Save Settings lädt Programmeinstellungen, Messstellen und Zuordnungshistorie als gemeinsame JSON-Datei herunter. Load Settings zeigt Änderungen vorab; erst Save Settings übernimmt sie. Alte Einstellungsdateien bleiben ladbar, Messstellen können beim Import abgewählt werden.

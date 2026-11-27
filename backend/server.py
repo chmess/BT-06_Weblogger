@@ -22,6 +22,7 @@ from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
+from backend.common.site_selection import select_site
 from backend.common.sites import SiteStore
 from backend.common.configuration import Configuration,MAX_BYTES as SETTINGS_MAX_BYTES
 from backend.linux.ble_jobs import BluetoothJobs, BusyError
@@ -211,7 +212,7 @@ def handler_for(app):
                         raise ValueError("Zeitzuordnung benötigt genau logger und snapshot.")
                     self.send(200, app.timezones.info(query["logger"][0], query["snapshot"][0]))
                 elif path in ("/api/history", "/api/export", "/api/export/options", "/api/risk", "/api/statistics"):
-                    allowed = {"source", "run", "logger", "start", "end", "snapshot", "time_basis"}
+                    allowed = {"source", "run", "logger", "start", "end", "snapshot", "time_basis", "site"}
                     if path=="/api/risk":allowed|=RISK_FIELDS
                     if path=="/api/export":allowed|={"fields","climate"}
                     if set(query) - allowed or any(len(v) != 1 for v in query.values()):
@@ -255,6 +256,11 @@ def handler_for(app):
                             fields = HISTORY_FIELDS + ASSIGNED_FIELDS
                     else:
                         raise ValueError("Unbekannte Datenquelle.")
+                    selection={}
+                    if "site" in query:
+                        if source!="live":raise ValueError("Messstellenfilter ist nur für Host-Empfänge verfügbar; Gerätezeit und Simulation werden nicht zugeordnet.")
+                        rows,selected_site=select_site(app.sites,logger,query["site"][0],rows)
+                        selection={"site_selection":selected_site}
                     if path=="/api/export/options":
                         begin=parse_time(start) if start else None;finish=parse_time(end) if end else None
                         if begin and finish and begin>finish:raise ValueError("Beginn liegt nach dem Ende.")
@@ -269,13 +275,13 @@ def handler_for(app):
                             export=csv_text(project_rows(rows,selected,climate),selected)
                         else:export = csv_text(rows, fields) if fields else csv_text(rows)
                         suffix='_klima' if climate else '_auswahl' if custom else ''
-                        self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}{suffix}.csv")
+                        self.send(200, export.encode("utf-8-sig"), "text/csv; charset=utf-8", f"{run}_{logger}{'_'+query['site'][0] if 'site' in query else ''}{suffix}.csv")
                     elif path=="/api/statistics":
-                        self.send(200,{"source":label,"clock_verified":source!="device","axis_basis":"device_calendar" if source=="device" else "timestamp",**summarize(rows,interval,start,end)})
+                        self.send(200,{**selection,"source":label,"clock_verified":source!="device","axis_basis":"device_calendar" if source=="device" else "timestamp",**summarize(rows,interval,start,end)})
                     elif path=="/api/risk":
-                        self.send(200,{"source":label,"clock_verified":source!="device","axis_basis":"device_calendar" if source=="device" else "timestamp",**analyze(rows,interval,risk_options,start,end)})
+                        self.send(200,{**selection,"source":label,"clock_verified":source!="device","axis_basis":"device_calendar" if source=="device" else "timestamp",**analyze(rows,interval,risk_options,start,end)})
                     else:
-                        self.send(200, {"source": label, "clock_verified": source != "device",
+                        self.send(200, {**selection,"source": label, "clock_verified": source != "device",
                                         "axis_basis": "device_calendar" if source == "device" else "timestamp", **chart_data(rows, interval)})
                 else:
                     assets = {"/": "index.html", "/css/app.css": "css/app.css", "/js/app.js": "js/app.js",

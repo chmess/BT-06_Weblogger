@@ -94,11 +94,16 @@ def analyze(rows,interval_minutes,options,start=None,end=None):
     surface=Phases(options['surface_threshold'],options['hysteresis'],minimum,gap) if use_surface else None
     condensation=Phases(100,0,minimum,gap) if use_surface else None
     fixed_pressure=saturation_pressure(options['surface_value']) if options['surface_mode']=='fixed' else None
-    first=last=None
+    first=last=None;segment=None
     for row in rows:
         t=round(parse_time(row['Zeitstempel']).timestamp()*1000)
         if lower is not None and t<lower or upper is not None and t>upper:continue
         if last is not None and t<=last:raise ValueError('Zeitreihe nicht eindeutig aufsteigend; keine Phasenauswertung.')
+        current_segment=getattr(row,"site_segment",None)
+        if last is not None and current_segment!=segment:
+            for channel in (air,surface,condensation):
+                if channel is not None:channel.finish("assignment_boundary");channel.previous=None
+        segment=current_segment
         if first is None:first=t
         last=t
         temperature=float(row['Temperatur'].replace(',','.')) if row['Temperatur'] else None

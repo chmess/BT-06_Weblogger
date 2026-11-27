@@ -1,4 +1,4 @@
-# Messstellen V0.8.1
+# Messstellen V0.8.2
 
 Messstellen sind lokale Metadaten unter `config/application.json` (bis V0.8.0: `config/sites.json`), keine Geräteeinstellungen. Anlage/Änderung/Zuordnung senden keine BLE-Befehle und ändern keine Geräteuhr. Es werden keine Namen, Räume oder echten Zuordnungen ohne ausdrückliche Eingabe angelegt.
 
@@ -12,7 +12,7 @@ Neue Host-Empfänge werden anhand ihres Empfangszeitpunkts unter der passenden s
 
 ## Grenzen dieser Ausbaustufe
 
-Diagramme, Statistik und Auswahl-Export wählen weiterhin einen Logger und Zeitraum. Ein solcher Bereich kann mehrere Messstellen umfassen; er wird nicht pauschal mit dem aktuellen Messstellennamen beschriftet. Messstellenfilter und historische Gerätezuordnung benötigen einen weiteren Schritt. Save Settings enthält Messstellen und Historie. Load Settings zeigt Änderungen vorab; Messstellen sind abwählbar. Bestehende Historie wird ergänzt, aktive Loggerbindungen bleiben erhalten. Importierte offene Intervalle enden am Dateistand und werden nicht aktiviert. Änderungen aktueller Angaben gelten erst ab Übernahme, widersprüchliche Historie blockiert den Import.
+Diagramme, Statistik und Exporte wählen einen Logger und Zeitraum. Bei echten Host-Empfängen lässt sich seit V0.8.2 zusätzlich eine Messstelle wählen. Ohne Filter kann der Bereich mehrere Messstellen umfassen. Der Filter verlangt sowohl die bereits gespeicherte Original-ID als auch das passende damalige Host-Zuordnungsintervall (Beginn einschließlich, Ende ausschließlich). Unzugeordnete Altzeilen werden nicht rückwirkend ergänzt. Berichte nennen die stabile ID, den gewählten Logger und den ausdrücklich aktuellen Messstellennamen. Frühere Namen/Kriterien bleiben in der Zuordnungshistorie nachlesbar. Zusammenführung mehrerer Logger und Gerätehistorienzuordnung benötigen einen weiteren Schritt. Save Settings enthält Messstellen und Historie. Load Settings zeigt Änderungen vorab; Messstellen sind abwählbar. Bestehende Historie wird ergänzt, aktive Loggerbindungen bleiben erhalten. Importierte offene Intervalle enden am Dateistand und werden nicht aktiviert. Änderungen aktueller Angaben gelten erst ab Übernahme, widersprüchliche Historie blockiert den Import.
 
 ## Integrität
 
@@ -21,3 +21,12 @@ Diagramme, Statistik und Auswahl-Export wählen weiterhin einen Logger und Zeitr
 Gleichzeitige API-Aufträge werden innerhalb des laufenden Prozesses serialisiert; veraltete Revisionen werden abgewiesen. Bis 200 Messstellen und 10.000 Zuordnungsintervalle; Erreichen der Grenze verwirft keine ältere Historie. Die Oberfläche erhält ungespeicherte Entwürfe bei ersetzt vorliegendem Stand und verlangt vor dem Speichern dessen ausdrückliche Übernahme. Zuordnungswechsel zeigen betroffene aktuelle Belegungen vor dem Klick an.
 
 Messstellenaktionen werden im bestehenden privaten Betriebsereignisprotokoll dokumentiert. Kein zusätzlicher Hintergrunddienst, keine Datenbank und kein gesondertes Backup-System.
+
+
+## Auswertungsgrenzen
+
+Der Filter verwendet einen konsistenten Snapshot der Zuordnungshistorie je Anfrage. Intervallsuche erfolgt binär, Zeilen werden laufend gefiltert; keine zusätzliche vollständige Messdatenkopie für Statistik oder CSV-Filter. Interne Segmentkennungen erscheinen nicht als zusätzliche CSV-Spalten. Original-/Auswahl-/Klima-CSV und Statistikexport verwenden denselben Filter.
+
+Jede Zuordnungsgrenze, auch eine Metadatenversionierung ohne Ortswechsel, unterbricht Kurven und benachbarte Messpaare für Zeitmittel/Feuchtephasen. Beide Grenzpunkte bleiben bei Verdichtung erhalten; dazwischen wird eine sichtbare Kurvenlücke eingefügt. Zeiten ohne gültiges Messpaar bleiben unbekannt. Die Berichtsspanne umfasst weiterhin den angefragten Zeitraum; unzugeordnete Abschnitte werden nicht als unkritisch gezählt. Ohne Messstellenfilter bleiben bisherige loggerbezogene Auswertungen unverändert.
+
+Auswertekriterien stammen weiterhin aus dem manuellen Formular und werden im Bericht ausgewiesen. Auswahl einer Messstelle aktiviert weder ihre aktuellen Kriterien automatisch noch eine historische Kriterienmischung oder einen Alarmdienst. Die Oberfläche erlaubt weiterhin bewusstes Übernehmen aktueller Messstellenkriterien. Simulation und ungeprüfte Gerätezeit bieten keinen Messstellenfilter.

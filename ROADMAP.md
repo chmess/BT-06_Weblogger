@@ -41,6 +41,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.8.0 im Dienst bestätigt. V0.8.1 vorbereitet: gemeinsames Save/Load mit Änderungsvorschau, optionalem Messstellenimport und atomarer Konfiguration. Frühere Historie und aktuelle Loggerbindungen bleiben geschützt; keine Wiederherstellung aktiver Bindungen aus Dateien. Gesamtsuite 191 Tests, abschließend 12 Konfigurations-Kerntests und Browserprüfung bestanden. Als Nächstes: messstellenbezogene Auswahl/Auswertung und Diagnose; automatische Warnungen und Dauerbetriebsabnahme weiterhin offen.
 
+- V0.8.1 im Dienst fehlerfrei bestätigt. V0.8.2 vorbereitet: Messstellenfilter innerhalb des gewählten Loggers für Host-Empfänge, Diagramm, Statistik, Feuchteauswertung und alle CSV-Varianten. Original-ID plus damalige Host-Zuordnung erforderlich; Zuordnungsgrenzen unterbrechen auch verdichtete Kurven und Zeitbewertung. 198 Tests und vollständige Browserprüfung bestanden. Weiter offen: Zusammenführung mehrerer Logger je Messstelle, Diagnoseausbau, automatische Warnungen und Dauerbetriebsabnahme.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

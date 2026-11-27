@@ -72,8 +72,11 @@ def read_months(folder, start=None, end=None, fields=FIELDS):
 
 def chart_data(rows, interval_minutes, budget=1600):
     """Derive before decimation; retain extrema of T/RH/dew point/density."""
-    points = []
+    points = [];boundaries=set();segment=None
     for row in rows:
+        current=getattr(row,"site_segment",None)
+        if points and current!=segment:boundaries.add(len(points))
+        segment=current
         points.append([int(parse_time(row["Zeitstempel"]).timestamp() * 1000),
                        float(row["Temperatur"].replace(",", ".")) if row["Temperatur"] else None,
                        float(row["Feuchte"].replace(",", ".")) if row["Feuchte"] else None])
@@ -93,7 +96,7 @@ def chart_data(rows, interval_minutes, budget=1600):
     selected = {0, count - 1}
     gap_ms = interval_minutes * 60_000 * 1.5
     for i in range(1, count):
-        if points[i][0] - points[i - 1][0] > gap_ms or [v is None for v in points[i][1:]] != [v is None for v in points[i-1][1:]]:
+        if i in boundaries or points[i][0] - points[i - 1][0] > gap_ms or [v is None for v in points[i][1:]] != [v is None for v in points[i-1][1:]]:
             selected.update((i - 1, i))
     buckets=max(1,budget//8)
     width = max(1, (count+buckets-1)//buckets)
@@ -107,8 +110,8 @@ def chart_data(rows, interval_minutes, budget=1600):
     reduced = []
     previous_index = None
     for i in sorted(selected):
-        if previous_index is not None and i == previous_index + 1 and points[i][0] - points[previous_index][0] > gap_ms:
-            reduced.append([points[previous_index][0] + interval_minutes * 60_000, None, None, None, None])
+        if previous_index is not None and i == previous_index + 1 and (i in boundaries or points[i][0] - points[previous_index][0] > gap_ms):
+            reduced.append([(points[previous_index][0]+points[i][0])/2 if i in boundaries else points[previous_index][0] + interval_minutes * 60_000, None, None, None, None])
         reduced.append(points[i])
         previous_index = i
     dew_points=[point[3] for point in points if point[3] is not None]

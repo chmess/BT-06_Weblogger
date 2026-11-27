@@ -237,8 +237,14 @@ from backend.common.live_store import LiveStore
 p=bytearray(24);p[:3]=bytes.fromhex('090205');p[4:8]=bytes.fromhex('12345678');p[11]=100;p[12]=2;p[15:19]=bytes.fromhex('c9002602')
 reading=decode(p).json();reading['quality']='SYNTHETISCHER_TESTVEKTOR'
 store=LiveStore(Path(sys.argv[2])/'data')
-for seconds in [120,60]:store.append(reading,-55,(datetime.now(timezone.utc)-timedelta(seconds=seconds)).isoformat())
-`,project,join(scratch,'data')],{encoding:'utf8'});
+from backend.common.configuration import Configuration
+registry=Configuration(Path(sys.argv[2])/'config').sites
+stamps=[((datetime.now(timezone.utc)-timedelta(seconds=seconds)).isoformat(),False) for seconds in [120,60]]
+stamps.extend((item['start'],True) for item in registry.value['assignments'] if item['site_id']==sys.argv[3])
+for stamp,assigned in sorted(stamps):
+    store.sites=registry if assigned else None
+    store.append(reading,-55,stamp)
+`,project,join(scratch,'data'),siteId],{encoding:'utf8'});
   assert.equal(fixture.status,0,fixture.stderr);
   await evaluate(`refreshLive()`);
   await evaluate(`document.querySelector('#source-select').value='live';document.querySelector('#source-select').dispatchEvent(new Event('change'))`);
@@ -251,6 +257,25 @@ for seconds in [120,60]:store.append(reading,-55,(datetime.now(timezone.utc)-tim
   await evaluate(`state.chart.dispatchAction({type:'dataZoom',start:20,end:80})`);
   assert.equal(await evaluate(`state.follow`),false);
   await screenshot('history-live-fixture-mobile.png');
+  await evaluate(`document.querySelector('#history-site').value=${JSON.stringify(siteId)};document.querySelector('#history-site').dispatchEvent(new Event('change'))`);
+  await waitFor(`state.query?.get('site')===${JSON.stringify(siteId)}&&state.chartData.raw_count===2`);
+  assert.equal(await evaluate(`state.chartData.points.filter(p=>p[1]===null).length`),1);
+  assert.ok(await evaluate(`document.querySelector('#chart-caption').textContent.includes('Messstelle site-')`));
+  assert.equal(await evaluate(`document.querySelector('#history-site-note').hidden`),false);
+  await evaluate(`go('statistics');analyzeStatistics(false)`);
+  await waitFor(`state.statisticsReport?.site_selection?.site_id===${JSON.stringify(siteId)}`);
+  assert.equal(await evaluate(`state.statisticsReport.raw_count`),2);
+  assert.ok(await evaluate(`document.querySelector('#statistics-range').textContent.includes('Messstelle site-')`));
+  await evaluate(`go('export');document.querySelector('#export-scope').value='statistics';prepareExport()`);
+  await waitFor(`state.exportBase?.get('site')===${JSON.stringify(siteId)}&&!document.querySelector('#export-download').disabled`);
+  assert.ok(await evaluate(`document.querySelector('#export-context').textContent.includes('Messstelle site-')`));
+  const siteCsv=await evaluate(`fetch('api/export?'+state.exportBase).then(r=>r.text())`);
+  assert.equal(siteCsv.trim().split('\n').length,3);assert.ok(!siteCsv.includes('site_segment'));
+  await evaluate(`go('history');document.querySelector('#history-site').value='';document.querySelector('#history-site').dispatchEvent(new Event('change'))`);
+  await waitFor(`state.query&&!state.query.has('site')&&state.chartData.raw_count===4`);
+  assert.equal(await evaluate(`document.querySelector('#export-download').disabled`),true);
+  await screenshot('history-site-filter-mobile.png');
+
   await evaluate(`document.querySelector('#source-select').value='simulation';document.querySelector('#source-select').dispatchEvent(new Event('change'))`);
   await waitFor(`document.querySelectorAll('.card').length===3`);
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
@@ -421,7 +446,7 @@ print(json.dumps({'settings':saved,'preview':preview,'record_preview':record_pre
   await screenshot('device-settings-mobile.png');
   assert.equal(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),true);
   assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(external.length,0,JSON.stringify(external));
-  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','dew point curve and climate calculator with stale response guard','original-row humidity phases, explicit surface assumption and visible-range analysis','original-row statistics, visible range, exact CSV and stale reply guard','persistent event table, filters, full filtered CSV and source separation','selection climate CSV, mandatory provenance and exact export scopes','measuring sites, assignment history and stale draft protection','zoom preservation','period presets, previous/next and original-resolution visible CSV','DST fold navigation and fullscreen controls','manual axes, invalid range guard and saved view restored after reload','save settings','load settings preview','load settings save','combined settings/sites preview, cancel, preference-only and edited import','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','25 minute recording draft, full preparation summary, two explicit confirmations, edit invalidation and uncertain write display','parameter verification never guesses recording state from zero summary','alarm limit and activation draft, reset and Fahrenheit guard','no JS exceptions','no external requests'],screenshots:screenshotCount};
+  const report={passed:true,checks:['empty state','generator','three cards','chart canvas','dew point curve and climate calculator with stale response guard','original-row humidity phases, explicit surface assumption and visible-range analysis','original-row statistics, visible range, exact CSV and stale reply guard','persistent event table, filters, full filtered CSV and source separation','selection climate CSV, mandatory provenance and exact export scopes','measuring sites, assignment history and stale draft protection','site-filtered chart, assignment gaps, statistics, original CSV, scoped export and reset','zoom preservation','period presets, previous/next and original-resolution visible CSV','DST fold navigation and fullscreen controls','manual axes, invalid range guard and saved view restored after reload','save settings','load settings preview','load settings save','combined settings/sites preview, cancel, preference-only and edited import','390px no overflow','BLE missing dependency state','live/simulation source switch with synthetic fixture','live CSV export','manual zoom pauses live follow','device calendar axis and warning','unverified original history CSV','device calendar custom range','switch back to simulation','prefix extension grouped without duplicate points','earlier snapshots accessible','incremental button availability','explicit timezone assignment and derived export','later data stays unconfirmed','auto sync remains off after saving interval','automatic attempt never requests button press','read-only settings values and unknown radio meaning','settings read unavailable without selection','settings job progress, button signal, timeout preserves prior stand, and success shown locally','draft diff preserves broadcast counterpart, warns of data loss, invalidates on edit, blocks stale base, and resets explicitly','25 minute recording draft, full preparation summary, two explicit confirmations, edit invalidation and uncertain write display','parameter verification never guesses recording state from zero summary','alarm limit and activation draft, reset and Fahrenheit guard','no JS exceptions','no external requests'],screenshots:screenshotCount};
   await writeFile(join(artifacts,'browser.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
   if(browser){try{await send('Browser.close',{},null);}catch{}if(browser.exitCode===null){browser.kill('SIGTERM');await new Promise(resolve=>{browser.once('exit',resolve);setTimeout(resolve,5000);});}}

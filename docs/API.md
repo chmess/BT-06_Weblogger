@@ -1,4 +1,4 @@
-# HTTP-API · V0.8.1-dev
+# HTTP-API · V0.8.2-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
@@ -195,3 +195,12 @@ Vorschau-POST: `{document:<Dateiobjekt>,include_sites:<bool>,settings:<sieben Fo
 Messstellenimport ergänzt Historie, entfernt keine vorhandenen Intervalle und bewahrt aktuelle Loggerbindungen. Offene importierte Intervalle werden am Dateistand geschlossen, nie aktiviert. Geänderte Metadaten einer aktuell belegten Messstelle werden erst zum Übernahmezeitpunkt versioniert. Widersprüche/Überlappungen blockieren den Messstellenimport; reine Programmeinstellungen können separat geladen werden. Dateizeit nach Hostzeit blockiert den Messstellenimport.
 
 Gemeinsame Ablage `config/application.json`, maximal 8 MiB, private Datei und atomarer Ersatz. Ohne diese Datei werden alte `settings.json`/`sites.json` eingelesen; die erste Änderung erzeugt den gemeinsamen Stand. Danach sind Altdateien nicht maßgeblich. Beschädigte gemeinsame Dateien werden nicht durch Altstände ersetzt. `/api/status.configuration` meldet Ablage, Revision und Schreibfehler. Nach unbestätigtem Schreibabschluss folgt der Prozess einer gültigen sichtbaren Gesamtdatei, meldet den Fehler und sperrt weitere Änderungen bis zum Neustart. Kein automatischer Retry/Rollback.
+
+
+## Messstellenfilter V0.8.2
+
+Optionaler Queryparameter `site=site-<UUID>` für `/api/history`, `/api/statistics`, `/api/risk`, `/api/export` und `/api/export/options`, ausschließlich mit `source=live` und weiterhin erforderlichem `logger`. Unbekannte/ungültige IDs oder mehrfache Parameter werden abgewiesen. Ohne `site` bleibt die bestehende Strecke unverändert.
+
+Der Filter verwendet Original-Messstellen-ID UND historisches Host-Zuordnungsintervall. Anfang einschließlich, Ende ausschließlich; keine nachträgliche Umzuordnung von Altzeilen. JSON-Berichte ergänzen `site_selection` mit `site_id`, `current_name` (ausdrücklich aktueller Name), `logger`, Messstellen-`revision`, `assignment_intervals`, `basis=stored_id_and_host_assignment`, `criteria_automatic=false`. Keine passenden Zeilen ergibt einen regulären leeren Bericht.
+
+Zuordnungsgrenzen unterbrechen Grafiklinien, Zeitmittel und Feuchtephasen unabhängig vom zeitlichen Abstand; in Phasendetails heißt der Abschluss `assignment_boundary`. Statistik-`gap_count` zählt bei gefilterten Daten auch Zuordnungsgrenzen zwischen ausgewerteten Zeilen. Die bisherige Berichtsspanne/Abdeckungsdefinition bleibt erhalten. Kriterien bleiben explizite API-Eingaben. CSV enthält ausschließlich die originalen Zeilen bzw. ausdrücklich gewählten Ableitungen, keine internen Segmentspalten. Dateinamen ergänzen die stabile Messstellen-ID. Mehrere Logger werden in dieser Version nicht zusammengeführt.

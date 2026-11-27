@@ -100,12 +100,22 @@ async function refreshRuns(preferRun) {
   }
   await renderCards();
 }
+let historySites=[];
+function updateHistorySites(data=null){
+  if(data)historySites=data.sites;
+  const select=$('#history-site'),previous=select.value;select.replaceChildren();addOption(select,'','Alle gespeicherten Empfänge');
+  for(const site of historySites)addOption(select,site.id,site.name+(site.room?' · '+site.room:'')+' · '+site.id.slice(-6));
+  select.value=historySites.some(site=>site.id===previous)?previous:'';
+  $('#history-site-label').hidden=state.source!=='live';$('#history-site-note').hidden=state.source!=='live'||!select.value;
+}
+function selectedSite(){return state.source==='live'?$('#history-site').value:'';}
+function siteReportLabel(result){const item=result.site_selection;return item?` · Messstelle ${item.site_id} (aktueller Name: ${item.current_name}) · Logger ${item.logger}`:'';}
 function chooseLogger() {
   const select=$('#logger-select'), previous=state.logger;select.replaceChildren();
   const loggers=state.source==='live'?state.liveLoggers:state.source==='device'?[...new Set(state.snapshots.map(s=>s.logger))].map(id=>({id,name:'BT06 '+id.replace('bt06-','')})):state.run?.loggers||[];
   for(const logger of loggers) addOption(select,logger.id,logger.name);
   state.logger=loggers.find(l=>l.id===previous)?.id||loggers[0]?.id||null;
-  select.value=state.logger||'';
+  select.value=state.logger||'';updateHistorySites();
   if(state.source==='device') populateSnapshots();
   $('#chart-export').disabled=!state.logger;$('#overview-export').disabled=!state.logger;
 }
@@ -150,7 +160,7 @@ function renderRisk(result){
     if(metric.phases.length){const details=element('details'),items=element('ol');details.append(element('summary',`Phasen anzeigen (${metric.phases.length}${metric.omitted_phases?' von '+metric.phase_count:''})`));for(const phase of metric.phases)items.append(element('li',`${chartDate(phase.start_ms)} bis ${chartDate(phase.end_ms)} · ${number(phase.duration_seconds/60)} min · Spitze ${number(phase.peak_pct)} % · ${phase.qualified?'Mindestdauer erreicht':'kurze Phase'}${phase.left_censored||phase.right_censored?' · Rand oder Lücke begrenzt die Beobachtung':''}`));details.append(items);card.append(details);}
     target.append(card);
   }
-  $('#risk-range').textContent=`${result.source}: ${result.range.start_ms==null?'kein Anfang':chartDate(result.range.start_ms)} bis ${result.range.end_ms==null?'kein Ende':chartDate(result.range.end_ms)}${result.clock_verified?'':' · Gerätekalender und UTC-Zuordnung ungeprüft'}. Oberflächenmodell: ${result.criteria.surface_mode==='none'?'keine Annahme':result.criteria.surface_mode==='fixed'?number(result.criteria.surface_value)+' °C konstant':number(result.criteria.surface_value)+' K unter Lufttemperatur'}.`;
+  $('#risk-range').textContent=`${result.source}${siteReportLabel(result)}: ${result.range.start_ms==null?'kein Anfang':chartDate(result.range.start_ms)} bis ${result.range.end_ms==null?'kein Ende':chartDate(result.range.end_ms)}${result.clock_verified?'':' · Gerätekalender und UTC-Zuordnung ungeprüft'}. Oberflächenmodell: ${result.criteria.surface_mode==='none'?'keine Annahme':result.criteria.surface_mode==='fixed'?number(result.criteria.surface_value)+' °C konstant':number(result.criteria.surface_value)+' K unter Lufttemperatur'}.`;
   $('#risk-status').textContent='Auswertung aus Originalwerten abgeschlossen. Konfigurierbare Feuchteindikatoren; keine Schimmelwahrscheinlichkeit.';
 }
 function analysisQuery(visible=false){
@@ -181,7 +191,7 @@ function renderStatistics(result){
     row.append(element('td',`${number(metric.observed_seconds/60)} min`),element('td',`${number(metric.unknown_seconds/60)} min`));target.append(row);
   }
   $('#statistics-table').hidden=false;
-  $('#statistics-range').textContent=`${result.source}: ${result.range.start_ms==null?'kein Anfang':chartDate(result.range.start_ms)} bis ${result.range.end_ms==null?'kein Ende':chartDate(result.range.end_ms)}${result.clock_verified?'':' · Gerätekalender und UTC-Zuordnung ungeprüft'}. ${result.raw_count.toLocaleString('de-DE')} Originalzeilen · ${result.gap_count} größere Zeitlücken · erwartetes Messintervall ${number(result.interval_minutes)} min.`;
+  $('#statistics-range').textContent=`${result.source}${siteReportLabel(result)}: ${result.range.start_ms==null?'kein Anfang':chartDate(result.range.start_ms)} bis ${result.range.end_ms==null?'kein Ende':chartDate(result.range.end_ms)}${result.clock_verified?'':' · Gerätekalender und UTC-Zuordnung ungeprüft'}. ${result.raw_count.toLocaleString('de-DE')} Originalzeilen · ${result.gap_count} Zeitlücken/Zuordnungsgrenzen · erwartetes Messintervall ${number(result.interval_minutes)} min.`;
   $('#statistics-status').textContent='Statistik berechnet. Fehlende oder nicht abgedeckte Zeit bleibt je Größe unbekannt.';
 }
 async function analyzeStatistics(visible=false){
@@ -226,7 +236,7 @@ async function prepareExport(){
   if(scope==='statistics'){
     if(!state.statisticsQuery)throw new Error('Zuerst einen Statistikbericht berechnen.');
     query=new URLSearchParams(state.statisticsQuery);
-    const source=query.get('source')||'simulation',key=JSON.stringify([source,query.get('logger'),source==='simulation'?query.get('run'):null,source==='device'?query.get('snapshot'):null]);
+    const source=query.get('source')||'simulation',identity=[source,query.get('logger'),source==='simulation'?query.get('run'):null,source==='device'?query.get('snapshot'):null];if(query.get('site'))identity.push(query.get('site'));const key=JSON.stringify(identity);
     if(key!==rangeIdentity())throw new Error('Der Statistikbericht gehört zu einer anderen Datenquelle oder Loggerauswahl. Passende Auswahl im Klimaverlauf wählen.');
   }else query=analysisQuery(scope==='visible');
   $('#export-download').disabled=true;$('#export-status').textContent='Exportspalten werden vorbereitet …';
@@ -236,7 +246,7 @@ async function prepareExport(){
   const original=$('#export-original-fields'),calculated=$('#export-calculated-fields');original.replaceChildren();calculated.replaceChildren();
   for(const [fields,target,kind] of [[options.original_fields,original,'original'],[options.calculated_fields,calculated,'calculated']])for(const field of fields){const label=element('label',null,'inline-check'),input=element('input');input.type='checkbox';input.value=field;input.checked=true;input.dataset.exportField=kind;input.disabled=kind==='original'&&options.required_fields.includes(field);label.append(input,document.createTextNode(options.labels[field]||field));target.append(label);}
   $('#export-climate').checked=false;$('#export-choices').hidden=false;
-  $('#export-context').textContent=`${({simulation:'Synthetische Testdaten',live:'BLE-Empfänge',device:'Loggerhistorie'})[query.get('source')]} · ${query.get('logger')} · ${query.has('start')?chartDate(query.get('start')):'Anfang'} bis ${query.has('end')?chartDate(query.get('end')):'Ende'}${query.get('source')==='device'?' · ungeprüfter Gerätekalender':''}`;
+  $('#export-context').textContent=`${({simulation:'Synthetische Testdaten',live:'BLE-Empfänge',device:'Loggerhistorie'})[query.get('source')]} · ${query.get('logger')}${query.get('site')?' · Messstelle '+query.get('site'):''} · ${query.has('start')?chartDate(query.get('start')):'Anfang'} bis ${query.has('end')?chartDate(query.get('end')):'Ende'}${query.get('source')==='device'?' · ungeprüfter Gerätekalender':''}`;
   $('#export-status').textContent='Spaltenauswahl vorbereitet. Der angezeigte Zeitraum bleibt für diesen Export fest.';exportControls();
 }
 async function downloadPreparedExport(){
@@ -274,7 +284,7 @@ function useSiteCriteria(site){
 }
 async function loadSites(force=false){
   const request=++sitesRequest;const [data,history]=await Promise.all([api('sites'),api('sites/assignments?limit=100')]);if(request!==sitesRequest)return;
-  sitesData=data;if(siteDraftRevision===null&&siteEditing===null)siteDraftRevision=data.revision;const target=$('#site-list');target.replaceChildren();
+  sitesData=data;updateHistorySites(data);if(siteDraftRevision===null&&siteEditing===null)siteDraftRevision=data.revision;const target=$('#site-list');target.replaceChildren();
   if(!data.sites.length)target.append(element('p','Noch keine Messstelle angelegt. Name und Kriterien unten eingeben.','hint'));
   for(const site of data.sites){const panel=element('article',null,'panel'),active=data.active_assignments.find(item=>item.site_id===site.id);panel.append(element('h3',site.name),element('p',`Raum: ${site.room||'–'} · aktuell zugeordnet: ${active?.logger||'kein Logger'}`),element('p',site.description||'Keine Beschreibung.','hint'),element('p','Stabile ID: '+site.id,'hint'));const buttons=element('div',null,'button-row'),edit=element('button','Diesen Stand bearbeiten','secondary'),criteria=element('button','Auswertekriterien übernehmen','secondary');edit.addEventListener('click',()=>editSite(site.id));criteria.addEventListener('click',()=>useSiteCriteria(site));buttons.append(edit,criteria);panel.append(buttons);target.append(panel);}
   const logger=$('#assignment-logger').value,site=$('#assignment-site').value;$('#assignment-logger').replaceChildren();addOption($('#assignment-logger'),'','Logger wählen');for(const id of data.available_loggers)addOption($('#assignment-logger'),id,id);$('#assignment-logger').value=logger;
@@ -314,10 +324,10 @@ async function renderCards() {
     const button=element('button','Verlauf ansehen','secondary');button.addEventListener('click',guard(async()=>{state.logger=logger.id;$('#logger-select').value=logger.id;go('history');await loadHistory();}));card.append(button);cards.append(card);
   });
 }
-function rangeIdentity(){return JSON.stringify([state.source,state.logger,state.source==='simulation'?state.run?.id:null,state.source==='device'?state.snapshot?.id:null]);}
+function rangeIdentity(){const identity=[state.source,state.logger,state.source==='simulation'?state.run?.id:null,state.source==='device'?state.snapshot?.id:null];if(selectedSite())identity.push(selectedSite());return JSON.stringify(identity);}
 function buildQuery() {
   if(!state.logger||state.source==='simulation'&&!state.run) return null;
-  const query=new URLSearchParams({source:state.source,logger:state.logger});
+  const query=new URLSearchParams({source:state.source,logger:state.logger});if(selectedSite())query.set('site',selectedSite());
   if(state.source==='simulation')query.set('run',state.run.id);
   if(state.source==='device'){if(!state.snapshot)return null;query.set('snapshot',state.snapshot.id);}
   const period=$('#period').value;
@@ -409,7 +419,7 @@ async function loadHistory(refresh=false) {
   if(state.exportBase&&exportSignature()!==state.exportSignature)invalidateExport();
   const changed=state.query?.toString()!==query.toString();if(changed&&state.riskReport)markRiskStale();if(changed&&state.statisticsReport)markStatisticsStale();
   const reset=!refresh&&changed;state.query=query;state.chartData=data;state.chartContext=rangeIdentity();
-  $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}${data.climate?' · Taupunkt berechnet (Magnus über Wasser)':''}`;
+  $('#chart-caption').textContent=`${data.raw_count.toLocaleString('de-DE')} ${state.source==='live'?'BLE-Empfänge':state.source==='device'?'Loggerwerte':'Testwerte'} · ${data.points.length.toLocaleString('de-DE')} Grafikpunkte · ${state.source==='device'?'Gerätezeit · Datum/Offset ungeprüft':state.saved.timezone}${data.climate?' · Taupunkt berechnet (Magnus über Wasser)':''}${siteReportLabel(data)}`;
   renderChart(data,reset);return true;
 }
 function chartRange(visible=false) {
@@ -725,6 +735,7 @@ async function main() {
   for(const button of document.querySelectorAll('[data-go]'))button.addEventListener('click',()=>go(button.dataset.go));
   window.addEventListener('hashchange',guard(async()=>{go(location.hash.slice(1));if(location.hash==='#history')await loadHistory();}));
   $('#run-select').addEventListener('change',guard(async()=>{if(state.source==='device')state.snapshot=state.snapshots.find(s=>s.id===$('#run-select').value);else state.run=state.runs.find(r=>r.id===$('#run-select').value);chooseLogger();await loadHistory();}));
+  $('#history-site').addEventListener('change',guard(async()=>{updateHistorySites();markRiskStale();markStatisticsStale();invalidateExport();await loadHistory();}));
   $('#logger-select').addEventListener('change',guard(async()=>{state.logger=$('#logger-select').value;await loadHistory();}));
   $('#period').addEventListener('change',guard(async()=>{$('#custom-period').hidden=$('#period').value!=='custom';if($('#period').value!=='custom')await loadHistory();}));
   $('#apply-range').addEventListener('click',guard(()=>loadHistory()));
@@ -806,7 +817,7 @@ async function main() {
   $('#settings-preview').addEventListener('click',guard(previewSettingsImport));
   $('#settings-include-sites').addEventListener('change',invalidateSettingsPreview);
   $('#settings-cancel-import').addEventListener('click',()=>{clearSettingsImport();fillSettings(state.saved);notice('Dateivorschau verworfen.');});
-  await diagnostics();await refreshLive();await refreshSync();await refreshAutoSync(true);await refreshDeviceSettings();await refreshBluetooth();await refreshRuns();await refreshSnapshots();setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
+  await diagnostics();await refreshLive();await refreshSync();await refreshAutoSync(true);await refreshDeviceSettings();await refreshBluetooth();await refreshRuns();await refreshSnapshots();updateHistorySites(await api('sites'));setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
   let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshSync();await refreshLive();await refreshAutoSync();await refreshDeviceSettings();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
 }
 guard(main)();

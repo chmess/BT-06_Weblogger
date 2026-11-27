@@ -40,15 +40,20 @@ def summarize(rows,interval_minutes,start=None,end=None):
     if lower is not None and upper is not None and lower>upper:raise ValueError('Beginn liegt nach dem Ende.')
     gap=interval_minutes*60000*1.5
     metrics={key:Metric() for key in ('temperature_c','humidity_pct','dew_point_c','absolute_humidity_g_m3')}
-    first=last=None;count=0;gap_count=0;largest_gap=0
+    first=last=None;count=0;gap_count=0;largest_gap=0;segment=None
     for row in rows:
         t=round(parse_time(row['Zeitstempel']).timestamp()*1000)
         if lower is not None and t<lower or upper is not None and t>upper:continue
+        current_segment=getattr(row,"site_segment",None)
+        changed=last is not None and current_segment!=segment
+        if changed:
+            for metric in metrics.values():metric.previous=None
+        segment=current_segment
         if last is not None:
             dt=t-last
             if dt<=0:raise ValueError('Zeitreihe nicht eindeutig aufsteigend; keine Statistik.')
             largest_gap=max(largest_gap,dt)
-            gap_count+=int(dt>gap)
+            gap_count+=int(dt>gap or changed)
         if first is None:first=t
         last=t;count+=1
         temperature=float(row['Temperatur'].replace(',','.')) if row['Temperatur'] else None
