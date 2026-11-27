@@ -486,7 +486,7 @@ function populateSnapshots() {
 function setSource(source) {
   if(!['live','device','simulation'].includes(source))source='simulation';
   markRiskStale();markStatisticsStale();invalidateExport();state.loading++;state.chartData=null;state.query=null;state.chartContext=null;state.chart?.clear();updateChartControls();$('#timezone-panel').hidden=true;$('#chart-export-assigned').hidden=true;
-  state.source=source;localStorage.setItem('bt06-source',source);$('#source-select').value=source;
+  state.source=source;renderWarnings();localStorage.setItem('bt06-source',source);$('#source-select').value=source;
   const live=source==='live',device=source==='device';$('#run-label').hidden=live;$('#live-follow-label').hidden=!live;
   $('#run-title').textContent=device?'Historienstand':'Testlauf';
   $('#source-notice').classList.toggle('real-notice',live);
@@ -675,12 +675,23 @@ async function refreshAutoSync(fill=false) {
   $('#autosync-status').textContent=[data.config.enabled?'Automatik eingeschaltet':'Automatik ausgeschaltet',data.active?'Nachladeversuch läuft':next,`Intervall ${data.config.interval_minutes} min`,data.failures?`${data.failures} aufeinanderfolgende Fehlversuche`:'',data.wait_reason||'',data.last_error||'',data.persistence_error||''].filter(Boolean).join(' · ');
 }
 async function refreshLive() {
-  const [live,loggers]=await Promise.all([api('live'),api('loggers')]);state.live=live;state.liveLoggers=loggers.loggers;
+  const [live,loggers]=await Promise.all([api('live'),api('loggers')]);state.live=live;state.liveLoggers=loggers.loggers;renderWarnings();
   const syncing=state.sync?.state==='running';const active=['starting','receiving','retrying'].includes(live.state);
   $('#capture-stop').disabled=!active||syncing;$('#capture-resume').hidden=!live.config.device||active;$('#capture-resume').disabled=syncing;$('#sync-start').disabled=syncing||!live.config.device;$('#sync-incremental').disabled=$('#sync-start').disabled;$('#device-settings-read').disabled=$('#sync-start').disabled;
   const latest=live.latest;
   $('#capture-status').textContent=[`Empfang: ${live.state}`,live.config.device?`BT06 ${live.config.device.id} · Firmware ${live.config.device.firmware}`:'Noch kein Gerät ausgewählt.',latest?`Letzter Empfang: ${date(latest.received_at)} (${live.fresh?'aktuell':'veraltet'})`:'Noch kein Livepaket in dieser Sitzung.',`CSV-Abstand ${live.config.save_interval_seconds} s`,live.last_stored_at?`Zuletzt gespeichert: ${date(live.last_stored_at)}`:'Noch nichts gespeichert.',live.error||''].filter(Boolean).join(' · ');
   $('#ble-scan').disabled=active||$('#ble-scan').disabled;
+}
+function renderWarnings(){
+  const panel=$('#live-warnings');panel.hidden=state.source!=='live';const target=$('#live-warnings-values');target.replaceChildren();const data=state.live?.warnings;
+  $('#live-warnings-status').textContent=data?.error||(!data?.entries.length?'Noch keine zugeordneten, gespeicherten Hostwerte in dieser Dienstsitzung.':`${data.active_count} aktive Feuchteindikatoren · Auswertung seit ${date(data.started_at)}`);
+  const names={air:'Luftfeuchte',surface:'Angenommene Oberflächenfeuchte',condensation:'Angenommene Kondensationsbedingung'},labels={warning:'Warnung aktiv',pending:'Mindestdauer noch nicht erreicht',below_threshold:'Unter Auslöseschwelle',unknown:'Unbekannt / Beurteilung unterbrochen'};
+  const reasons={host_paused:'Hostempfang pausiert',receiver_interrupted:'Empfang unterbrochen',sample_gap:'Lücke seit letztem gespeicherten Wert',assignment_changed:'Messstellenzuordnung geändert',assignment_or_cadence_changed:'Zuordnung oder Speicherabstand geändert',no_matching_assignment:'Keine passende Messstellenzuordnung',host_time_backwards:'Hostuhr zurückgesprungen',host_time_not_increasing:'Zeitfolge nicht vorwärts',evaluation_error:'Auswertungsfehler',waiting_for_sample:'Warte auf Messwert'};
+  for(const entry of data?.entries||[]){const block=element('article',null,'panel');block.append(element('h3',entry.site_name+' · '+entry.logger),element('p',`Stand der Zuordnung: ${entry.site_id} · Mindestdauer ${number(entry.criteria.minimum_minutes)} min · Hysterese ${number(entry.criteria.hysteresis)} Prozentpunkte`,'hint'));
+    for(const [name,item] of Object.entries(entry.channels)){const threshold=name==='air'?entry.criteria.air_threshold:name==='surface'?entry.criteria.surface_threshold:100;block.append(element('p',`${names[name]}: ${labels[item.state]} · ${number(item.value_pct)} % · Schwelle ${number(threshold)} % · Phase ${number(item.phase_seconds/60)} min${item.event_saved===false?' · Ereignisspeicherung nicht bestätigt':''}`));}
+    if(entry.criteria.surface_mode!=='none')block.append(element('p','Oberflächenannahme: '+(entry.criteria.surface_mode==='fixed'?number(entry.criteria.surface_value)+' °C konstant':number(entry.criteria.surface_value)+' K unter Lufttemperatur'),'hint'));
+    block.append(element('p',`Zuletzt gespeichert: ${date(entry.last_stored_at)}${entry.reason?' · '+(reasons[entry.reason]||'Beurteilung unterbrochen'):''}`,'hint'));target.append(block);
+  }
 }
 async function renderLiveCards() {
   const cards=$('#cards');const loggers=state.liveLoggers;

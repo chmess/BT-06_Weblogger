@@ -231,3 +231,20 @@ node tools/browser_smoke.mjs --site-continuity
 ```
 
 Der Browserparameter wählt ausschließlich dieses Szenario im vorhandenen temporären Testaufbau; ohne Parameter bleibt die vollständige Browserstrecke verfügbar.
+
+
+## V0.8.5 · gezielte Prüfung
+
+29 Python-Prüfungen bestanden: acht neue Warnlogik-/Integrationsprüfungen, neun vorhandene Empfangsprüfungen, elf Ereignisprüfungen und eine neue API-Prüfung. Mindestdauer, Hysterese, einmalige Warnung/Freigabe, unbekannt nach Lücke ohne vorherigen Statusabruf, Timeout ohne Entwarnung, fehlende Messwerte, Pause/Neustart/Hostzeit/Speicherabstand, Zuordnungswechsel, Original-ID und Quellenabgrenzung geprüft. Oberflächen-/Kondensationskanäle verlangen die ausdrückliche Annahme und bleiben unabhängig vom Luftkanal. Fehlgeschlagene Ereignisablage führt nicht zu Wiederholung oder falscher Bestätigung.
+
+Empfängerintegration mit synthetischen Protokollvektoren: nur erfolgreich gespeicherte Zeilen zählen, unterdrückte Zwischenpakete und fehlgeschlagene primäre CSV-Anhänge qualifizieren keine Warnung. Bestehende CSV-Zeilen bleiben erhalten. API liefert Sitzungsstatus ohne Empfängerstart. Keine Gesamtsuite oder vollständige Browserstrecke wiederholt.
+
+Fokussierter Browserlauf prüft echte leere API-Antwort und danach ausschließlich synthetische Anzeigezustände (ausstehende Mindestdauer, Warnung, fehlende Ereignisbestätigung, Oberflächenannahme, unbekannte Lücke und Auswertungsfehler), mobile Breite sowie Trennung von Simulation/Gerätehistorie. Die Anzeigevektoren verändern den Backendzustand nicht und sind kein Hardwaretest. Bericht `test-results/browser-climate-warnings.json`, ein Screenshot.
+
+```sh
+python3 -m unittest discover -s tests -p test_climate_warnings.py -q
+python3 -m unittest discover -s tests -p test_live.py -q
+python3 -m unittest discover -s tests -p test_events.py -q
+PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_live_exposes_session_warning_status_without_starting_receiver -q
+node tools/browser_smoke.mjs --climate-warnings
+```

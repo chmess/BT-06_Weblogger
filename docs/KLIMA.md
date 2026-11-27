@@ -54,3 +54,12 @@ Bekannte und unbekannte Zeit werden je Größe ausgewiesen. Eine fehlende Temper
 Taupunkt und absolute Feuchte werden vor der Aggregation aus jedem gültigen Originalpaar berechnet, einschließlich der vorhandenen Modellgrenzen. Die Statistik ist unabhängig von der Grafikverdichtung und beschreibt ausschließlich den ausgewerteten Zeitraum, keine aktuellen oder unbekannten Bedingungen. Keine zusätzliche Messdatenablage.
 
 Synthetischer DeskPi-Test für die Statistik: 43.201 Zeilen in etwa 2,38 s einschließlich Zeilengenerierung; aggregierte Antwort ohne Quellenmetadaten etwa 2,1 KB. Keine CSV-/HTTP-/BLE-Leistungsmessung.
+
+
+## Automatische Host-Indikatoren ab V0.8.5
+
+Zusätzlich zur manuellen Auswertung bewertet der vorhandene Empfänger neu erfolgreich gespeicherte, zugeordnete Hostwerte. Er übernimmt die Kriterien aus dem historischen Zuordnungssnapshot; keine automatische Änderung des manuellen Formulars oder der Gerätealarme. Luft-, angenommene Oberflächen- und Kondensationskanäle verwenden dieselben Schwellen-/Phasenregeln und Modellgrenzen wie die manuelle Auswertung. Die Mindestdauer gilt für die Phase einschließlich Hysterese.
+
+Aktiv, Freigabeschwelle unterschritten und unbekannt werden als Zustandswechsel in der Ereignis-CSV festgehalten. Bei Lücken, Pausen, Metadaten-/Loggerwechsel oder Neustart wird keine kontinuierliche unkritische Zeit erfunden. Laufende Nachweisdauer beginnt nach Unterbrechung neu; die Übersicht unterscheidet unbekannt, unter Auslöseschwelle, Mindestdauer ausstehend und aktiven Indikator. „Unter Auslöseschwelle“ ist keine allgemeine Entwarnung. Oberfläche bleibt eine ausdrücklich ausgewiesene Modellannahme; keine Schimmelwahrscheinlichkeit.
+
+Die Automatik verarbeitet weder alte CSV-Dateien noch Gerätehistorien oder Simulation. Eine Messstelle muss zuvor bewusst angelegt und dem Logger zugeordnet werden; ohne passende Zuordnung gibt es keine automatische Bewertung. Keine zusätzlichen Hintergrunddienste, keine externen Mitteilungen.

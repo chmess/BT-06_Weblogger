@@ -15,7 +15,8 @@ from .ble_options import scan_options
 
 
 class Receiver:
-    def __init__(self, config_path, store, radio_lock, events=None):
+    def __init__(self, config_path, store, radio_lock, events=None, warnings=None):
+        self.warnings=warnings
         self.events=events;self._reported_error=None;self._fresh_state=None;self._last_recording=None;self._last_full=None
         self.config_path = config_path
         self.store = store
@@ -96,6 +97,7 @@ class Receiver:
         self._last_full=full
 
     def check_health(self,now=None):
+        if self.warnings:self.warnings.tick(now)
         if not self.events:return
         with self.lock:
             if self.stop_event.is_set() or self.value['state']!='receiving' or self._fresh_state is not True:return
@@ -144,6 +146,7 @@ class Receiver:
             worker = self.worker
         if worker and worker is not threading.current_thread():
             worker.join(timeout=8)
+        if self.warnings:self.warnings.pause()
         if persist:self._event('receiver.stopped','info','Hostempfang pausiert; kein Stoppbefehl an den Logger.')
         return self.status()
 
@@ -174,11 +177,12 @@ class Receiver:
             if elapsed is not None and elapsed < self.config["save_interval_seconds"]:
                 return
             try:
-                self.store.append(reading, advertisement.rssi, received.isoformat())
+                stored_row=self.store.append(reading, advertisement.rssi, received.isoformat())
             except (OSError, ValueError) as exc:
                 self.value["error"] = str(exc) if isinstance(exc, ValueError) else "CSV-Schreibfehler: Speicherplatz und Dateirechte prüfen. Empfang ist nicht dauerhaft gespeichert."
                 self._report_error()
                 return
+            if self.warnings:self.warnings.observe("bt06-"+selected["id"],stored_row,self.config["save_interval_seconds"])
             self.value["last_stored_at"] = received.isoformat()
             self.value["saved_this_session"] += 1
             self.value["error"] = None
@@ -199,6 +203,7 @@ class Receiver:
                         await asyncio.sleep(.2)
                         self.check_health()
             except Exception:
+                if self.warnings:self.warnings.pause("receiver_interrupted")
                 with self.lock:
                     self.value.update(state="retrying", error="BLE-Empfang unterbrochen. Erneuter Versuch; Loggeraufzeichnung bleibt unverändert.")
                     self._report_error()

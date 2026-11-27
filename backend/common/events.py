@@ -13,7 +13,7 @@ from pathlib import Path
 from .storage import csv_text,identifier,parse_time
 
 FIELDS=['Schema','EreignisID','Zeitstempel','Typ','Stufe','Logger','Quelle','Nachricht','DetailsJSON']
-TYPES={'settings.imported':'Einstellungen importiert','settings.saved':'Programmeinstellungen gespeichert','settings.error':'Konfigurationsfehler','site.created':'Messstelle angelegt','site.updated':'Messstelle geändert','site.assigned':'Logger zugeordnet','site.unassigned':'Zuordnung beendet','application.started':'Dienst gestartet','application.stopped':'Dienst beendet',
+TYPES={'climate.warning':'Feuchteindikator aktiv','climate.cleared':'Feuchte-Freigabeschwelle unterschritten','climate.unknown':'Feuchtebeurteilung unterbrochen','settings.imported':'Einstellungen importiert','settings.saved':'Programmeinstellungen gespeichert','settings.error':'Konfigurationsfehler','site.created':'Messstelle angelegt','site.updated':'Messstelle geändert','site.assigned':'Logger zugeordnet','site.unassigned':'Zuordnung beendet','application.started':'Dienst gestartet','application.stopped':'Dienst beendet',
        'receiver.started':'Hostempfang gestartet','receiver.stopped':'Hostempfang pausiert',
        'receiver.fresh':'Aktuelles Advertising','receiver.stale':'Advertising veraltet',
        'receiver.error':'Empfangs-/CSV-Fehler','receiver.recovered':'Empfangsfehler behoben',
@@ -71,7 +71,7 @@ class EventStore:
         parse_time(row['Zeitstempel'])
         if row['Typ'] not in TYPES or row['Stufe'] not in LEVELS:raise ValueError('Unbekannter Ereignistyp oder Stufe.')
         if row['Logger']:identifier(row['Logger'])
-        if row['Quelle'] not in ('application','receiver','history'):raise ValueError('Unbekannte Ereignisquelle.')
+        if row['Quelle'] not in ('application','receiver','history','climate-monitor'):raise ValueError('Unbekannte Ereignisquelle.')
         if not isinstance(row['Nachricht'],str) or not row['Nachricht'] or len(row['Nachricht'])>1000 or any(ord(c)<32 for c in row['Nachricht']):raise ValueError('Ungültige Ereignisnachricht.')
         if len(row['DetailsJSON'])>4000 or not isinstance(json.loads(row['DetailsJSON']),dict):raise ValueError('Ungültige Ereignisdetails.')
 

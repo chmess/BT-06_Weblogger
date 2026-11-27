@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.5-dev · 2026-11-27
+
+- Automatische lokale Feuchteindikatoren für neu dauerhaft gespeicherte Host-Empfänge mit passender Messstellenzuordnung. Kriterien aus dem damaligen Zuordnungsstand: Luftfeuchte, optionale angenommene Oberflächenfeuchte/Kondensation, Mindestphasendauer und Hysterese. Keine Gerätealarme oder Schimmelwahrscheinlichkeit.
+- Zustandswechsel aktiv/Freigabeschwelle unterschritten/unbekannt als Ereignis-CSV. Keine Wiederholung pro Paket; Warnereignisfehler blockieren die primäre Messwertspeicherung nicht und führen zu keinem automatischen Retry.
+- Übersicht zeigt aktive, noch nicht qualifizierte und unbekannte Zustände sowie die Oberflächenannahme. Datenlücken, Pausen, Zuordnungs-/Intervalländerungen und rückwärts laufende Hostzeit unterbrechen die Beurteilung. Nach Neustart beginnt die Nachweisdauer neu; keine rückwirkenden Warnungen aus CSV/Simulation/Gerätezeit.
+- 29 gezielte Python-Prüfungen (Warnlogik, Empfänger, Ereignisse, neue API-Antwort) und fokussierte Browserprüfung bestanden. Browser prüft synthetische Anzeigezustände; die Empfänger-/Speicherintegration ist separat mit Protokoll-Testvektoren geprüft. V0.8.4 im Dienst bestätigt, keine echten Zuordnungen oder Geräteänderungen.
+
 ## 0.8.4-dev · 2026-11-27
 
 - Messstellenansicht über historische Loggerwechsel: Nach Messstellenwahl optional alle zugeordneten Logger zusammenführen. Diagramm, Statistik, Feuchteauswertung und CSV nutzen denselben zeitlich sortierten Originalbestand; Zuordnungsgrenzen bleiben Unterbrechungen. Keine Umzuordnung alter Zeilen oder Gerätehistorien.

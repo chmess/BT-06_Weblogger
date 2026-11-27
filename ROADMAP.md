@@ -47,6 +47,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.8.3 im Dienst fehlerfrei bestätigt. V0.8.4 vorbereitet: Messstellenansicht über historische Loggerwechsel für Host-Empfänge, Diagramm, Statistik, Feuchteauswertung und CSV mit verpflichtendem Logger-Nachweis. 13 gezielte Python-Prüfungen und fokussierte Browserprüfung bestanden; künftige Prüfungen nach Änderungsumfang statt regelmäßiger Gesamtläufe. Offen bleiben insbesondere automatische Warnungen, Historien-/Simulationsdiagnose und Dauerbetriebs-/Performanceabnahme.
 
+- V0.8.4 im Dienst fehlerfrei bestätigt. V0.8.5 vorbereitet: automatische Feuchteindikatoren aus neu dauerhaft gespeicherten, zugeordneten Host-Empfängen; Messstellenkriterien, Mindestdauer/Hysterese und optionale Oberflächenannahme, Ereignis-CSV und Übersicht. Unterbrechungen/Neustart bleiben unbekannt, keine rückwirkenden Geräte-/CSV-Alarme. 29 gezielte Python-Prüfungen und fokussierte Browserprüfung bestanden. Offen bleiben Batterieereignisse, Historien-/Simulationsdiagnose, dauerbetriebliche Abnahme und weitere nachweisbare Gerätefunktionen.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

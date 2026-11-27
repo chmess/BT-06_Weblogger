@@ -284,6 +284,15 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request("/klima/api/settings", DEFAULTS,
                                       {"Host": "deskpi.test", "Origin": "http://not-approved.test", "X-CSRF-Token": self.app.csrf})[0], 403)
 
+    def test_live_exposes_session_warning_status_without_starting_receiver(self):
+        self.assertIs(self.app.receiver.warnings,self.app.warnings)
+        with patch.object(self.app.receiver,'start') as start:
+            code,_,body=self.request('/klima/api/live')
+        self.assertEqual(code,200);start.assert_not_called()
+        warnings=json.loads(body)['warnings']
+        self.assertEqual(warnings['scope'],'new_persisted_host_samples')
+        self.assertEqual(warnings['entries'],[]);self.assertEqual(warnings['active_count'],0)
+
     def test_storage_diagnostics_is_read_only_serialized_and_rejects_parameters(self):
         with patch('backend.server.inspect_live',return_value={'state':'empty'}) as inspect,patch.object(self.app.receiver,'start') as start:
             code,_,body=self.request('/klima/api/diagnostics/storage')

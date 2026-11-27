@@ -22,6 +22,7 @@ from backend.common.settings import Settings
 from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
+from backend.common.climate_warnings import ClimateWarnings
 from backend.common.storage_diagnostics import inspect_live
 from backend.common.site_selection import select_site,select_all_loggers
 from backend.common.sites import SiteStore
@@ -64,7 +65,8 @@ class Application:
         self.configuration_store=Configuration(self.root/"config",self.events)
         self.settings=self.configuration_store.settings;self.sites=self.configuration_store.sites
         self.live_store = LiveStore(self.root / "data",self.sites)
-        self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock,self.events)
+        self.warnings=ClimateWarnings(self.sites,self.events)
+        self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock,self.events,self.warnings)
         self.control_lock = threading.RLock()
         self.history_store = HistoryStore(self.root / "data/history")
         self.device_settings = DeviceSettingsStore(self.root / "data/device-settings")
@@ -181,7 +183,7 @@ def handler_for(app):
                     self.send(200, app.bluetooth.status())
                 elif path == "/api/live":
                     live=app.receiver.status();reading=live.get("latest") or {}
-                    self.send(200, {**live,"latest_climate":air_values(reading.get("temperature_c"),reading.get("humidity_pct"))})
+                    self.send(200, {**live,"latest_climate":air_values(reading.get("temperature_c"),reading.get("humidity_pct")),"warnings":app.warnings.status()})
                 elif path=="/api/sites":
                     if query:raise ValueError("Messstellenliste benötigt keine Filter.")
                     result=app.sites.snapshot();loggers={item['id'] for item in app.loggers()}|{item['logger'] for item in app.history_store.snapshots()}|{item['logger'] for item in result['active_assignments']}
