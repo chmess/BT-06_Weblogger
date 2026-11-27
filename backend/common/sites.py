@@ -27,9 +27,9 @@ def validate_attributes(value):
 
 
 class SiteStore:
-    def __init__(self,path,events=None,clock=None):
-        self.path=path;self.events=events;self.clock=clock or (lambda:datetime.now(timezone.utc));self.lock=threading.RLock()
-        self.value=json.loads(path.read_text()) if path.exists() else {'schema_version':1,'revision':0,'sites':[],'assignments':[]}
+    def __init__(self,path,events=None,clock=None,initial=None,lock=None,persist=None):
+        self.path=path;self.events=events;self.clock=clock or (lambda:datetime.now(timezone.utc));self.lock=lock or threading.RLock();self.persist=persist
+        self.value=deepcopy(initial) if initial is not None else json.loads(path.read_text()) if path.exists() else {'schema_version':1,'revision':0,'sites':[],'assignments':[]}
         self.validate(self.value)
 
     @staticmethod
@@ -100,7 +100,10 @@ class SiteStore:
         return now.astimezone(timezone.utc).isoformat()
 
     def _commit(self,value):
-        value['revision']+=1;self.validate(value);atomic_json(self.path,value);self.value=value
+        value['revision']+=1;self.validate(value)
+        if self.persist:self.persist(value)
+        else:atomic_json(self.path,value)
+        self.value=value
 
     def _emit(self,kind,message,logger='',details=None,at=None):
         if self.events:self.events.emit(kind,'info',message,logger=logger,details=details,at=at)

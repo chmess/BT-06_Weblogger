@@ -1,14 +1,16 @@
-# HTTP-API · V0.4.4-dev
+# HTTP-API · V0.8.1-dev
 
-Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB. Fehler: `{ "error": "..." }`.
+Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
 | Methode | Route | Zweck |
 |---|---|---|
 | GET | `/api/session` | temporäres CSRF-Token |
 | GET | `/api/status` | Version, Laufzeit, freier Platz, BLE-Grenzen |
 | GET | `/api/settings` | validierte Programmeinstellungen |
-| GET | `/api/settings/download` | JSON als Download |
-| POST | `/api/settings` | vollständige Programmeinstellungen atomar speichern |
+| GET | `/api/settings/download` | Gemeinsame Programmeinstellungen/Messstellen als BT06_SETTINGS-Schema 2 |
+| POST | `/api/settings` | sieben allgemeine Programmeinstellungsfelder speichern, Messstellen erhalten |
+| POST | `/api/settings/preview` | Datei und Änderungen validieren, einmaliges Importtoken erzeugen |
+| POST | `/api/settings/apply` | geprüften Import atomar übernehmen |
 | GET | `/api/runs` | vollständige synthetische Testläufe |
 | POST | `/api/simulation` | neuen isolierten Testlauf erzeugen |
 | GET | `/api/history?run=...&logger=...&start=...&end=...` | Grafikwerte, Min/Max und Rohanzahl |
@@ -182,3 +184,14 @@ Die neue Exportseite verwendet gewählten Zeitraum, sichtbaren Ausschnitt oder e
 `POST /api/sites/assign`: exakt `{revision,logger,site_id}`. Logger muss verifiziert bekannt sein; site_id ist vorhandene Messstelle oder `null` zum Beenden. Keine rückdatierbaren Zeitparameter. Änderungen gelten ab erzeugter Hostzeit; bestehende Belegungen von Logger/Zielmessstelle werden geschlossen, historische Snapshots bleiben bestehen. Beide POSTs erfordern gleiche Origin und Sitzungstoken; keine Bluetooth-Steuerung.
 
 Konfigurationsschema, Integrität und aktuelle Auswertungsgrenzen: [MESSSTELLEN.md](MESSSTELLEN.md). Betriebsereignisse ergänzen `site.created`, `site.updated`, `site.assigned`, `site.unassigned`.
+
+
+## Gemeinsame Einstellungen V0.8.1
+
+Download: `{format:"BT06_SETTINGS",schema_version:2,exported_at:<Host-ISO-Zeit>,settings:<bisherige sieben Felder>,sites:<vollständige Messstellenregistratur>}`. GET `/api/settings` bleibt unverändert. Alte reine Einstellungsdateien bleiben gültig. Empfang, Autosync, Zugangsschlüssel und Geräteparameter sind nicht Bestandteil dieses Imports.
+
+Vorschau-POST: `{document:<Dateiobjekt>,include_sites:<bool>,settings:<sieben Formularfelder>}`. Die Formularwerte dürfen die Dateiwerte bewusst überschreiben. Antwort enthält `token`, Ablaufzeit, Einstellungs-/Messstellenänderungen und Zähler. Keine Speicherung. Ein Token gilt einmalig für zehn Minuten und die aktuelle globale Konfigurationsrevision; eine neue Vorschau ersetzt es. Apply-POST: `{token:<Token>}`; Antwort ist der neue gemeinsame Exportstand. Beide POSTs unterliegen dem bestehenden CSRF-/Origin-Schutz.
+
+Messstellenimport ergänzt Historie, entfernt keine vorhandenen Intervalle und bewahrt aktuelle Loggerbindungen. Offene importierte Intervalle werden am Dateistand geschlossen, nie aktiviert. Geänderte Metadaten einer aktuell belegten Messstelle werden erst zum Übernahmezeitpunkt versioniert. Widersprüche/Überlappungen blockieren den Messstellenimport; reine Programmeinstellungen können separat geladen werden. Dateizeit nach Hostzeit blockiert den Messstellenimport.
+
+Gemeinsame Ablage `config/application.json`, maximal 8 MiB, private Datei und atomarer Ersatz. Ohne diese Datei werden alte `settings.json`/`sites.json` eingelesen; die erste Änderung erzeugt den gemeinsamen Stand. Danach sind Altdateien nicht maßgeblich. Beschädigte gemeinsame Dateien werden nicht durch Altstände ersetzt. `/api/status.configuration` meldet Ablage, Revision und Schreibfehler. Nach unbestätigtem Schreibabschluss folgt der Prozess einer gültigen sichtbaren Gesamtdatei, meldet den Fehler und sperrt weitere Änderungen bis zum Neustart. Kein automatischer Retry/Rollback.

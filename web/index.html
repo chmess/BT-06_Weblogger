@@ -95,7 +95,7 @@
       <p id="assignment-preview" class="hint">Logger und Zielmessstelle wählen.</p><div class="button-row"><button id="site-assign" disabled>Ab jetzt zuordnen</button><button id="site-unassign" class="secondary" disabled>Zuordnung ab jetzt beenden</button></div>
       <p class="hint">Kein Gerätebefehl. Neue Host-CSV-Zeilen erhalten die Messstellen-ID; bestehende Originalzeilen bleiben erhalten. Ungeprüfte Gerätehistorien werden anhand ihres Datums keiner Messstelle automatisch zugeordnet.</p>
       <details><summary>Zuordnungshistorie · letzte 100 Intervalle</summary><div class="table-scroll"><table><thead><tr><th>Logger</th><th>Messstelle damals</th><th>Raum damals</th><th>Ab Hostzeit</th><th>Bis Hostzeit, exklusiv</th></tr></thead><tbody id="site-history"></tbody></table></div></details>
-      <p class="hint">Messstellen werden unmittelbar lokal gespeichert. Der bisherige Programmeinstellungs-Export umfasst die Messstellenverwaltung noch nicht; die gemeinsame Save-/Load-Einbindung folgt im nächsten Schritt.</p>
+      <p class="hint">Messstellen werden unmittelbar lokal gespeichert. Save Settings enthält Programmeinstellungen und Messstellenhistorie. Load Settings zeigt eine Vorschau und aktiviert keine Loggerzuordnungen aus der Datei.</p>
     </article>
   </section>
 
@@ -184,7 +184,7 @@
 
   <section id="page-settings" class="page" hidden>
     <article class="panel"><div class="section-heading"><h2>Programmeinstellungen</h2><span id="dirty" class="tag">Gespeichert</span></div>
-      <p>Save Settings speichert die aktuellen Werte lokal und lädt eine JSON-Datei herunter. Load Settings liest eine gespeicherte Datei zunächst zur Prüfung ein; mit Save Settings übernimmst du sie.</p>
+      <p>Save Settings speichert lokal und lädt Programmeinstellungen samt Messstellenhistorie als JSON herunter. Load Settings bereitet eine geprüfte Vorschau vor; Save Settings übernimmt sie. Vorhandene Zuordnungshistorie wird nicht durch eine ältere Datei ersetzt.</p>
       <form id="settings-form"><div class="form-grid">
         <label>Darstellung<select name="theme"><option value="dark">Dunkel</option><option value="light">Hell</option></select></label>
         <label>Zeitzone<input name="timezone" value="Europe/Berlin" required></label>
@@ -192,8 +192,14 @@
         <label>Standardzeitraum in Stunden<input name="default_hours" type="number" min="1" max="2160" required></label>
         <label>Feuchte-Warnlinie in %<input name="humidity_warning" type="number" min="1" max="99" step="0.1" required></label>
         <label>Kritische Feuchtelinie in %<input name="humidity_critical" type="number" min="2" max="100" step="0.1" required></label>
-      </div><p class="hint">Die Schwellen zeichnen Hilfslinien im Diagramm. Eine zeitabhängige Risikobewertung ist noch nicht enthalten. Geräteeinstellungen sind hiervon getrennt.</p>
-      <div class="form-actions"><button id="load-settings" type="button" class="secondary">Load Settings</button><input id="settings-file" type="file" accept=".json,application/json" hidden><button type="submit">Save Settings</button></div></form>
+      </div><p class="hint">Die Schwellen zeichnen Hilfslinien im Diagramm. Zeitabhängige Feuchteindikatoren haben eigene Kriterien unter Taupunkt / Feuchte. Geräteeinstellungen sind hiervon getrennt.</p>
+      <div class="form-actions"><button id="load-settings" type="button" class="secondary">Load Settings</button><input id="settings-file" type="file" accept=".json,application/json" hidden><button id="settings-save" type="submit">Save Settings</button></div></form>
+      <div id="settings-import" hidden>
+        <label class="inline-check"><input id="settings-include-sites" type="checkbox" checked> Messstellen und kompatible Historie mit laden</label>
+        <div class="button-row"><button id="settings-preview" class="secondary">Vorschau aktualisieren</button><button id="settings-cancel-import" class="secondary">Dateivorschau verwerfen</button></div>
+        <p id="settings-import-status" class="hint" role="status"></p><div id="settings-import-preview"></div>
+        <p class="hint">Aktive Loggerbelegungen bleiben lokal erhalten. Offene Zuordnungen aus der Datei werden nur als historische Abschnitte bis zur Datei-Speicherzeit übernommen, nicht aktiviert. Widersprechende Historie blockiert den Messstellenimport; Programmeinstellungen können separat geladen werden. Keine Gerätebefehle und keine automatische Synchronisation durch den Import.</p>
+      </div>
     </article>
   </section>
 

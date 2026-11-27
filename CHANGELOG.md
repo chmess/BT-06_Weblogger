@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.8.1-dev · 2026-11-27
+
+- Save Settings lädt Programmeinstellungen, Messstellen und Zuordnungshistorie als gemeinsame JSON-Datei herunter. Load Settings zeigt Änderungen vorab; erst Save Settings übernimmt sie. Alte Einstellungsdateien bleiben ladbar, Messstellen können beim Import abgewählt werden.
+- Gemeinsame atomare Ablage unter config/application.json; vorhandene settings.json/sites.json werden beim ersten Speichern übernommen. Bestehende Zuordnungshistorie bleibt erhalten; importierte offene Intervalle enden am Dateistand und aktivieren keine Loggerbindung. Änderungen aktueller Messstellen gelten erst ab Übernahme.
+- Vorschau mit einmaligem, zehn Minuten gültigem Token und Revisionsprüfung. Konflikte, ungültige Dateien und unbestätigte Schreibabschlüsse blockieren Änderungen; kein automatischer Wiederholungsversuch. Keine BLE-/Uhränderungen oder Aktivierung von Empfang/Autosync.
+- Gesamtsuite 191 Tests bestanden; nach abschließenden Fehler-/Datenschutzkorrekturen alle 12 Konfigurations-Kerntests bestanden. Vollständige Chromium-Prüfung einschließlich Vorschau, Abbrechen, Einstellungen ohne Messstellen und bearbeitetem Import bestanden. V0.8.0 im Dienst bestätigt.
+
 ## 0.8.0-dev · 2026-11-27
 
 - Messstellenverwaltung mit stabiler ID, Name, Raum, Beschreibung, individuellen Feuchte-/Dauerkriterien und optionaler Oberflächenannahme. Kriterien bewusst in die manuelle Auswertung übernehmbar; kein neuer automatischer Alarmdienst.

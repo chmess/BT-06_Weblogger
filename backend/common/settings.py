@@ -66,11 +66,12 @@ def atomic_json(path: Path, value):
 
 
 class Settings:
-    def __init__(self, path):
+    def __init__(self, path, initial=None, lock=None, persist=None):
         self.path = Path(path)
-        self.lock = threading.Lock()
+        self.lock = lock or threading.Lock()
+        self.persist=persist
         # Invalid files are reported; never silently replaced with defaults.
-        self.value = validate_settings(json.loads(self.path.read_text(encoding="utf-8"))) if self.path.exists() else deepcopy(DEFAULTS)
+        self.value = validate_settings(initial) if initial is not None else validate_settings(json.loads(self.path.read_text(encoding="utf-8"))) if self.path.exists() else deepcopy(DEFAULTS)
 
     def get(self):
         with self.lock:
@@ -79,6 +80,7 @@ class Settings:
     def save(self, value):
         clean = validate_settings(value)
         with self.lock:
-            atomic_json(self.path, clean)
+            if self.persist:self.persist(clean)
+            else:atomic_json(self.path, clean)
             self.value = clean
         return self.get()

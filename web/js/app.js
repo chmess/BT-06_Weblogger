@@ -31,8 +31,8 @@ function downloadSettings(value) {
   const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='bt06-settings.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
 }
 function formSettings() {
-  const data=new FormData($('#settings-form'));
-  return {schema_version:1,theme:data.get('theme'),timezone:data.get('timezone'),refresh_seconds:Number(data.get('refresh_seconds')),default_hours:Number(data.get('default_hours')),humidity_warning:Number(data.get('humidity_warning')),humidity_critical:Number(data.get('humidity_critical'))};
+  const input=name=>$('#settings-form').elements.namedItem(name).value;
+  return {schema_version:1,theme:input('theme'),timezone:input('timezone'),refresh_seconds:Number(input('refresh_seconds')),default_hours:Number(input('default_hours')),humidity_warning:Number(input('humidity_warning')),humidity_critical:Number(input('humidity_critical'))};
 }
 function checkSettings(value) {
   const fields=['schema_version','theme','timezone','refresh_seconds','default_hours','humidity_warning','humidity_critical'].sort();
@@ -46,7 +46,38 @@ function fillSettings(value) {
   for(const [key,val] of Object.entries(value)) {const input=$('#settings-form').elements.namedItem(key); if(input) input.value=val;}
   dirty();
 }
-function dirty() { const changed=JSON.stringify(formSettings())!==JSON.stringify(state.saved); $('#dirty').textContent=changed?'Ungespeichert':'Gespeichert'; $('#dirty').classList.toggle('warning',changed); }
+function dirty() { const changed=!!state.settingsImport||JSON.stringify(formSettings())!==JSON.stringify(state.saved); $('#dirty').textContent=changed?'Ungespeichert':'Gespeichert'; $('#dirty').classList.toggle('warning',changed); }
+let settingsBusy=false,settingsFileRevision=0;
+function settingsControls(){for(const input of document.querySelectorAll('#settings-form input,#settings-form select,#settings-form button,#settings-import input,#settings-import button'))input.disabled=settingsBusy;$('#settings-include-sites').disabled=settingsBusy||!!state.settingsImport?.legacy;$('#settings-save').disabled=settingsBusy||!!state.settingsImport&&!state.settingsImport.token;}
+function invalidateSettingsPreview(){if(state.settingsImport){state.settingsImport.token=null;$('#settings-import-status').textContent='Entwurf geändert; Vorschau vor Save Settings aktualisieren.';$('#settings-import-preview').replaceChildren();}dirty();settingsControls();}
+function clearSettingsImport(){state.settingsImport=null;$('#settings-import').hidden=true;$('#settings-import-preview').replaceChildren();dirty();settingsControls();}
+async function previewSettingsImport(){
+  const staged=state.settingsImport;if(!staged)throw new Error('Zuerst eine Datei wählen.');const settings=checkSettings(formSettings());staged.token=null;settingsBusy=true;settingsControls();$('#settings-import-status').textContent='Datei und lokale Historie werden geprüft …';
+  try{
+    const plan=await post('settings/preview',{document:staged.document,include_sites:$('#settings-include-sites').checked,settings});
+    if(state.settingsImport!==staged)return;staged.token=plan.token;const target=$('#settings-import-preview');target.replaceChildren();
+    const changes=element('dl');for(const item of plan.settings_changes)changes.append(element('dt',item.field),element('dd',`${item.before} → ${item.after}`));target.append(changes);
+    target.append(element('p',`${plan.added_sites} neue / ${plan.updated_sites} geänderte Messstellen · ${plan.added_intervals} zusätzliche historische Intervalle · ${plan.preserved_active_loggers} vorhandene aktive Loggerbelegungen bleiben erhalten.`));
+    for(const change of plan.site_changes){const details=element('details'),list=element('dl');details.append(element('summary',(change.before?'Ändern: ':'Neu: ')+change.after.name+' · '+change.id.slice(-6)));for(const [key,label] of [['name','Name'],['room','Raum'],['description','Beschreibung']])list.append(element('dt',label),element('dd',`${change.before?.[key]||'–'} → ${change.after[key]||'–'}`));for(const key of Object.keys(change.after.criteria))list.append(element('dt',key),element('dd',`${change.before?.criteria[key]??'–'} → ${change.after.criteria[key]??'–'}`));details.append(list);target.append(details);}
+    $('#settings-import-status').textContent=(plan.legacy?'Ältere Programmeinstellungsdatei; Messstellen bleiben erhalten. ':'Gemeinsame Einstellungsdatei geprüft. ')+`Vorschau gilt ${Math.floor(plan.expires_in_seconds/60)} Minuten. Noch nichts übernommen.`;
+  }catch(error){$('#settings-import-status').textContent='Vorschau fehlgeschlagen. Gegebenenfalls Messstellen abwählen und neu prüfen.';throw error;}finally{settingsBusy=false;settingsControls();}
+}
+async function saveAllSettings(event){
+  event.preventDefault();const settings=checkSettings(formSettings());settingsBusy=true;settingsControls();
+  try{
+    let document;
+    if(state.settingsImport){if(!state.settingsImport.token)throw new Error('Importvorschau zuerst prüfen.');document=await post('settings/apply',{token:state.settingsImport.token});}
+    else{await post('settings',settings);document=await api('settings/download');}
+    state.saved=document.settings;clearSettingsImport();fillSettings(state.saved);applySettings();if(sitesData)await loadSites();downloadSettings(document);notice('Einstellungen gespeichert; gemeinsame JSON-Datei zum Download bereitgestellt.');
+  }catch(error){if(state.settingsImport)state.settingsImport.token=null;throw error;}finally{settingsBusy=false;settingsControls();}
+}
+async function loadSettingsFile(event){
+  const file=event.target.files[0];if(!file)return;const revision=++settingsFileRevision;
+  try{
+    if(file.size>8*1024*1024)throw new Error('Einstellungsdatei ist größer als 8 MiB.');const document=JSON.parse(await file.text());if(revision!==settingsFileRevision)return;const bundle=document.format==='BT06_SETTINGS';
+    const settings=checkSettings(bundle?document.settings:document);state.settingsImport={document,legacy:!bundle,token:null};fillSettings(settings);$('#settings-import').hidden=false;$('#settings-include-sites').checked=bundle;await previewSettingsImport();notice('Datei nur geprüft. Vorschau lesen und mit Save Settings übernehmen.');
+  }finally{event.target.value='';}
+}
 function applySettings() {
   document.documentElement.dataset.theme=state.saved.theme;
   if(state.chartData) renderChart(state.chartData);
@@ -768,10 +799,13 @@ async function main() {
     event.preventDefault();const button=event.target.querySelector('button[type=submit]');button.disabled=true;button.textContent='Wird erzeugt …';
     try{const form=new FormData(event.target);const result=await post('simulation',{scenario:form.get('scenario'),days:Number(form.get('days')),interval_minutes:Number(form.get('interval_minutes')),seed:Number(form.get('seed'))});setSource('simulation');await refreshRuns(result.id);go('history');await loadHistory();notice('Testdaten gespeichert. Alle Werte sind synthetisch.');}finally{button.disabled=false;button.textContent='Testdaten erzeugen';}
   }));
-  $('#settings-form').addEventListener('input',dirty);
-  $('#settings-form').addEventListener('submit',guard(async event=>{event.preventDefault();const result=await post('settings',checkSettings(formSettings()));state.saved=result;fillSettings(result);applySettings();downloadSettings(result);notice('Einstellungen gespeichert und als JSON zum Download bereitgestellt.');}));
+  $('#settings-form').addEventListener('input',invalidateSettingsPreview);
+  $('#settings-form').addEventListener('submit',guard(saveAllSettings));
   $('#load-settings').addEventListener('click',()=>$('#settings-file').click());
-  $('#settings-file').addEventListener('change',guard(async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>16384)throw new Error('Einstellungsdatei ist zu groß.');fillSettings(checkSettings(JSON.parse(await file.text())));notice('Einstellungen eingelesen. Mit Save Settings übernehmen.');}finally{event.target.value='';}}));
+  $('#settings-file').addEventListener('change',guard(loadSettingsFile));
+  $('#settings-preview').addEventListener('click',guard(previewSettingsImport));
+  $('#settings-include-sites').addEventListener('change',invalidateSettingsPreview);
+  $('#settings-cancel-import').addEventListener('click',()=>{clearSettingsImport();fillSettings(state.saved);notice('Dateivorschau verworfen.');});
   await diagnostics();await refreshLive();await refreshSync();await refreshAutoSync(true);await refreshDeviceSettings();await refreshBluetooth();await refreshRuns();await refreshSnapshots();setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
   let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshSync();await refreshLive();await refreshAutoSync();await refreshDeviceSettings();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
 }

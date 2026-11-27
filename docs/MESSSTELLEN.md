@@ -1,6 +1,6 @@
-# Messstellen V0.8.0
+# Messstellen V0.8.1
 
-Messstellen sind lokale Metadaten unter `config/sites.json`, keine Geräteeinstellungen. Anlage/Änderung/Zuordnung senden keine BLE-Befehle und ändern keine Geräteuhr. Es werden keine Namen, Räume oder echten Zuordnungen ohne ausdrückliche Eingabe angelegt.
+Messstellen sind lokale Metadaten unter `config/application.json` (bis V0.8.0: `config/sites.json`), keine Geräteeinstellungen. Anlage/Änderung/Zuordnung senden keine BLE-Befehle und ändern keine Geräteuhr. Es werden keine Namen, Räume oder echten Zuordnungen ohne ausdrückliche Eingabe angelegt.
 
 ## Bedeutung und Historie
 
@@ -12,11 +12,11 @@ Neue Host-Empfänge werden anhand ihres Empfangszeitpunkts unter der passenden s
 
 ## Grenzen dieser Ausbaustufe
 
-Diagramme, Statistik und Auswahl-Export wählen weiterhin einen Logger und Zeitraum. Ein solcher Bereich kann mehrere Messstellen umfassen; er wird nicht pauschal mit dem aktuellen Messstellennamen beschriftet. Messstellenfilter und historische Gerätezuordnung benötigen einen weiteren Schritt. Der bisherige Programmeinstellungs-Export umfasst die neue Verwaltung noch nicht; die gemeinsame Save-/Load-Einbindung folgt innerhalb V0.8.
+Diagramme, Statistik und Auswahl-Export wählen weiterhin einen Logger und Zeitraum. Ein solcher Bereich kann mehrere Messstellen umfassen; er wird nicht pauschal mit dem aktuellen Messstellennamen beschriftet. Messstellenfilter und historische Gerätezuordnung benötigen einen weiteren Schritt. Save Settings enthält Messstellen und Historie. Load Settings zeigt Änderungen vorab; Messstellen sind abwählbar. Bestehende Historie wird ergänzt, aktive Loggerbindungen bleiben erhalten. Importierte offene Intervalle enden am Dateistand und werden nicht aktiviert. Änderungen aktueller Angaben gelten erst ab Übernahme, widersprüchliche Historie blockiert den Import.
 
 ## Integrität
 
-Änderungen brauchen die aktuelle Konfigurationsrevision. Speichern erfolgt nach vollständiger Validierung per atomarem JSON-Ersatz, Datei privat (600). Bei Schreibfehlern wird auch die Arbeitsspeicherkopie nicht geändert. Ungültige bestehende Konfiguration wird nicht automatisch geleert oder repariert. Zeitstempel kommen ausschließlich von der Hostuhr; nicht vorwärts fortgeschrittene Zeit blockiert Zuordnungsänderungen. Die Historie wird nicht zur aktuellen Gerätezeit erklärt.
+Änderungen brauchen die aktuelle Konfigurationsrevision. Speichern erfolgt nach vollständiger Validierung per atomarem JSON-Ersatz, Datei privat (600). Bei einem Fehler vor Dateiersatz bleibt der alte Gesamtstand erhalten. Kann ein Fehler erst nach Dateiersatz auftreten (z. B. Verzeichnis-fsync), wird eine gültige sichtbare Gesamtdatei übernommen, jedoch als unbestätigt gemeldet; weitere Änderungen bleiben bis zum Dienstneustart gesperrt. Ungültige bestehende Konfiguration wird nicht automatisch geleert oder repariert. Zeitstempel kommen ausschließlich von der Hostuhr; nicht vorwärts fortgeschrittene Zeit blockiert Zuordnungsänderungen. Die Historie wird nicht zur aktuellen Gerätezeit erklärt.
 
 Gleichzeitige API-Aufträge werden innerhalb des laufenden Prozesses serialisiert; veraltete Revisionen werden abgewiesen. Bis 200 Messstellen und 10.000 Zuordnungsintervalle; Erreichen der Grenze verwirft keine ältere Historie. Die Oberfläche erhält ungespeicherte Entwürfe bei ersetzt vorliegendem Stand und verlangt vor dem Speichern dessen ausdrückliche Übernahme. Zuordnungswechsel zeigen betroffene aktuelle Belegungen vor dem Klick an.
 

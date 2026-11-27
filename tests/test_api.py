@@ -157,6 +157,27 @@ class ApiTests(unittest.TestCase):
                 self.assertEqual(self.request('/klima/api/sites/assignments?limit=501')[0],400)
                 self.assertEqual(self.request('/klima/api/sites?unknown=1')[0],400)
 
+    def test_settings_bundle_preview_apply_preserves_sites_and_legacy_files(self):
+        from backend.common.configuration import Configuration
+        with tempfile.TemporaryDirectory() as folder:
+            config=Configuration(Path(folder))
+            values={'name':'Testort','room':'','description':'','criteria':{'air_threshold':70,'surface_threshold':80,'hysteresis':2,'minimum_minutes':60,'surface_mode':'none','surface_value':None}}
+            config.sites.save({'revision':0,'id':None,'values':values})
+            with patch.object(self.app,'configuration_store',config),patch.object(self.app,'settings',config.settings),patch.object(self.app,'sites',config.sites),patch.object(self.app.receiver,'start',side_effect=AssertionError('No BLE action')):
+                document=json.loads(self.request('/klima/api/settings/download')[2])
+                self.assertEqual(document['format'],'BT06_SETTINGS');self.assertEqual(len(document['sites']['sites']),1)
+                legacy={**DEFAULTS,'theme':'light'};request={'document':legacy,'include_sites':True,'settings':legacy}
+                self.assertEqual(self.request('/klima/api/settings/preview',request)[0],403)
+                status,_,raw=self.request('/klima/api/settings/preview',request,headers=self.auth());self.assertEqual(status,200)
+                plan=json.loads(raw);self.assertEqual(config.settings.get()['theme'],'dark')
+                status,_,raw=self.request('/klima/api/settings/apply',{'token':plan['token']},headers=self.auth())
+                self.assertEqual(status,200);loaded=json.loads(raw)
+                self.assertEqual(loaded['settings']['theme'],'light');self.assertEqual(len(loaded['sites']['sites']),1)
+                self.assertEqual(self.request('/klima/api/settings/apply',{'token':plan['token']},headers=self.auth())[0],400)
+                bad={**document,'receiver':{'enabled':True}}
+                self.assertEqual(self.request('/klima/api/settings/preview',{'document':bad,'include_sites':True,'settings':DEFAULTS},headers=self.auth())[0],400)
+                self.assertEqual(self.request('/klima/api/settings/preview',{'document':{**document,'exported_at':False},'include_sites':True,'settings':DEFAULTS},headers=self.auth())[0],400)
+
     def test_climate_calculator_is_read_only_validated_and_session_protected(self):
         value={'temperature_c':20,'humidity_pct':50,'surface_temperature_c':10}
         self.assertEqual(self.request('/klima/api/climate/calculate',value)[0],403)

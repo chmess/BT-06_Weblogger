@@ -23,6 +23,7 @@ from backend.common.simulation import generate, list_runs, load_profiles
 from backend.common.storage import FIELDS,chart_data, csv_text, identifier, rows_in_range,parse_time
 from backend.common.export import options as export_options,selected_fields,project_rows
 from backend.common.sites import SiteStore
+from backend.common.configuration import Configuration,MAX_BYTES as SETTINGS_MAX_BYTES
 from backend.linux.ble_jobs import BluetoothJobs, BusyError
 from backend.linux.receiver import Receiver
 from backend.common.live_store import LiveStore, LIVE_FIELDS
@@ -45,7 +46,6 @@ class Application:
         self.base_path = base_path.rstrip("/")
         if self.base_path and (not self.base_path.startswith("/") or any(c not in "/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in self.base_path)):
             raise ValueError("Ungültiger Basispfad.")
-        self.settings = Settings(self.root / "config/settings.json")
         self.simulation = self.root / "simulation"
         self.csrf = secrets.token_urlsafe(32)
         self.started = time.monotonic()
@@ -58,7 +58,8 @@ class Application:
         self.generation_lock = threading.Lock()
         radio_lock = threading.Lock()
         self.bluetooth = BluetoothJobs(radio_lock)
-        self.sites=SiteStore(self.root/"config/sites.json",self.events)
+        self.configuration_store=Configuration(self.root/"config",self.events)
+        self.settings=self.configuration_store.settings;self.sites=self.configuration_store.sites
         self.live_store = LiveStore(self.root / "data",self.sites)
         self.receiver = Receiver(self.root / "config/receiver.json", self.live_store, radio_lock,self.events)
         self.control_lock = threading.RLock()
@@ -97,7 +98,7 @@ class Application:
         live = self.receiver.status()
         sync = self.sync.status()
         syncing = sync["state"] == "running"
-        return {"version": VERSION, "event_log":self.events.status(), "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
+        return {"version": VERSION, "event_log":self.events.status(), "configuration":self.configuration_store.status(), "mode": "advertising" if live["config"]["enabled"] else "offline", "uptime_seconds": round(time.monotonic() - self.started),
                 "ble": {"connected": syncing and sync["phase"] in ("reading_metadata", "reading_settings", "selecting_range", "full_fallback", "receiving", "stopping_logger", "writing_settings", "committing_settings", "verifying_settings", "reading_inventory", "starting_logger", "verifying_recording"),
                         "status": ("Aufzeichnungssteuerung · " if sync.get('mode','').startswith('recording_') else "Gerätekonfiguration · " if sync.get('mode', '').startswith('configuration_') else "Historienlesen · ") + sync["phase"] if syncing else "Advertising-Empfang " + live["state"] + " · keine GATT-Verbindung"},
                 "free_bytes": shutil.disk_usage(self.root).free,
@@ -163,7 +164,7 @@ def handler_for(app):
                 elif path == "/api/settings":
                     self.send(200, app.settings.get())
                 elif path == "/api/settings/download":
-                    self.send(200, app.settings.get(), filename="bt06-settings.json")
+                    self.send(200, app.configuration_store.document(), filename="bt06-settings.json")
                 elif path == "/api/runs":
                     self.send(200, {"runs": list_runs(app.simulation)})
                 elif path == "/api/ble":
@@ -308,8 +309,9 @@ def handler_for(app):
                 if self.headers.get("Transfer-Encoding"):
                     raise ValueError("Transfer-Encoding nicht unterstützt.")
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 16384:
-                    self.send(413, {"error": "JSON muss zwischen 1 und 16.384 Bytes groß sein."})
+                maximum=SETTINGS_MAX_BYTES+8192 if path=="/api/settings/preview" else 16384
+                if not 0 < length <= maximum:
+                    self.send(413, {"error": "JSON-Anfrage außerhalb der erlaubten Größe."})
                     return
                 value = json.loads(self.rfile.read(length))
                 controlled = path in {"/api/ble", "/api/live/start", "/api/live/stop", "/api/sync", "/api/autosync", "/api/device-settings/read", "/api/device-settings/preview", "/api/device-settings/prepare", "/api/device-settings/apply", "/api/device-settings/cancel", "/api/device-settings/verify", "/api/recording/prepare", "/api/recording/start", "/api/recording/cancel", "/api/recording/verify"}
@@ -318,6 +320,10 @@ def handler_for(app):
                         raise BusyError("Historienlesen läuft. Bluetooth-Steuerung nach Abschluss wieder verfügbar.")
                     if path == "/api/settings":
                         self.send(200, app.settings.save(value))
+                    elif path=="/api/settings/preview":
+                        self.send(200,app.configuration_store.preview(value))
+                    elif path=="/api/settings/apply":
+                        self.send(200,app.configuration_store.apply(value))
                     elif path=="/api/sites/save":
                         self.send(200,app.sites.save(value))
                     elif path=="/api/sites/assign":
