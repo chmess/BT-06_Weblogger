@@ -1,0 +1,24 @@
+// Exercise only the scheduler gate; no browser, HTTP, production files or BLE.
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
+const source=await readFile(new URL('../web/js/app.js',import.meta.url),'utf8');
+assert.ok(/\nguard\(main\)\(\);\s*$/.test(source));
+const context=vm.createContext({document:{hidden:false,querySelector:()=>({hidden:true})}});
+vm.runInContext(source.replace(/\nguard\(main\)\(\);\s*$/,'\n'),context);
+vm.runInContext(`var calls=[];var release;state.saved={refresh_seconds:5};state.source='simulation';state.lastBackgroundUpdate=0;
+diagnostics=()=>{calls.push('status');return new Promise(resolve=>{release=resolve;});};
+refreshSync=async()=>calls.push('sync');refreshLive=async()=>calls.push('live');refreshAutoSync=async()=>calls.push('auto');refreshDeviceSettings=async()=>calls.push('device');refreshBluetooth=async()=>calls.push('ble');
+var first=backgroundRefresh();state.lastBackgroundUpdate=0;var second=backgroundRefresh();`,context);
+await context.second;assert.equal(context.calls.length,1);
+context.release();await context.first;
+assert.deepEqual(Array.from(context.calls),['status','sync','live','auto','device','ble']);
+assert.equal(vm.runInContext('state.backgroundUpdating',context),false);
+vm.runInContext(`state.lastBackgroundUpdate=0;diagnostics=async()=>{throw new Error('synthetic failure');};var failed=backgroundRefresh();`,context);
+await assert.rejects(context.failed,/synthetic failure/);
+assert.equal(vm.runInContext('state.backgroundUpdating',context),false);
+vm.runInContext(`state.lastBackgroundUpdate=0;diagnostics=async()=>calls.push('status');var recovered=backgroundRefresh();`,context);await context.recovered;
+const count=context.calls.length;await vm.runInContext('backgroundRefresh()',context);assert.equal(context.calls.length,count);
+vm.runInContext('document.hidden=true;state.lastBackgroundUpdate=0;',context);
+await vm.runInContext('backgroundRefresh()',context);assert.equal(context.calls.length,count);
+console.log('4 scheduler checks passed: no overlap, failure releases gate, cadence preserved, hidden tab skipped.');

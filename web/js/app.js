@@ -777,6 +777,12 @@ async function startBluetooth(command, device, pair=false) {
   const value={command,adapter,seconds:30};if(device){value.device=device;value.pair=pair;}
   await post('ble',value);await refreshBluetooth();
 }
+async function backgroundRefresh(){
+  if(state.backgroundUpdating||document.hidden||Date.now()-state.lastBackgroundUpdate<state.saved.refresh_seconds*1000)return;
+  state.backgroundUpdating=true;state.lastBackgroundUpdate=Date.now();
+  try{await diagnostics();await refreshSync();await refreshLive();await refreshAutoSync();await refreshDeviceSettings();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}
+  finally{state.backgroundUpdating=false;}
+}
 async function main() {
   state.csrf=(await api('session')).csrf_token;state.saved=await api('settings');fillSettings(state.saved);applySettings();
   const hours=String(state.saved.default_hours);if(![...$('#period').options].some(o=>o.value===hours))addOption($('#period'),hours,`${hours} Stunden`);$('#period').value=hours;
@@ -873,6 +879,6 @@ async function main() {
   $('#settings-include-sites').addEventListener('change',invalidateSettingsPreview);
   $('#settings-cancel-import').addEventListener('click',()=>{clearSettingsImport();fillSettings(state.saved);notice('Dateivorschau verworfen.');});
   await diagnostics();await refreshLive();await refreshSync();await refreshAutoSync(true);await refreshDeviceSettings();await refreshBluetooth();await refreshRuns();await refreshSnapshots();updateHistorySites(await api('sites'));setSource(localStorage.getItem('bt06-source')||(state.liveLoggers.length?'live':'simulation'));await renderCards();go(location.hash.slice(1)||'overview');if(location.hash==='#history')await loadHistory();
-  let lastUpdate=Date.now();setInterval(guard(async()=>{if(document.hidden||Date.now()-lastUpdate<state.saved.refresh_seconds*1000)return;lastUpdate=Date.now();await diagnostics();await refreshSync();await refreshLive();await refreshAutoSync();await refreshDeviceSettings();await refreshBluetooth();if(state.source==='live'){await renderCards();if(!$('#page-history').hidden&&state.follow)await loadHistory(true);}}),1000);
+  state.backgroundUpdating=false;state.lastBackgroundUpdate=Date.now();setInterval(guard(backgroundRefresh),1000);
 }
 guard(main)();

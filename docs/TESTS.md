@@ -274,3 +274,17 @@ python3 -m unittest discover -s tests -p test_simulation_diagnostics.py -q
 PYTHONPATH=tests python3 -m unittest test_api.ApiTests.test_simulation_diagnostics_validates_run_scope_lock_and_damage -q
 node tools/browser_smoke.mjs --simulation-diagnostics
 ```
+
+
+## V0.9.0 · gezielte Performanceprüfung
+
+33 bestehende Prüfungen aus `test_core`, `test_climate`, `test_live` und `test_site_selection` bestanden. Kompakte Spalten erhalten Originalextrema, abgeleitete Kurven, fehlende Werte und Daten-/Messstellenunterbrechungen. Zwölf zusätzliche direkte Vergleiche mit der bisherigen Funktion prüfen verschiedene Grafikbudgets, leere/einzelne Reihen, Nullfeuchte, Modellgrenzen, negative Zeitstempel, Lücken und Zuordnungswechsel; normalisierte JSON-Ausgaben identisch. Nach der abschließenden Erhaltung der JSON-Zahlendarstellung an Modellgrenzen alle sechs Klimaprüfungen erneut bestanden.
+
+`tools/check_background_refresh.mjs` führt den vorhandenen JS-Code ohne DOM-Start, HTTP oder Browser in einer isolierten Node-VM aus: keine Überlappung trotz abgelaufenem Intervall, Sperrfreigabe nach Fehler, unveränderte Zeitsteuerung und Pause bei verborgenem Tab. Vier Ablaufprüfungen bestanden. Keine erneute vollständige Browser-/Python-Suite bei unveränderter Oberfläche.
+
+Million-Zeilen-Benchmark vor/nach Änderung: gleiche künstliche CSV-Prüfsumme und identische normalisierte Diagrammantwort. Nur die tatsächlich geänderte Diagrammfunktion erneut gemessen; Ergebnisse, Methode und verbleibende Engpässe in [PERFORMANCE.md](PERFORMANCE.md). Kein Dauerlast-, HTTP-, BLE- oder SMApi-Nachweis.
+
+```sh
+PYTHONPATH=tests python3 -m unittest test_core test_climate test_live test_site_selection -q
+node tools/check_background_refresh.mjs
+```

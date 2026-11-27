@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import csv
+from array import array
+from math import isfinite,isnan
 import io
 import re
 from datetime import datetime
@@ -71,50 +73,63 @@ def read_months(folder, start=None, end=None, fields=FIELDS):
 
 
 def chart_data(rows, interval_minutes, budget=1600):
-    """Derive before decimation; retain extrema of T/RH/dew point/density."""
-    points = [];boundaries=set();segment=None
+    """Compact columns, streaming summaries; preserve the established point selection."""
+    times=array('q');columns=[array('d') for _ in range(4)];missing=float('nan')
+    selected=set();boundaries=set();segment=None;previous_mask=None;gap_ms=None
+    minima=[None]*4;maxima=[None]*4
+    temperature_values,humidity_values,dew_values,density_values=columns
     for row in rows:
-        current=getattr(row,"site_segment",None)
-        if points and current!=segment:boundaries.add(len(points))
+        index=len(times);current=getattr(row,"site_segment",None)
+        if index and current!=segment:boundaries.add(index)
         segment=current
-        points.append([int(parse_time(row["Zeitstempel"]).timestamp() * 1000),
-                       float(row["Temperatur"].replace(",", ".")) if row["Temperatur"] else None,
-                       float(row["Feuchte"].replace(",", ".")) if row["Feuchte"] else None])
-        derived=air_values(points[-1][1],points[-1][2])
-        points[-1].extend((derived["dew_point_c"],derived["absolute_humidity_g_m3"]))
-    if not points:
+        t=int(parse_time(row["Zeitstempel"]).timestamp()*1000)
+        temperature=float(row["Temperatur"].replace(",",".")) if row["Temperatur"] else None
+        humidity=float(row["Feuchte"].replace(",",".")) if row["Feuchte"] else None
+        if temperature is not None and not isfinite(temperature) or humidity is not None and not isfinite(humidity):raise ValueError('Nicht endlicher Messwert; keine Diagrammausgabe.')
+        derived=air_values(temperature,humidity)
+        dew=derived['dew_point_c'];density=derived['absolute_humidity_g_m3']
+        mask=(temperature is None,humidity is None,dew is None,density is None)
+        if gap_ms is None:gap_ms=interval_minutes*60_000*1.5
+        if index and (index in boundaries or t-times[-1]>gap_ms or mask!=previous_mask):selected.update((index-1,index))
+        previous_mask=mask;times.append(t)
+        temperature_values.append(missing if temperature is None else temperature)
+        humidity_values.append(missing if humidity is None else humidity)
+        dew_values.append(missing if dew is None else dew)
+        density_values.append(missing if density is None else density)
+    count=len(times)
+    if not count:
         return {"points": [], "raw_count": 0, "latest": None, "min_temperature": None,
                 "max_temperature": None, "min_humidity": None, "max_humidity": None,
                 "climate":{"model":MODEL,"latest":None,"points":[],"min_dew_point_c":None,"max_dew_point_c":None}}
-    count = len(points)
-    summary = {"raw_count": count, "latest": points[-1][:3],
-               "min_temperature": min((p[1] for p in points if p[1] is not None), default=None),
-               "max_temperature": max((p[1] for p in points if p[1] is not None), default=None),
-               "min_humidity": min((p[2] for p in points if p[2] is not None), default=None),
-               "max_humidity": max((p[2] for p in points if p[2] is not None), default=None)}
-    # Preserve gap boundaries as well as extrema. Never draw a line across a gap.
-    selected = {0, count - 1}
-    gap_ms = interval_minutes * 60_000 * 1.5
-    for i in range(1, count):
-        if i in boundaries or points[i][0] - points[i - 1][0] > gap_ms or [v is None for v in points[i][1:]] != [v is None for v in points[i-1][1:]]:
-            selected.update((i - 1, i))
-    buckets=max(1,budget//8)
-    width = max(1, (count+buckets-1)//buckets)
-    for left in range(0, count, width):
-        indices = range(left, min(left + width, count))
-        for column in (1, 2, 3, 4):
-            valid = [i for i in indices if points[i][column] is not None]
-            if valid:
-                selected.add(min(valid, key=lambda i: points[i][column]))
-                selected.add(max(valid, key=lambda i: points[i][column]))
-    reduced = []
-    previous_index = None
-    for i in sorted(selected):
-        if previous_index is not None and i == previous_index + 1 and (i in boundaries or points[i][0] - points[previous_index][0] > gap_ms):
-            reduced.append([(points[previous_index][0]+points[i][0])/2 if i in boundaries else points[previous_index][0] + interval_minutes * 60_000, None, None, None, None])
-        reduced.append(points[i])
-        previous_index = i
-    dew_points=[point[3] for point in points if point[3] is not None]
-    return {**summary, "points": [point[:3] for point in reduced],
-            "climate":{"model":MODEL,"latest":derived,"points":[[point[0],point[3],point[4]] for point in reduced],
-                       "min_dew_point_c":min(dew_points,default=None),"max_dew_point_c":max(dew_points,default=None)}}
+    def point(index):
+        values=[column[index] for column in columns]
+        values=[None if isnan(value) else value for value in values]
+        # The established inverse model serializes clamped dew-point bounds as integers.
+        if values[2] in MODEL['temperature_range_c']:values[2]=int(values[2])
+        return [times[index],*values]
+    selected.update((0,count-1));buckets=max(1,budget//8);width=max(1,(count+buckets-1)//buckets)
+    for left in range(0,count,width):
+        right=min(left+width,count)
+        for column_index,column in enumerate(columns):
+            low=float('inf');high=-low;low_index=high_index=None
+            for index in range(left,right):
+                value=column[index]
+                if isnan(value):continue
+                if value<low:low=value;low_index=index
+                if value>high:high=value;high_index=index
+            if low_index is not None:
+                selected.update((low_index,high_index))
+                if minima[column_index] is None or low<minima[column_index]:minima[column_index]=low
+                if maxima[column_index] is None or high>maxima[column_index]:maxima[column_index]=high
+    reduced=[];previous_index=None
+    for index in sorted(selected):
+        if previous_index is not None and index==previous_index+1 and (index in boundaries or times[index]-times[previous_index]>gap_ms):
+            reduced.append([(times[previous_index]+times[index])/2 if index in boundaries else times[previous_index]+interval_minutes*60_000,None,None,None,None])
+        reduced.append(point(index));previous_index=index
+    for extrema in (minima,maxima):
+        if extrema[2] in MODEL['temperature_range_c']:extrema[2]=int(extrema[2])
+    summary={"raw_count":count,"latest":point(count-1)[:3],"min_temperature":minima[0],"max_temperature":maxima[0],
+             "min_humidity":minima[1],"max_humidity":maxima[1]}
+    return {**summary,"points":[item[:3] for item in reduced],
+            "climate":{"model":MODEL,"latest":derived,"points":[[item[0],item[3],item[4]] for item in reduced],
+                       "min_dew_point_c":minima[2],"max_dew_point_c":maxima[2]}}

@@ -1,3 +1,3 @@
 """BT-06 Weblogger."""
 
-VERSION = "0.8.7-dev"
+VERSION = "0.9.0-dev"

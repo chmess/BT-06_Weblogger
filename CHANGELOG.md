@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.9.0-dev · 2026-11-27
+
+- Erste Ressourcen-/Performanceabnahme begonnen. Laufender V0.8.7-Dienst über zehn Sekunden ohne zusätzliche HTTP-Last beobachtet: etwa 33,2 MiB RSS, 0,9 % eines CPU-Kerns, drei Threads. Kein Dauerbetriebsnachweis.
+- Diagramm intern auf kompakte Zahlenspalten umgestellt, globale Extrema in der ohnehin nötigen Verdichtung ermitteln. Originalwerte, Min/Max-Auswahl, abgeleitete Extremwerte, Daten-/Zuordnungsgrenzen und bisherige JSON-Darstellung der Modellgrenzen erhalten. Nicht endliche Rohwerte werden ausdrücklich abgewiesen.
+- Eine Million synthetische CSV-Zeilen: Diagrammaufbereitung 41,237 → 36,923 s, Spitzen-RSS 309,6 → 57,2 MiB (81,5 % weniger RAM). Gleicher Eingabebestand und identische normalisierte Ergebnis-Prüfsumme mit 1.396 Grafikpunkten. Einzellauf mit warmem temporärem Dateibestand, keine HTTP-/BLE-/SMApi- oder Dauerlastmessung.
+- Periodische Hauptaktualisierung im Browser serialisiert: keine zweite Runde bei noch laufender Antwort; Fehlerschutz gibt die Sperre wieder frei. Keine zusätzlichen Timer/Dienste.
+- 33 betroffene bestehende Python-Prüfungen, zwölf Vergleiche mit der bisherigen Randfallausgabe und vier isolierte JS-Ablaufprüfungen bestanden; nach letzter Darstellungskorrektur die sechs Klimaprüfungen erneut bestanden. Keine Gesamt- oder Browserstrecke wiederholt. Details und verbleibende Engpässe unter docs/PERFORMANCE.md.
+
 ## 0.8.7-dev · 2026-11-27
 
 - Manuelle Strukturdiagnose abgeschlossener synthetischer Testläufe: Manifest, CSV-Schema, Quellen-/Testkennzeichnung, Messstellen-/Datensatzkennung, UTC-Monatsablage, erwartetes Zeitraster einschließlich Szenario-Lücken und Zeilenanzahlen. Keine Neuerzeugung, Reparatur oder Geräteaktion.
