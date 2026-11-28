@@ -319,3 +319,17 @@ Fehlgeschlagenes Sperrbelegschreiben gibt den Flock sofort frei; private Dateire
 python3 -m unittest discover -s tests -p test_lifecycle.py -q
 bash -n start.sh stop.sh status.sh update.sh
 ```
+
+
+## V0.9.3 · gezielte Abbruchprüfung
+
+Sechs gezielte Prüfungen bestanden: zwei neue rein lesende Statusprüfungen, zwei neue isolierte Prozessabbruch-/Wiederanlauftests und zwei vorhandene Schutzprüfungen für unsichere Geräteänderungen bzw. verfallene Aufzeichnungsstart-Freigaben. Kein erneuter Gesamt-/Browserlauf; bestehende Oberfläche zeigt bereits die vom Backend gelieferte Notice.
+
+SIGKILL ausschließlich für eigene Popen-Kinder mit verifiziertem Arbeitsverzeichnis der temporären Programmkopie. Gespeicherte Einstellungen und sämtliche synthetischen Historienarchivdateien bleiben bytegleich, Instanzsperre wird frei, nach Neustart ist der Hostempfang weiterhin deaktiviert, Auftragskanal idle, Warnliste leer und Originalhistorie exportierbar. Gespeicherte Testjournale `writing` werden sichtbar als unterbrochen bewertet, ohne Vorbereitung, Wiederholung oder Änderung ihrer Originalbytes.
+
+Der zweite Prozess stirbt nach fsync der Pending-Einstellungsdatei und vor rename: veröffentlichte Konfiguration bleibt unverändert, Pending-Datei wird nicht übernommen/gelöscht. Versteckter beschädigter Generator-Zwischenstand erscheint nicht in `/api/runs`. Die Fehlergrenze ist absichtlich gesetzt; kein Stromausfall-/physischer Datenträger- oder echter BLE-Abbruchtest. Echter DeskPi-Dienst nur lesend geprüft und für die Tests nicht beendet.
+
+```sh
+python3 -m unittest discover -s tests -p test_recovery_status.py -q
+PYTHONPATH=tests python3 -m unittest test_lifecycle.LifecycleTests.test_sigkill_restart_keeps_committed_data_and_does_not_retry_device_actions test_lifecycle.LifecycleTests.test_killed_atomic_writer_does_not_publish_pending_settings_or_partial_run test_configuration.ConfigurationTests.test_uncertain_write_is_durable_single_use_and_never_retried_or_restarted test_recording.RecordingTests.test_missing_confirmation_expiry_replaced_capture_restart_and_cancel_are_safe -q
+```

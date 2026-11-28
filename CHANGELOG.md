@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.9.3-dev · 2026-11-28
+
+- Unterbrochene Aufzeichnungsstarts werden wie Einstellungsaufträge in der Statusantwort ausdrücklich als unterbrochen gekennzeichnet, wenn kein Auftrag läuft. Hinweis zum erneuten Lesen statt automatischem Wiederholen; bestehende Journale bleiben unverändert. Kein neuer Gerätebefehl oder Recovery-Automatismus.
+- Unerwarteten Prozessabbruch in temporärer Programmkopie geprüft: SIGKILL gibt die Instanzsperre frei, Neustart erhält bestätigte Einstellungen und Original-Historienbytes, startet keine unterbrochenen Geräteaktionen und baut keinen alten Warnzustand wieder auf.
+- Abbruch einer atomaren Einstellungsdatei nach fsync vor rename geprüft: veröffentlichter Stand bleibt erhalten, nicht veröffentlichte Pending-Datei wird nicht übernommen. Versteckter unvollständiger Generatorstand bleibt außerhalb der angebotenen Testläufe; keine automatische Reparatur/Löschung.
+- Sechs gezielte Prüfungen bestanden (zwei Status-, zwei Prozessabbruch- und zwei vorhandene Geräteablauf-Schutztests). V0.9.2 im echten Dienst bestätigt, für die Tests nicht angehalten. Stromausfall/Datenträgerfehler, echte abgebrochene BLE-Schreibvorgänge und längerer Dauerbetrieb weiterhin nicht abgenommen.
+
 ## 0.9.2-dev · 2026-11-27
 
 - Portable Start-/Status-/Stop-Aufrufe unterstützen dasselbe separate Datenverzeichnis per --root; serve/generate akzeptieren die Option auch hinter dem Unterbefehl. Status-/Stop-Skripte reichen Argumente weiter. Tests verwenden eine temporäre Programmkopie und Pfade mit Leerzeichen.

@@ -40,6 +40,9 @@ class RecordingWorkflow:
             if prepared:prepared['expires_in_seconds']=max(0,int(pending['deadline']-time.monotonic()))
             path=self.root/'changes/latest.json'
             report=json.loads(path.read_text()) if path.exists() else None
+            if report and report.get('status') in ('checking','writing') and not self.jobs.busy():
+                report['interrupted']=True
+                report['notice']='Aufzeichnungsstart unterbrochen. Gerätezustand erneut lesen; keinen Start automatisch wiederholen.'
             diagnostic=self.root/'diagnostics/latest.json'
             return {'prepared':prepared,'last_start':report,'automatic_retry':False,
                     'inventory_diagnostic':json.loads(diagnostic.read_text()) if diagnostic.exists() else None}

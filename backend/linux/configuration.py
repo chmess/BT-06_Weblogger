@@ -111,6 +111,7 @@ class ConfigurationWorkflow:
             path = self.root / 'latest.json'
             report = json.loads(path.read_text()) if path.exists() else None
             if report and report['status'] in ('checking', 'writing') and not self.jobs.busy():
+                report['interrupted']=True
                 report['notice'] = 'Auftrag unterbrochen. Gerätezustand erneut lesen; nicht automatisch wiederholen.'
             return {'prepared': prepared, 'last_change': report, 'automatic_retry': False, 'reset_available': False}
 

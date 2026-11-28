@@ -69,6 +69,53 @@ class LifecycleTests(unittest.TestCase):
         result=self.command('stop.sh','--root',data or self.data);self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(process.wait(timeout=5),0)
 
+    def hard_stop(self,process):
+        self.assertIn(process,self.children)
+        self.assertEqual((Path('/proc')/str(process.pid)/'cwd').resolve(),self.program.resolve())
+        process.kill();self.assertEqual(process.wait(timeout=5),-9)
+
+    def test_sigkill_restart_keeps_committed_data_and_does_not_retry_device_actions(self):
+        from backend.common.configuration import Configuration
+        from backend.common.history_store import HistoryStore
+        from backend.common.history_capture import decode_capture
+        from backend.common.settings import atomic_json
+        from history_fixture import capture
+        config=Configuration(self.data/'config');settings=config.settings.get();settings['theme']='light';config.settings.save(settings)
+        archive=HistoryStore(self.data/'data/history').publish('12345678',**decode_capture(capture()))
+        paths=[self.data/'config/application.json',*list((self.data/'data/history').rglob('*'))]
+        original={path:path.read_bytes() for path in paths if path.is_file()}
+        reports=[]
+        for folder in ('data/device-settings/changes','data/recording/changes'):
+            path=self.data/folder/'latest.json';atomic_json(path,{'id':'synthetic-interrupted','status':'writing','may_have_changed':True,'notice':'Synthetic in-progress notice'})
+            reports.append((path,path.read_bytes()))
+        process,_=self.start();record=json.loads((self.data/'runtime/app.lock').read_text());self.hard_stop(process)
+        self.assertIn('beendet',self.command('status.sh','--root',self.data).stdout)
+        restarted,port=self.start();current=json.loads((self.data/'runtime/app.lock').read_text());self.assertNotEqual(record['pid'],current['pid'])
+        connection=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
+        for route,key in (('device-settings/configuration','last_change'),('recording','last_start')):
+            connection.request('GET','/klima/api/'+route);response=connection.getresponse();self.assertEqual(response.status,200);result=json.loads(response.read())
+            self.assertIsNone(result['prepared']);self.assertFalse(result['automatic_retry']);self.assertTrue(result[key]['interrupted'])
+        connection.request('GET','/klima/api/sync');result=json.loads(connection.getresponse().read());self.assertEqual(result['state'],'idle')
+        connection.request('GET','/klima/api/live');live=json.loads(connection.getresponse().read());self.assertFalse(live['config']['enabled']);self.assertEqual(live['warnings']['entries'],[])
+        connection.request('GET',f"/klima/api/export?source=device&logger={archive['logger']}&snapshot={archive['id']}");response=connection.getresponse();self.assertEqual(response.status,200);self.assertIn(b'Geraetekalender',response.read());connection.close()
+        for path,content in original.items():self.assertEqual(path.read_bytes(),content)
+        for path,content in reports:self.assertEqual(path.read_bytes(),content)
+        self.stop(restarted)
+
+    def test_killed_atomic_writer_does_not_publish_pending_settings_or_partial_run(self):
+        from backend.common.configuration import Configuration
+        config=Configuration(self.data/'config');settings=config.settings.get();settings['theme']='light';config.settings.save(settings)
+        target=self.data/'config/application.json';original=target.read_bytes()
+        stage=self.data/'simulation/.generating-interrupted';stage.mkdir(parents=True);(stage/'manifest.json').write_text('synthetic incomplete data')
+        code="from pathlib import Path;from unittest.mock import patch;import json,sys,time;from backend.common.settings import atomic_json;path=Path(sys.argv[1]);value=json.loads(path.read_text());value['settings']['theme']='dark';value['revision']+=1\ndef paused(*args):\n print('READY',flush=True);time.sleep(30)\nwith patch('backend.common.settings.os.replace',side_effect=paused):atomic_json(path,value)"
+        writer=subprocess.Popen([sys.executable,'-c',code,str(target)],cwd=self.program,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);self.children.append(writer)
+        self.assertTrue(select.select([writer.stdout],[],[],5)[0]);self.assertEqual(writer.stdout.readline().strip(),'READY');self.hard_stop(writer)
+        self.assertEqual(target.read_bytes(),original);pending=list(target.parent.glob('.pending-*'));self.assertEqual(len(pending),1)
+        restarted,port=self.start();connection=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
+        connection.request('GET','/klima/api/settings');self.assertEqual(json.loads(connection.getresponse().read())['theme'],'light')
+        connection.request('GET','/klima/api/runs');self.assertEqual(json.loads(connection.getresponse().read())['runs'],[]);connection.close()
+        self.assertEqual(target.read_bytes(),original);self.assertTrue(pending[0].exists());self.assertEqual((stage/'manifest.json').read_text(),'synthetic incomplete data');self.stop(restarted)
+
     def test_portable_root_restart_preserves_original_and_preferences(self):
         process,port=self.start();self.assertEqual(self.command('status.sh','--root',self.data).returncode,0)
         original=self.data/'data/original.csv';original.parent.mkdir(exist_ok=True);original.write_bytes(b'SYNTHETIC ORIGINAL\n')

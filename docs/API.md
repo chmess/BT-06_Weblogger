@@ -1,4 +1,4 @@
-# HTTP-API · V0.9.1-dev
+# HTTP-API · V0.9.3-dev
 
 Alle Routen relativ zum konfigurierten Basispfad (z. B. `/klima`). JSON, keine CORS-Freigabe. Host muss zu Loopback-Port oder ausdrücklich konfigurierter Proxy-Origin passen. Alle POSTs benötigen `Content-Type: application/json`, passende `Origin` und `X-CSRF-Token` aus der Sitzung. JSON-Limit 16 KiB; nur die Einstellungsimport-Vorschau erlaubt 8 MiB plus 8 KiB Hülle. Fehler: `{ "error": "..." }`.
 
@@ -272,3 +272,10 @@ Nur ein CSV-Auftrag gleichzeitig, einschließlich Transfer. Weitere CSV-Anfragen
 Nach begonnenem Transfer ist keine zweite JSON-/HTTP-Antwort erlaubt: Fehler schließen die Verbindung. Ein unvollständiger Body widerspricht der angekündigten Länge und muss vom Client als unvollständig behandelt werden. CSV-Transfer verwendet 30 Sekunden Socket-Inaktivitätslimit; dies ist keine absolute Gesamtzeitgrenze. Ein langsam weiterlesender Client kann die einzelne Exportfreigabe länger belegen. Sperre und temporäre Datei werden bei regulärem Erfolg und Fehler freigegeben. HTTP-Erfolg bedeutet hier vollständige serverseitige Vorbereitung, keinen Nachweis, dass der Client die Datei dauerhaft gespeichert hat.
 
 Die Quelldaten können eigene Speicher-/Lesekosten besitzen, insbesondere rekonstruierte Historien. Die Änderung begrenzt die CSV-Ausgabepufferung. Dateisystemcache bzw. tmpfs-Speicher gehören nicht zum gemessenen Prozess-RSS; siehe [PERFORMANCE.md](PERFORMANCE.md).
+
+
+## Unterbrochene Geräteaufträge V0.9.3
+
+`/api/device-settings/configuration.last_change` und `/api/recording.last_start` ergänzen bei gespeichertem Status `checking`/`writing` und aktuell nicht belegtem Auftragskanal die abgeleitete Kennzeichnung `interrupted=true` und einen Hinweis zum erneuten Lesen statt automatischem Wiederholen. Status und Rohjournal werden nicht umgeschrieben. Bestätigte Endzustände bzw. momentan laufende Aufträge werden nicht so gekennzeichnet.
+
+`automatic_retry=false` bleibt erhalten; nach Prozessneustart sind keine alten Vorbereitungen/Tokens gültig. Die Kennzeichnung löst weder BLE noch Konfigurations-/Startbefehle aus. Sie bestätigt keinen konkreten Geräte-Aufzeichnungszustand; auch ein möglicherweise schon gesendeter Befehl darf nicht automatisch wiederholt werden. Bestehende ausdrücklich lesende Nachprüfung bleibt separat.

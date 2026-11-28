@@ -59,6 +59,8 @@ P0 = Muss für Linux V1.0. P1 = Wunsch nach stabiler Grundversion. P2 = spätere
 
 - V0.9.1 im Dienst fehlerfrei bestätigt. V0.9.2 vorbereitet: konsistente --root-Betriebsabläufe, privater Prozessfingerabdruck, tatsächliche Flock-/PID-Prüfung und sichere Trennung von portablem Server und Systemd-Hauptprozess. Sechs isolierte Betriebsprüfungen mit geordnetem Wiederanlauf und unveränderten Testoriginalen/Einstellungen bestanden. Update-Vorprüfung erkennt weitere eigene Datenwurzeln. Noch offen: unerwarteter Prozessabbruch/Stromausfall, längerer Echtbetrieb, HTTP-/Datenträgerlast und weitere Performance-/Hardwaregrenzen.
 
+- V0.9.2 im Dienst fehlerfrei bestätigt. V0.9.3 vorbereitet: unerwarteter Prozessabbruch/Wiederanlauf in isolierter Kopie geprüft, bestätigte Einstellungen und Original-Historienbytes erhalten, Pending-Einstellungen/Generatorfragmente nicht als vollständig übernommen. Unterbrochene Aufzeichnungsstarts sichtbar, kein automatisches Wiederholen. Sechs gezielte Prüfungen bestanden. Weiter offen: Stromausfall/Datenträgerfehler, reale unterbrochene BLE-Aufträge, längerer Betrieb und HTTP-/Datenträgerlast.
+
 ## P0 – Muss
 - Portable Linux-Anwendung nach ESPA-Monitor-Konzept; Start/Stop/Status, optional systemd; PC/Server/Pi, lokale responsive Weboberfläche, offline, gemeinsame API und Windows-kompatible Datenformate. Keine Datenbank.
 - BLE-Suche, Auswahl, Identifikation, Live-Temperatur und Feuchte, Batterie/RSSI/Firmware/Status soweit verfügbar, Wiederverbindung, Fehlererkennung, komplette Historie, automatische Synchronisation/Nachladen, Speicherbelegung.

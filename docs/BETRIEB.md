@@ -1,4 +1,4 @@
-# Betrieb und Wiederanlauf · V0.9.2
+# Betrieb und Wiederanlauf · V0.9.3
 
 Linux ist die führende Version. Die folgenden portablen Befehle benötigen keine Systeminstallation oder Administratorrechte. Die aktive Systemd-Installation auf dem DeskPi bleibt getrennt zu verwalten. Windows und eine SMApi-Installation sind weiterhin zurückgestellt.
 
@@ -52,4 +52,17 @@ Während des Updates keine neue Instanz starten; die Vorprüfung ist eine Moment
 
 Sechs isolierte Betriebsprüfungen verwenden ausschließlich eine temporäre Kopie des veröffentlichten Codes/Webverzeichnisses, neue Datenpfade und synthetische Originaldateien. Geordnetes Stoppen/Wiederanlauf erhält Originalbytes und gespeicherte Programmeinstellungen. Zwei Datenwurzeln werden korrekt zugeordnet, doppelte Instanzen blockiert, manipulierte Belege nicht signalisiert und Fehler-/Symlinkfälle erhalten vorhandene Testdaten.
 
-Der echte Dienst wurde nur auf V0.9.1/Fehlerstatus gelesen, nicht für die Tests angehalten; kein Bluetooth-/Gerätebefehl. Unerwarteter Prozessabbruch, Stromausfall, längerer Echtbetrieb und vollständige Wiederanlaufprüfung laufender Hardwareaufträge bleiben eigene Abnahmepunkte.
+Der echte Dienst wurde für V0.9.3 nur auf V0.9.2/Fehlerstatus gelesen, nicht für die Tests angehalten; kein Bluetooth-/Gerätebefehl. Zusätzliche Prozessabbruchprüfungen siehe unten. Stromausfall, längerer Echtbetrieb und vollständige Wiederanlaufprüfung laufender Hardwareaufträge bleiben eigene Abnahmepunkte.
+
+
+## Unerwarteter Prozessabbruch · V0.9.3
+
+Zwei zusätzliche Integrationsprüfungen beenden ausschließlich zuvor selbst gestartete Prozesse in der temporären Programmkopie mit SIGKILL. Vor dem Signal werden Herkunft des Popen-Objekts und tatsächliches Arbeitsverzeichnis der Testkopie geprüft. Das ist kein Befehl für den realen Dienst oder Logger und keine Empfehlung für den regulären Betrieb.
+
+Nach dem abrupten Ende ist die Kernel-Instanzsperre frei. Ein zurückgebliebener PID-Beleg verhindert keinen erneuten Start. Bestätigte Programmeinstellungen und synthetische Original-Historienarchive bleiben bytegleich und lassen sich nach Neustart auslesen/exportieren. In den neuen Prozess werden weder alte Vorbereitungstokens noch laufende Feuchte-Warnphasen übernommen.
+
+Bereits gespeicherte Testjournale mit Status `writing` simulieren unterbrochene Einstellungen/Aufzeichnungsstarts. Bei ruhendem Auftrag zeigt der Status ausdrücklich `interrupted=true` und verlangt eine erneute lesende Zustandsprüfung; `automatic_retry=false`, keine vorbereitete Schreibfreigabe, kein automatischer Aufzeichnungsstart. Die Statusabfrage verändert die Originaljournale nicht. Aktive Aufträge oder bestätigte Endzustände werden nicht fälschlich als unterbrochen beschriftet.
+
+Ein zweiter Test unterbricht den tatsächlichen atomaren JSON-Schreibhelfer nach Schreiben/fsync seiner Pending-Datei, aber vor `os.replace`. Der veröffentlichte alte Gesamtstand bleibt maßgeblich, die nicht veröffentlichte Datei wird beim Neustart nicht übernommen oder ungefragt entfernt. Ein künstlicher versteckter `.generating-*`-Zwischenstand wird nicht als vollständiger Testlauf angeboten.
+
+Grenzen: SIGKILL beendet Prozesse, aber weder Kernel noch Datenträger. Diese Prüfungen ersetzen daher keinen Stromausfall-/Hardware-/Dateisystemnachweis. Gerätejournale sind Testbelege, keine real abgebrochenen BLE-Schreibtransaktionen; mehrdeutige ACK-/Gerätezustände müssen am Gerät separat beurteilt werden. Ein Abbruch nach tatsächlich erfolgtem rename mit unbestätigtem Verzeichnis-fsync wird bereits separat durch die Konfigurations-Fehlertests behandelt; kein automatischer Rollback.
